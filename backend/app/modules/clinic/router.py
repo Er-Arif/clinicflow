@@ -18,7 +18,11 @@ from app.modules.clinic.schemas import (
     DoctorSettingsUpdateRequest,
 )
 from app.modules.clinic.service import ClinicSettingsService
-from app.modules.identity.dependencies import ensure_password_ready, get_auth_context, require_permission
+from app.modules.identity.dependencies import (
+    ensure_password_ready,
+    get_auth_context,
+    require_permission,
+)
 from app.modules.identity.service import AuthContext
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])

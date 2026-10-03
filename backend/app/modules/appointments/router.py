@@ -13,12 +13,16 @@ from app.modules.appointments.schemas import (
     AppointmentCancelRequest,
     AppointmentCreateRequest,
     AppointmentListResponse,
-    AppointmentResponse,
     AppointmentRescheduleRequest,
     AppointmentRescheduleResponse,
+    AppointmentResponse,
 )
 from app.modules.appointments.service import AppointmentService
-from app.modules.identity.dependencies import ensure_password_ready, get_auth_context, require_permission
+from app.modules.identity.dependencies import (
+    ensure_password_ready,
+    get_auth_context,
+    require_permission,
+)
 from app.modules.identity.service import AuthContext
 from app.modules.scheduling.schemas import AvailabilityResponse
 from app.modules.visits.schemas import CheckInResponse

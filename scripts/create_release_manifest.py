@@ -30,7 +30,7 @@ def git_commit() -> str:
 
 
 def _revision_values(path: Path) -> tuple[str | None, set[str]]:
-    tree = ast.parse(path.read_text(), filename=str(path))
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     revision: str | None = None
     parents: set[str] = set()
 
@@ -85,7 +85,7 @@ def main() -> None:
     if not apk.is_file():
         raise SystemExit(f"APK not found: {apk}")
 
-    app_json = json.loads((ROOT / "mobile" / "app.json").read_text())["expo"]
+    app_json = json.loads((ROOT / "mobile" / "app.json").read_text(encoding="utf-8"))["expo"]
     with (ROOT / "backend" / "pyproject.toml").open("rb") as handle:
         backend_version = tomllib.load(handle)["project"]["version"]
 

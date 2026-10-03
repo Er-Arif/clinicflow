@@ -37,8 +37,6 @@ from app.modules.scheduling.models import SessionOccurrence
 from app.modules.visits.models import Visit
 
 
-
-
 def format_receipt_number(year: int, sequence: int) -> str:
     return f"RCT-{year}-{sequence:06d}"
 

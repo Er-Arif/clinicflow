@@ -146,6 +146,6 @@ def test_json_logging_formatter_keeps_request_metadata_structured() -> None:
 def test_system_info_route_is_registered_and_uses_configured_version() -> None:
     from app.main import app
 
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"].keys())
     assert "/api/v1/system/info" in paths
     assert app.version == "0.1.0"

@@ -420,9 +420,10 @@ class ReminderService:
             raise AppError("MESSAGE_TYPE_INVALID_FOR_STATE", "Confirmation is only available for a booked appointment.", 409)
         if message_type == "APPOINTMENT_CANCELLED" and appointment.status != "CANCELLED":
             raise AppError("MESSAGE_TYPE_INVALID_FOR_STATE", "Cancellation message requires a cancelled appointment.", 409)
-        if message_type == "APPOINTMENT_RESCHEDULED":
-            if appointment.status != "BOOKED" or appointment.rescheduled_from_appointment_id is None:
-                raise AppError("MESSAGE_TYPE_INVALID_FOR_STATE", "Reschedule message requires the replacement appointment.", 409)
+        if message_type == "APPOINTMENT_RESCHEDULED" and (
+            appointment.status != "BOOKED" or appointment.rescheduled_from_appointment_id is None
+        ):
+            raise AppError("MESSAGE_TYPE_INVALID_FOR_STATE", "Reschedule message requires the replacement appointment.", 409)
 
     def _locked_reminder(self, reminder_id: UUID) -> Reminder:
         reminder = self.db.scalar(

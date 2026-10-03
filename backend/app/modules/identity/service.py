@@ -13,8 +13,20 @@ from app.core.context import request_id_var
 from app.core.errors import AppError
 from app.core.security import PasswordService, TokenService
 from app.modules.audit.service import AuditService
-from app.modules.identity.models import AuthSession, Permission, Role, RolePermission, User, UserRole
-from app.modules.identity.schemas import ChangePasswordRequest, LoginRequest, TokenPairResponse, UserContextResponse
+from app.modules.identity.models import (
+    AuthSession,
+    Permission,
+    Role,
+    RolePermission,
+    User,
+    UserRole,
+)
+from app.modules.identity.schemas import (
+    ChangePasswordRequest,
+    LoginRequest,
+    TokenPairResponse,
+    UserContextResponse,
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,10 +6,14 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock, get_clock
 from app.core.errors import AppError
 from app.db.session import get_db
-from app.modules.identity.dependencies import ensure_password_ready, get_auth_context, require_permission
+from app.modules.followups.schemas import VisitCompleteRequest, VisitCompletionResponse
+from app.modules.identity.dependencies import (
+    ensure_password_ready,
+    get_auth_context,
+    require_permission,
+)
 from app.modules.identity.service import AuthContext
 from app.modules.visits.schemas import CheckInResponse, VisitResponse, WalkInRequest
-from app.modules.followups.schemas import VisitCompleteRequest, VisitCompletionResponse
 from app.modules.visits.service import VisitService
 
 router = APIRouter(tags=["visits"])

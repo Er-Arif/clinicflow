@@ -1,0 +1,27 @@
+diff --git a/node_modules/react-native-gesture-handler/android/CMakeLists.txt b/node_modules/react-native-gesture-handler/android/CMakeLists.txt
+index ae44354..03d5d4a 100644
+--- a/node_modules/react-native-gesture-handler/android/CMakeLists.txt
++++ b/node_modules/react-native-gesture-handler/android/CMakeLists.txt
+@@ -4,14 +4,18 @@ project(GestureHandlerCodegen)
+ set(CMAKE_VERBOSE_MAKEFILE on)
+ set(CMAKE_CXX_STANDARD 20)
+ 
+-file(GLOB_RECURSE rn_gesture_handler_SRCS CONFIGURE_DEPENDS ../shared/shadowNodes/*.cpp)
+-file(GLOB_RECURSE rn_gesture_handler_codegen_SRCS CONFIGURE_DEPENDS ./build/generated/source/codegen/jni/*.cpp)
++file(GLOB_RECURSE DEEP_CUSTOM_SRCS CONFIGURE_DEPENDS ../shared/shadowNodes/*.cpp ../shared/shadowNodes/*.h)
++file(GLOB_RECURSE DEEP_CODEGEN_SRCS CONFIGURE_DEPENDS ./build/generated/source/codegen/jni/*.cpp ./build/generated/source/codegen/jni/*.h)
++foreach(f ${DEEP_CUSTOM_SRCS} ${DEEP_CODEGEN_SRCS})
++  get_filename_component(fname ${f} NAME)
++  configure_file(${f} ${CMAKE_CURRENT_BINARY_DIR}/${fname} COPYONLY)
++endforeach()
++file(GLOB ALL_FLAT_SRCS CONFIGURE_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/*.cpp)
+ 
+ add_library(
+   react_codegen_rngesturehandler_codegen
+   SHARED
+-  ${rn_gesture_handler_SRCS}
+-  ${rn_gesture_handler_codegen_SRCS}
++  ${ALL_FLAT_SRCS}
+ )
+ 
+ if(ReactAndroid_VERSION_MINOR GREATER_EQUAL 80)

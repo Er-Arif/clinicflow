@@ -12,7 +12,6 @@ from app.core.middleware import (
     SecurityHeadersMiddleware,
 )
 
-
 configure_logging(settings.log_level)
 
 

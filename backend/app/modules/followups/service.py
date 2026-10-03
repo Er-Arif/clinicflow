@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -11,7 +10,6 @@ from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
 from app.modules.appointments.models import Appointment
-from app.modules.appointments.schemas import AppointmentResponse
 from app.modules.appointments.service import AppointmentService
 from app.modules.audit.service import AuditService
 from app.modules.followups.models import FollowUpRecommendation

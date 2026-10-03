@@ -9,9 +9,12 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.modules.appointments.models import Appointment
 from app.modules.identity.service import AuthContext
-from app.modules.scheduling.models import SessionOccurrence
-from app.modules.scheduling.schemas import AvailabilityResponse, AvailabilitySession, AvailabilitySlot
-from app.modules.scheduling.service import SchedulingService, generate_slots
+from app.modules.scheduling.schemas import (
+    AvailabilityResponse,
+    AvailabilitySession,
+    AvailabilitySlot,
+)
+from app.modules.scheduling.service import SchedulingService
 
 
 class AppointmentAvailabilityService:

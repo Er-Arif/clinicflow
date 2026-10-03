@@ -1,0 +1,14 @@
+{
+  "brand": {
+    "name": "ClinicFlow",
+    "tagline": "Appointments \u00b7 Payments \u00b7 Follow-ups",
+    "primaryNavy": "#0A2D62",
+    "primaryBlue": "#1F6BFF",
+    "accentCyan": "#22B8F0",
+    "accentTeal": "#13C1B2",
+    "background": "#FFFFFF",
+    "surfaceSoft": "#F5FAFF",
+    "textPrimary": "#0A2D62",
+    "textSecondary": "#5F6D7E"
+  }
+}

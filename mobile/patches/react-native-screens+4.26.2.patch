@@ -1,0 +1,18 @@
+diff --git a/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt b/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
+index b2dfc56..24381e6 100644
+--- a/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
++++ b/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
+@@ -21,7 +21,12 @@ add_compile_options(
+ )
+ 
+ file(GLOB LIB_CUSTOM_SRCS CONFIGURE_DEPENDS *.cpp ${LIB_COMMON_COMPONENTS_DIR}/*.cpp ${LIB_COMMON_COMPONENTS_DIR}/utils/*.cpp)
+-file(GLOB LIB_CODEGEN_SRCS CONFIGURE_DEPENDS ${LIB_ANDROID_GENERATED_COMPONENTS_DIR}/*.cpp)
++file(GLOB DEEP_CODEGEN_SRCS CONFIGURE_DEPENDS ${LIB_ANDROID_GENERATED_COMPONENTS_DIR}/*.cpp ${LIB_ANDROID_GENERATED_COMPONENTS_DIR}/*.h)
++foreach(f ${DEEP_CODEGEN_SRCS})
++  get_filename_component(fname ${f} NAME)
++  configure_file(${f} ${CMAKE_CURRENT_BINARY_DIR}/${fname} COPYONLY)
++endforeach()
++file(GLOB LIB_CODEGEN_SRCS CONFIGURE_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/*.cpp)
+ 
+ add_library(
+   ${LIB_TARGET_NAME}

@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock, get_clock
 from app.db.session import get_db
 from app.modules.identity.dependencies import get_auth_context
-from app.modules.identity.schemas import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenPairResponse, UserContextResponse
+from app.modules.identity.schemas import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RefreshRequest,
+    TokenPairResponse,
+    UserContextResponse,
+)
 from app.modules.identity.service import AuthContext, AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])

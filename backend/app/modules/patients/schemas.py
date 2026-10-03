@@ -19,7 +19,7 @@ class PatientCreateRequest(BaseModel):
     allow_shared_mobile: bool = False
 
     @model_validator(mode="after")
-    def validate_age_and_whatsapp(self) -> "PatientCreateRequest":
+    def validate_age_and_whatsapp(self) -> PatientCreateRequest:
         if (self.date_of_birth is None) == (self.approximate_age_years is None):
             raise ValueError("Provide either date of birth or approximate age, not both.")
         if not self.whatsapp_same_as_mobile and not self.whatsapp_number:
@@ -45,7 +45,7 @@ class PatientUpdateRequest(BaseModel):
     allow_shared_mobile: bool = False
 
     @model_validator(mode="after")
-    def validate_enums(self) -> "PatientUpdateRequest":
+    def validate_enums(self) -> PatientUpdateRequest:
         if self.gender is not None and self.gender not in {
             "MALE",
             "FEMALE",

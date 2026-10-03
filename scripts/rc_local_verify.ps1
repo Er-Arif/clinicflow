@@ -5,7 +5,9 @@ $BackendLock = Join-Path $RootDir "backend\uv.lock"
 $MobileLock = Join-Path $RootDir "mobile\package-lock.json"
 $Compose = Join-Path $RootDir "infra\docker-compose.yml"
 $TestDb = "clinicflow_rc_test"
-$DatabaseUrl = "postgresql+psycopg://clinicflow:clinicflow@localhost:5432/$TestDb"
+$HostPort = if ($env:CLINICFLOW_POSTGRES_PORT) { $env:CLINICFLOW_POSTGRES_PORT } else { "5435" }
+$env:CLINICFLOW_POSTGRES_PORT = $HostPort
+$DatabaseUrl = "postgresql+psycopg://clinicflow:clinicflow@localhost:$HostPort/$TestDb"
 
 if (-not (Test-Path $BackendLock)) {
     throw "backend/uv.lock is missing. Run 'cd backend; uv lock' online, review it, and commit it before RC."
@@ -30,7 +32,7 @@ function Remove-RcDatabase {
 }
 
 try {
-    & docker compose -f $Compose up -d postgres
+    & docker compose -f $Compose up -d --wait postgres
     if ($LASTEXITCODE -ne 0) { throw "Failed to start PostgreSQL." }
 
     Remove-RcDatabase

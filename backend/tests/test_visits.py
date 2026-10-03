@@ -2,7 +2,6 @@ from datetime import date
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import UniqueConstraint
 
 from app.core.errors import AppError
 from app.modules.payments.models import Payment

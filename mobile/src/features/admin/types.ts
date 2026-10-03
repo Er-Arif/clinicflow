@@ -9,7 +9,7 @@ export type AdminUser = {
   login_identifier: string;
   active: boolean;
   must_change_password: boolean;
-  roles: Array<'ASSISTANT' | 'DOCTOR' | 'OWNER_ADMIN'>;
+  roles: ('ASSISTANT' | 'DOCTOR' | 'OWNER_ADMIN')[];
   linked_doctor_id: string | null;
   last_login_at: string | null;
   version: number;

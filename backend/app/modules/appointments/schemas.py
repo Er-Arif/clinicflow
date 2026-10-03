@@ -48,7 +48,7 @@ class AppointmentCancelRequest(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
-    def validate_reason(self) -> "AppointmentCancelRequest":
+    def validate_reason(self) -> AppointmentCancelRequest:
         allowed = {"PATIENT_CANCELLED", "NO_SHOW", "DOCTOR_UNAVAILABLE", "OTHER"}
         self.reason = self.reason.upper()
         if self.reason not in allowed:

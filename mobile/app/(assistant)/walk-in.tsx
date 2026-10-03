@@ -155,7 +155,7 @@ export default function WalkInScreen() {
         ))}
       </View>
 
-      <Text style={styles.label}>Today's Session</Text>
+      <Text style={styles.label}>Today&apos;s Session</Text>
       <Text style={styles.subtitle}>{clinicDate || 'Loading clinic date…'}{clinicClock ? ` · ${clinicClock}` : ''}</Text>
       {availability.isFetching ? <ActivityIndicator /> : null}
       {availability.data?.sessions.map((session) => {

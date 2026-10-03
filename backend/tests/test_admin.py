@@ -62,7 +62,7 @@ def test_password_policy_requires_ten_characters() -> None:
 
 
 def test_m10_admin_routes_are_registered() -> None:
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"].keys())
     expected = {
         "/api/v1/auth/change-password",
         "/api/v1/clinic/settings",

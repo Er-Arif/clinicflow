@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from threading import Barrier
 from uuid import UUID, uuid4
@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.core.context import request_id_var
 from app.core.errors import AppError
@@ -46,7 +46,7 @@ TARGET_DATE = date(2026, 10, 5)  # Monday
 
 @dataclass(frozen=True, slots=True)
 class FrozenClock:
-    instant: datetime = datetime(2026, 10, 5, 4, 0, tzinfo=timezone.utc)
+    instant: datetime = datetime(2026, 10, 5, 4, 0, tzinfo=UTC)
 
     def now_utc(self) -> datetime:
         return self.instant
@@ -431,11 +431,10 @@ def test_audit_rows_are_database_immutable() -> None:
         )
         assert audit_id is not None
 
-    with pytest.raises(DBAPIError):
-        with session_factory.begin() as db:
-            db.execute(
-                update(AuditEvent)
-                .where(AuditEvent.audit_id == audit_id)
-                .values(action_type="TAMPERED")
-            )
+    with pytest.raises(DBAPIError), session_factory.begin() as db:
+        db.execute(
+            update(AuditEvent)
+            .where(AuditEvent.audit_id == audit_id)
+            .values(action_type="TAMPERED")
+        )
     engine.dispose()

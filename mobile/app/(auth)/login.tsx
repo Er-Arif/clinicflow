@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -54,8 +55,12 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.card}>
-        <Text style={styles.brand}>ClinicFlow</Text>
-        <Text style={styles.tagline}>Appointments · Payments · Follow-ups</Text>
+        <Image
+          source={require('../../assets/clinicflow-lockup.png')}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="ClinicFlow — Appointments · Payments · Follow-ups"
+        />
         <View style={styles.form}>
           <TextInput
             autoCapitalize="none"
@@ -94,6 +99,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#F7FAFC' },
   card: { gap: 12 },
+  logo: { width: '100%', height: 80, alignSelf: 'center', marginBottom: 8 },
   brand: { fontSize: 32, fontWeight: '700', color: '#1264A3' },
   tagline: { fontSize: 16, color: '#475569' },
   form: { marginTop: 24, gap: 14 },

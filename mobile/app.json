@@ -3,16 +3,25 @@
     "name": "ClinicFlow",
     "slug": "clinicflow",
     "scheme": "clinicflow",
-    "version": "0.1.0",
+    "version": "1.0.0-rc.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "plugins": [
       "expo-router",
       "expo-secure-store"
     ],
     "android": {
       "package": "com.clinicflow.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

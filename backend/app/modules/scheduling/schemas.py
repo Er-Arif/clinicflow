@@ -17,7 +17,7 @@ class SessionWrite(BaseModel):
     display_order: int = Field(default=0, ge=0, le=100)
 
     @model_validator(mode="after")
-    def validate_session(self) -> "SessionWrite":
+    def validate_session(self) -> SessionWrite:
         if self.end_time <= self.start_time:
             raise ValueError("Session end time must be later than start time.")
         if self.maximum_capacity > generated_slot_count(
@@ -32,7 +32,7 @@ class ScheduleReplaceRequest(BaseModel):
     sessions: list[SessionWrite] = Field(default_factory=list, max_length=12)
 
     @model_validator(mode="after")
-    def validate_orders(self) -> "ScheduleReplaceRequest":
+    def validate_orders(self) -> ScheduleReplaceRequest:
         orders = [session.display_order for session in self.sessions]
         if len(orders) != len(set(orders)):
             raise ValueError("Session display order must be unique within a weekday.")

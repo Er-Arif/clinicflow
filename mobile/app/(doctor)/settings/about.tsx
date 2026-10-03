@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { useGetSystemInfoQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
@@ -15,7 +15,15 @@ export default function AboutScreen() {
 
   return (
     <AppScreen>
-      <Text style={styles.title}>About ClinicFlow</Text>
+      <View style={styles.brandHeader}>
+        <Image
+          source={require('../../../assets/clinicflow-lockup.png')}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="ClinicFlow"
+        />
+        <Text style={styles.tagline}>Appointments · Payments · Follow-ups</Text>
+      </View>
       <View style={styles.card}>
         <Row label="Mobile version" value={appVersion} />
         <Row label="Android build" value={buildNumber} />
@@ -47,6 +55,9 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '900', color: colors.text },
+  brandHeader: { alignItems: 'center', marginBottom: spacing.md, gap: 4 },
+  logo: { width: '80%', height: 64, alignSelf: 'center' },
+  tagline: { fontSize: 14, color: colors.muted, textAlign: 'center' },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,

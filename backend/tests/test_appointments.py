@@ -5,9 +5,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.appointments.schemas import (
+    AppointmentAdjustFeeRequest,
     AppointmentCancelRequest,
     AppointmentCreateRequest,
-    AppointmentAdjustFeeRequest,
     CapacityOverrideInput,
 )
 from app.modules.idempotency.service import IdempotencyService

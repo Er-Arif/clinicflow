@@ -9,7 +9,6 @@ from app.modules.appointments.schemas import (
     FeeAdjustmentInput,
 )
 from app.modules.payments.schemas import PaymentSummary
-from app.modules.followups.schemas import VisitCompleteRequest, VisitCompletionResponse
 
 
 class VisitResponse(BaseModel):

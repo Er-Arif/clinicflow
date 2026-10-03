@@ -22,7 +22,7 @@ export default function DoctorToday() {
       <Text style={styles.subtitle}>{today.data ? formatClinicDate(today.data.date) : 'Loading clinic day…'}</Text>
 
       {today.isLoading ? <ActivityIndicator /> : null}
-      {today.isError ? <Text style={styles.error}>Unable to load today's patients.</Text> : null}
+      {today.isError ? <Text style={styles.error}>Unable to load today&apos;s patients.</Text> : null}
 
       {today.data ? (
         <>

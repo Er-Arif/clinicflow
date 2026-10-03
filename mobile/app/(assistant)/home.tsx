@@ -21,7 +21,7 @@ export default function AssistantHome() {
       <Text style={styles.subtitle}>{data ? formatClinicDate(data.clinic_date) : 'Loading clinic day…'}</Text>
 
       {home.isLoading ? <ActivityIndicator /> : null}
-      {home.isError ? <Text style={styles.error}>Unable to load today's clinic activity.</Text> : null}
+      {home.isError ? <Text style={styles.error}>Unable to load today&apos;s clinic activity.</Text> : null}
 
       {data ? (
         <>

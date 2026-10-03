@@ -1,6 +1,6 @@
 [project]
 name = "clinicflow-backend"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 description = "ClinicFlow V1 FastAPI backend"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -28,6 +28,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

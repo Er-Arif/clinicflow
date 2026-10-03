@@ -19,12 +19,11 @@ from app.modules.appointments.schemas import (
     AppointmentDoctorSummary,
     AppointmentListResponse,
     AppointmentPatientSummary,
-    AppointmentResponse,
     AppointmentRescheduleRequest,
     AppointmentRescheduleResponse,
+    AppointmentResponse,
     AppointmentSessionSummary,
     CapacityOverrideInput,
-    FeeAdjustmentInput,
 )
 from app.modules.audit.service import AuditService
 from app.modules.clinic.models import Doctor
@@ -36,8 +35,8 @@ from app.modules.messaging.service import ReminderService
 from app.modules.patients.models import Patient
 from app.modules.payments.models import Payment
 from app.modules.scheduling.models import FeeConfiguration, SessionOccurrence
-from app.modules.visits.models import Visit
 from app.modules.scheduling.service import SchedulingService, generate_slots
+from app.modules.visits.models import Visit
 
 
 def _request_id() -> UUID:

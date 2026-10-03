@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -49,17 +49,17 @@ def test_report_range_is_bounded() -> None:
 
 def test_clinic_day_bounds_are_converted_to_utc() -> None:
     start, end = _service()._utc_bounds(date(2026, 10, 3), date(2026, 10, 3))
-    assert start == datetime(2026, 10, 2, 18, 30, tzinfo=timezone.utc)
-    assert end == datetime(2026, 10, 3, 18, 30, tzinfo=timezone.utc)
+    assert start == datetime(2026, 10, 2, 18, 30, tzinfo=UTC)
+    assert end == datetime(2026, 10, 3, 18, 30, tzinfo=UTC)
 
 
 def test_patient_age_uses_clinic_date_for_exact_dob() -> None:
     class FrozenClock:
         def now_utc(self):
-            return datetime(2026, 10, 3, tzinfo=timezone.utc)
+            return datetime(2026, 10, 3, tzinfo=UTC)
 
         def clinic_now(self):
-            return datetime(2026, 10, 3, 12, tzinfo=timezone.utc)
+            return datetime(2026, 10, 3, 12, tzinfo=UTC)
 
         def clinic_date(self):
             return date(2026, 10, 3)
@@ -85,7 +85,7 @@ def test_patient_age_uses_clinic_date_for_exact_dob() -> None:
 
 
 def test_m9_reporting_routes_are_registered() -> None:
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"].keys())
     expected = {
         "/api/v1/home/assistant",
         "/api/v1/doctor/today",

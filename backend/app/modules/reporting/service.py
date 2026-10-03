@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -38,7 +38,6 @@ from app.modules.reporting.schemas import (
 )
 from app.modules.scheduling.models import SessionOccurrence
 from app.modules.visits.models import Visit
-
 
 _ZERO = Decimal("0.00")
 
@@ -632,7 +631,7 @@ class ReportingService:
         zone = ZoneInfo(settings.clinic_timezone)
         start_local = datetime.combine(date_from, time.min, tzinfo=zone)
         end_local = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=zone)
-        return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+        return start_local.astimezone(UTC), end_local.astimezone(UTC)
 
     @staticmethod
     def _validate_range(date_from: date, date_to: date) -> tuple[date, date]:

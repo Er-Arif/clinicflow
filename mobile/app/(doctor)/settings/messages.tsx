@@ -14,10 +14,11 @@ export default function MessageTemplatesScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!query.data) return;
+    const templates = query.data;
+    if (!templates) return;
     setDrafts((current) => {
       const next = { ...current };
-      for (const item of query.data) if (!(item.template_id in next)) next[item.template_id] = item.template_body;
+      for (const item of templates) if (!(item.template_id in next)) next[item.template_id] = item.template_body;
       return next;
     });
   }, [query.data]);

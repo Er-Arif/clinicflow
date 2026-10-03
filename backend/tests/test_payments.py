@@ -4,12 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.payments.models import Receipt, UpiConfiguration
-from app.modules.payments.service import build_upi_uri, format_receipt_number
 from app.modules.payments.schemas import (
     PaymentConfirmRequest,
     PaymentVoidRequest,
     UpiConfigurationUpdateRequest,
 )
+from app.modules.payments.service import build_upi_uri, format_receipt_number
 
 
 def test_payment_method_normalizes() -> None:

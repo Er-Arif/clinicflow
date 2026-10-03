@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
@@ -21,7 +21,7 @@ class SystemClock:
     clinic_timezone: str
 
     def now_utc(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     def clinic_now(self) -> datetime:
         return self.now_utc().astimezone(ZoneInfo(self.clinic_timezone))

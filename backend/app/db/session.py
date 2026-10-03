@@ -24,12 +24,12 @@ def get_session_factory() -> sessionmaker[Session]:
     )
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     with get_session_factory()() as session:
         yield session
 
 
-def get_auth_db() -> Generator[Session, None, None]:
+def get_auth_db() -> Generator[Session]:
     # Authentication/permission reads intentionally use a separate short-lived
     # session so protected command endpoints can own their business transaction.
     with get_session_factory()() as session:

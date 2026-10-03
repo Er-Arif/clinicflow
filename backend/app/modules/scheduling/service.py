@@ -147,7 +147,7 @@ class SchedulingService:
         )
         self.db.add(definition)
         self.db.flush()
-        for index, session in enumerate(request.sessions):
+        for session in request.sessions:
             self.db.add(
                 SessionDefinition(
                     clinic_id=self.context.clinic_id,

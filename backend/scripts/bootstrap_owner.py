@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import os
+from datetime import date
+from decimal import Decimal
 from getpass import getpass
 
 from sqlalchemy import select
@@ -11,6 +14,7 @@ from app.modules.clinic.models import Clinic, Doctor
 from app.modules.identity.models import Role, User, UserRole
 from app.modules.messaging.defaults import DEFAULT_MESSAGE_TEMPLATES
 from app.modules.messaging.models import MessageTemplate
+from app.modules.scheduling.models import FeeConfiguration
 
 
 def main() -> None:
@@ -18,8 +22,9 @@ def main() -> None:
     parser.add_argument("--clinic-name", required=True)
     parser.add_argument("--owner-name", required=True)
     parser.add_argument("--login", required=True)
+    parser.add_argument("--password", help="Owner password (or will prompt if omitted)")
     args = parser.parse_args()
-    password = getpass("Owner password: ")
+    password = args.password or os.getenv("CLINICFLOW_OWNER_PASSWORD") or getpass("Owner password: ")
     if len(password) < 10:
         raise SystemExit("Password must contain at least 10 characters.")
 
@@ -54,6 +59,16 @@ def main() -> None:
                     user_id=user.user_id,
                     display_name=args.owner_name,
                     active=True,
+                )
+            )
+            db.add(
+                FeeConfiguration(
+                    clinic_id=clinic.clinic_id,
+                    effective_from=date.today(),
+                    regular_fee=Decimal("500.00"),
+                    followup_fee=Decimal("300.00"),
+                    assistant_adjustment_allowed=True,
+                    created_by=user.user_id,
                 )
             )
             for template_type, language, body in DEFAULT_MESSAGE_TEMPLATES:

@@ -70,7 +70,7 @@ export default function EditUserScreen() {
 
       <View style={styles.divider} />
       <Text style={styles.heading}>Reset Password</Text>
-      <Text style={styles.subtitle}>Sets a temporary password and immediately revokes the user's active sessions.</Text>
+      <Text style={styles.subtitle}>Sets a temporary password and immediately revokes the user&apos;s active sessions.</Text>
       <TextInput style={styles.input} secureTextEntry placeholder="New temporary password" value={temporaryPassword} onChangeText={setTemporaryPassword} />
       <TextInput style={styles.input} placeholder="Reason" value={resetReason} onChangeText={setResetReason} />
       <AppButton label="Reset Password" tone="danger" loading={resetState.isLoading} disabled={editingSelf || temporaryPassword.length < 10 || !resetReason.trim()} onPress={reset} />

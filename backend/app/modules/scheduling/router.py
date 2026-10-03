@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import Clock, get_clock
 from app.db.session import get_db
-from app.modules.identity.dependencies import ensure_password_ready, get_auth_context, require_permission
+from app.modules.identity.dependencies import (
+    ensure_password_ready,
+    get_auth_context,
+    require_permission,
+)
 from app.modules.identity.service import AuthContext
 from app.modules.scheduling.schemas import (
     BlockSessionRequest,

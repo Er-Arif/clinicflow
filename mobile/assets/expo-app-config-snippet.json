@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "ClinicFlow",
+    "slug": "clinicflow",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "android": {
+      "package": "com.clinicflow.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": { "favicon": "./assets/favicon.png" }
+  }
+}

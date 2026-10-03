@@ -57,7 +57,7 @@ export type PatientOperationalSummary = {
     overdue: boolean;
     status: string;
   };
-  visit_history: Array<{
+  visit_history: {
     visit_id: string;
     appointment_id: string;
     date: string;
@@ -65,7 +65,7 @@ export type PatientOperationalSummary = {
     completed_at: string;
     payment_status: string | null;
     followup_status: string | null;
-  }>;
+  }[];
 };
 
 export type OwnerDashboard = {
