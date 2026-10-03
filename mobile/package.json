@@ -1,0 +1,37 @@
+{
+  "name": "clinicflow-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.9.0",
+    "expo": "~57.0.0",
+    "expo-constants": "~57.0.20",
+    "expo-linking": "~57.0.11",
+    "expo-router": "~57.0.21",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "^5.10.1",
+    "react-native-screens": "^4.28.0",
+    "react-redux": "^9.2.0",
+    "react-hook-form": "^7.89.0",
+    "zod": "^4.6.5",
+    "react-native-qrcode-svg": "^6.3.26",
+    "react-native-svg": "15.15.4",
+    "expo-clipboard": "~57.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "eslint": "^9.0.0",
+    "typescript": "~5.9.0",
+    "eslint-config-expo": "~57.0.2"
+  }
+}

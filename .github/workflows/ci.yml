@@ -1,0 +1,55 @@
+name: clinicflow-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: clinicflow_test
+          POSTGRES_USER: clinicflow
+          POSTGRES_PASSWORD: clinicflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinicflow -d clinicflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      CLINICFLOW_DATABASE_URL: postgresql+psycopg://clinicflow:clinicflow@localhost:5432/clinicflow_test
+      CLINICFLOW_CLINIC_TIMEZONE: Asia/Kolkata
+      CLINICFLOW_ACCESS_TOKEN_SECRET: ci-only-secret-that-is-long-enough-1234567890
+      CLINICFLOW_RUN_INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - run: uv sync --dev
+      - run: uv run ruff check .
+      - run: uv run alembic upgrade head
+      - run: uv run pytest
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run lint
+      - run: npm run typecheck
