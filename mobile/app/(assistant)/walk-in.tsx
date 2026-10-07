@@ -35,7 +35,6 @@ export default function WalkInScreen() {
   const search = useSearchPatientsQuery({ q: query.trim() }, { skip: query.trim().length < 2 || Boolean(initialPatientId) });
   const [patient, setPatient] = useState<Patient | null>(null);
   const [doctorId, setDoctorId] = useState('');
-  const [sessionDefinitionId, setSessionDefinitionId] = useState('');
   const [appointmentType, setAppointmentType] = useState<'REGULAR' | 'FOLLOW_UP'>('REGULAR');
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
@@ -55,7 +54,6 @@ export default function WalkInScreen() {
     { doctorId, date: clinicDate },
     { skip: !doctorId || !clinicDate },
   );
-  const selectedSession = availability.data?.sessions.find((item) => item.session_definition_id === sessionDefinitionId);
   const isOwner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
   const assistantCanAdjust = Boolean(fee.data?.assistant_adjustment_allowed);
   const canAdjust = isOwner || assistantCanAdjust;
@@ -73,14 +71,6 @@ export default function WalkInScreen() {
   }
 
   useEffect(() => {
-    if (activeSession && activeSession.session_definition_id !== sessionDefinitionId) {
-      setSessionDefinitionId(activeSession.session_definition_id);
-    } else if (!activeSession && sessionDefinitionId) {
-      setSessionDefinitionId('');
-    }
-  }, [activeSession, sessionDefinitionId]);
-
-  useEffect(() => {
     setOverrideEnabled(false);
     setOverrideReason('');
   }, [doctorId, clinicDate]);
@@ -89,14 +79,14 @@ export default function WalkInScreen() {
   }, [suggestedFee, appointmentType]);
 
   async function submit() {
-    if (!patient || !doctorId || !sessionDefinitionId) return;
+    if (!patient || !doctorId || !activeSession) return;
     try {
       const result = await addWalkIn({
         idempotencyKey,
         body: {
           patient_id: patient.patient_id,
           doctor_id: doctorId,
-          session_definition_id: sessionDefinitionId,
+          session_definition_id: activeSession.session_definition_id,
           appointment_type: appointmentType,
           ...(adjustFee ? { fee_adjustment: { amount: adjustedAmount, reason: adjustReason.trim() } } : {}),
           ...(overrideEnabled ? { capacity_override: { enabled: true as const, reason: overrideReason.trim() } } : {}),
@@ -108,8 +98,8 @@ export default function WalkInScreen() {
     }
   }
 
-  const sessionFull = selectedSession ? selectedSession.remaining_capacity <= 0 : false;
-  const blocked = selectedSession?.status === 'BLOCKED';
+  const sessionFull = activeSession ? activeSession.remaining_capacity <= 0 : false;
+  const blocked = activeSession?.status === 'BLOCKED';
   const overrideRequired = sessionFull;
   const canSubmitOverride = !overrideRequired || (isOwner && overrideEnabled && overrideReason.trim().length >= 2);
   const adjustmentValid = !adjustFee || (/^\d+(\.\d{1,2})?$/.test(adjustedAmount) && adjustReason.trim().length >= 2);
@@ -190,7 +180,7 @@ export default function WalkInScreen() {
         </View>
       ) : null}
 
-      {selectedSession && sessionFull && isOwner && !blocked ? (
+      {activeSession && sessionFull && isOwner && !blocked ? (
         <View style={styles.card}>
           <Pressable onPress={() => setOverrideEnabled((value) => !value)}>
             <Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Add Extra Walk-in</Text>
@@ -199,7 +189,7 @@ export default function WalkInScreen() {
           {overrideEnabled ? <TextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Override reason" style={styles.input} /> : null}
         </View>
       ) : null}
-      {selectedSession && sessionFull && !isOwner ? <Text style={styles.warning}>This session is full. Ask the Owner/Doctor before adding another patient.</Text> : null}
+      {activeSession && sessionFull && !isOwner ? <Text style={styles.warning}>This session is full. Ask the Owner/Doctor before adding another patient.</Text> : null}
 
       <View style={styles.feeCard}>
         <View>
