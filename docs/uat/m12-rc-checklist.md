@@ -24,3 +24,12 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | APK manifest/checksum archived | PASS | scripts/create_release_manifest.py verified with SHA-256 and Alembic head 0010 |
 | No critical/high defects | PASS | All 73 tests green, 0 lint/TS errors, 0 runtime bundling errors |
 | Owner UAT approval | PENDING | Awaiting physical sign-off |
+
+## Physical UAT Defect Tracking (RC2)
+
+| Defect ID | Description | Root Cause | Fix Commit | Status | RC2 Artifact SHA | Physical Retest Required |
+|---|---|---|---|---|---|---|
+| CF-UAT-001 | Scheduled Appointment session/slot selection missing / booking blocked | Frontend failed to render session selector and time slots upon date selection. | 3367b79 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | 8DBEDEEBE8B9CC941DA70980F9DDE5143191E694CDB9FF3C48142479A49E61C4 | Yes |
+| CF-UAT-002 | Walk-in current-session state unclear and Add & Check In blocked | Fallback/unclear UX for session tracking, active session derived with clock drift leading to blocked submit. | ac6ac77 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | 8DBEDEEBE8B9CC941DA70980F9DDE5143191E694CDB9FF3C48142479A49E61C4 | Yes |
+| CF-UAT-003 | Assistant navigation shell / More / Logout missing | No persistent tabs layout for assistant role; missing More screen and Logout behavior. | 1a1152d | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | 8DBEDEEBE8B9CC941DA70980F9DDE5143191E694CDB9FF3C48142479A49E61C4 | Yes |
+
