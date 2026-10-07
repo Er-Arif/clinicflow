@@ -65,8 +65,22 @@ export default function WalkInScreen() {
   }, [appointmentType, fee.data]);
   const clinicClock = clinicTime.data?.clinic_now?.slice(11, 16) ?? '';
 
+  let activeSession = null;
+  if (availability.data?.sessions && clinicClock) {
+    activeSession = availability.data.sessions.find(session => 
+      session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5)
+    ) ?? null;
+  }
+
   useEffect(() => {
-    setSessionDefinitionId('');
+    if (activeSession && activeSession.session_definition_id !== sessionDefinitionId) {
+      setSessionDefinitionId(activeSession.session_definition_id);
+    } else if (!activeSession && sessionDefinitionId) {
+      setSessionDefinitionId('');
+    }
+  }, [activeSession, sessionDefinitionId]);
+
+  useEffect(() => {
     setOverrideEnabled(false);
     setOverrideReason('');
   }, [doctorId, clinicDate]);
@@ -156,32 +170,25 @@ export default function WalkInScreen() {
       </View>
 
       <Text style={styles.label}>Today&apos;s Session</Text>
-      <Text style={styles.subtitle}>{clinicDate || 'Loading clinic date…'}{clinicClock ? ` · ${clinicClock}` : ''}</Text>
       {availability.isFetching ? <ActivityIndicator /> : null}
-      {availability.data?.sessions.map((session) => {
-        const current = clinicClock && session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5);
-        const selected = session.session_definition_id === sessionDefinitionId;
-        return (
-          <Pressable
-            key={session.session_definition_id}
-            disabled={session.status === 'BLOCKED'}
-            onPress={() => {
-              setSessionDefinitionId(session.session_definition_id);
-              setOverrideEnabled(false);
-              setOverrideReason('');
-            }}
-            style={[styles.card, selected && styles.cardSelected, session.status === 'BLOCKED' && styles.disabled]}
-          >
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{session.name}{current ? ' · Current' : ''}</Text>
-                <Text style={styles.subtitle}>{session.start_time.slice(0, 5)}–{session.end_time.slice(0, 5)} · {session.used_capacity}/{session.maximum_capacity} accepted</Text>
-              </View>
-              <Text style={session.remaining_capacity > 0 ? styles.success : styles.warning}>{session.status === 'BLOCKED' ? 'BLOCKED' : session.remaining_capacity > 0 ? 'AVAILABLE' : 'FULL'}</Text>
+      {!availability.isFetching && !activeSession ? (
+        <Text style={styles.subtitle}>
+          No active clinic session right now.{"\n\n"}Walk-ins can only be added during an active clinic session.
+        </Text>
+      ) : null}
+      {activeSession ? (
+        <View style={[styles.card, styles.cardSelected, activeSession.status === 'BLOCKED' && styles.disabled]}>
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{activeSession.name}</Text>
+              <Text style={styles.subtitle}>{activeSession.start_time.slice(0, 5)}–{activeSession.end_time.slice(0, 5)} · {activeSession.used_capacity} / {activeSession.maximum_capacity} capacity used</Text>
             </View>
-          </Pressable>
-        );
-      })}
+            <Text style={activeSession.status === 'BLOCKED' ? styles.warning : (activeSession.remaining_capacity > 0 ? styles.success : styles.warning)}>
+              {activeSession.status === 'BLOCKED' ? 'BLOCKED' : (activeSession.remaining_capacity > 0 ? 'AVAILABLE' : 'FULL')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {selectedSession && sessionFull && isOwner && !blocked ? (
         <View style={styles.card}>
