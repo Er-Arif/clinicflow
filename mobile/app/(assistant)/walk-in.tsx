@@ -63,12 +63,11 @@ export default function WalkInScreen() {
   }, [appointmentType, fee.data]);
   const clinicClock = clinicTime.data?.clinic_now?.slice(11, 16) ?? '';
 
-  let activeSession = null;
-  if (availability.data?.sessions && clinicClock) {
-    activeSession = availability.data.sessions.find(session => 
-      session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5)
-    ) ?? null;
-  }
+  const activeSession = (availability.data?.sessions && clinicClock)
+    ? (availability.data.sessions.find(session => 
+        session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5)
+      ) ?? null)
+    : null;
 
   useEffect(() => {
     setOverrideEnabled(false);
@@ -209,7 +208,7 @@ export default function WalkInScreen() {
       <AppButton
         label="Add & Check In"
         loading={addState.isLoading}
-        disabled={!patient || !doctorId || !sessionDefinitionId || blocked || !canSubmitOverride || !adjustmentValid}
+        disabled={!patient || !doctorId || !activeSession || blocked || !canSubmitOverride || !adjustmentValid}
         onPress={() => void submit()}
       />
     </AppScreen>
