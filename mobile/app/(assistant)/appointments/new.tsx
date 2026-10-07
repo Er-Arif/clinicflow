@@ -104,13 +104,19 @@ export default function NewAppointmentScreen() {
       <Text style={styles.label}>Date</Text>
       <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={styles.input} autoCapitalize="none" />
 
+      <Text style={styles.label}>Session</Text>
       {availability.isFetching ? <ActivityIndicator /> : null}
+      {!availability.isFetching && availability.data?.sessions.length === 0 ? (
+        <Text style={styles.subtitle}>No appointment sessions are available on this date.{"\n"}Select another date.</Text>
+      ) : null}
       {availability.data?.sessions.map((session) => {
         const selected = sessionDefinitionId === session.session_definition_id;
+        const isFull = session.remaining_capacity <= 0;
+        const disabled = session.status === 'BLOCKED' || (isFull && !isOwner);
         return (
-          <View key={session.session_definition_id} style={[styles.card, selected && styles.cardSelected]}>
+          <View key={session.session_definition_id} style={[styles.card, selected && styles.cardSelected, disabled && !selected && { opacity: 0.5 }]}>
             <Pressable
-              disabled={session.status === 'BLOCKED'}
+              disabled={disabled}
               onPress={() => {
                 setSessionDefinitionId(session.session_definition_id);
                 setAppointmentTime('');
@@ -119,30 +125,35 @@ export default function NewAppointmentScreen() {
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{session.name}</Text>
-                  <Text style={styles.subtitle}>{shortTime(session.start_time)}–{shortTime(session.end_time)} · {session.remaining_capacity} normal place(s) left</Text>
+                  <Text style={styles.subtitle}>{shortTime(session.start_time)}–{shortTime(session.end_time)} · {session.used_capacity} / {session.maximum_capacity} booked</Text>
                 </View>
-                <Text style={session.status === 'BLOCKED' ? styles.danger : styles.success}>{session.status}</Text>
+                <Text style={session.status === 'BLOCKED' ? styles.danger : (isFull ? styles.danger : styles.success)}>
+                  {session.status === 'BLOCKED' ? 'BLOCKED' : (isFull ? 'FULL' : 'AVAILABLE')}
+                </Text>
               </View>
             </Pressable>
             {selected ? (
-              <View style={styles.slots}>
-                {session.slots.map((slot) => {
-                  const selectable = slot.normal_booking_allowed || (isOwner && overrideEnabled && session.status !== 'BLOCKED');
-                  return (
-                    <Pressable
-                      key={slot.time}
-                      disabled={!selectable}
-                      onPress={() => setAppointmentTime(slot.time)}
-                      style={[
-                        styles.slot,
-                        !selectable && styles.slotDisabled,
-                        appointmentTime === slot.time && styles.slotSelected,
-                      ]}
-                    >
-                      <Text style={appointmentTime === slot.time ? styles.slotSelectedText : styles.slotText}>{shortTime(slot.time)}</Text>
-                    </Pressable>
-                  );
-                })}
+              <View>
+                <Text style={[styles.label, { marginTop: spacing.sm, marginBottom: spacing.xs }]}>Available Time</Text>
+                <View style={styles.slots}>
+                  {session.slots.map((slot) => {
+                    const selectable = slot.normal_booking_allowed || (isOwner && overrideEnabled && session.status !== 'BLOCKED');
+                    return (
+                      <Pressable
+                        key={slot.time}
+                        disabled={!selectable}
+                        onPress={() => setAppointmentTime(slot.time)}
+                        style={[
+                          styles.slot,
+                          !selectable && styles.slotDisabled,
+                          appointmentTime === slot.time && styles.slotSelected,
+                        ]}
+                      >
+                        <Text style={appointmentTime === slot.time ? styles.slotSelectedText : styles.slotText}>{shortTime(slot.time)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
             ) : null}
           </View>
@@ -190,6 +201,11 @@ export default function NewAppointmentScreen() {
           })
         }
       />
+      {!sessionDefinitionId || !appointmentTime ? (
+        <Text style={[styles.subtitle, { textAlign: 'center', marginTop: spacing.sm }]}>
+          Select a session and appointment time to continue.
+        </Text>
+      ) : null}
     </AppScreen>
   );
 }
