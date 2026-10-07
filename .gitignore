@@ -17,6 +17,7 @@ web-build/
 .env.*
 !.env.example
 agy.txt
+sha.txt
 
 # IDE / OS
 .vscode/
