@@ -17,8 +17,9 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function NewAppointmentScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ patientId?: string; appointmentType?: string }>();
+  const params = useLocalSearchParams<{ patientId?: string; appointmentType?: string; followupId?: string }>();
   const patientId = String(params.patientId ?? '');
+  const followupId = params.followupId;
   const patient = useGetPatientQuery(patientId, { skip: !patientId });
   const doctors = useListDoctorsQuery();
   const me = useMeQuery();
@@ -97,7 +98,14 @@ export default function NewAppointmentScreen() {
       <Text style={styles.label}>Doctor</Text>
       <View style={styles.chips}>
         {doctors.data?.map((doctor) => (
-          <Pressable key={doctor.doctor_id} onPress={() => setDoctorId(doctor.doctor_id)} style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]}>
+          <Pressable 
+            key={doctor.doctor_id} 
+            onPress={() => {
+              setDoctorId(doctor.doctor_id);
+              setSessionDefinitionId('');
+              setAppointmentTime('');
+            }} 
+            style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]}>
             <Text style={doctorId === doctor.doctor_id ? styles.chipTextActive : styles.chipText}>{doctor.display_name}</Text>
           </Pressable>
         ))}
@@ -224,6 +232,7 @@ export default function NewAppointmentScreen() {
               appointmentType,
               overrideEnabled: overrideEnabled ? '1' : '0',
               overrideReason,
+              followupId: followupId ?? '',
             },
           })
         }
