@@ -532,7 +532,7 @@ export const api = createApi({
     }),
     confirmPayment: builder.mutation<
       PaymentConfirmation,
-      { paymentId: string; paymentMethod: 'CASH' | 'UPI'; idempotencyKey: string }
+      { paymentId: string; paymentMethod: 'CASH' | 'UPI'; idempotencyKey: string; appointmentId?: string; visitId?: string }
     >({
       query: ({ paymentId, paymentMethod, idempotencyKey }) => ({
         url: `/api/v1/payments/${paymentId}/confirm`,
@@ -540,13 +540,18 @@ export const api = createApi({
         body: { payment_method: paymentMethod },
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
-      invalidatesTags: (_result, _error, arg) => [
-        { type: 'Payment', id: arg.paymentId },
-        { type: 'Payment', id: 'LIST' },
-        { type: 'Appointment', id: 'LIST' },
-        { type: 'Visit', id: 'LIST' },
-        'Report',
-      ],
+      invalidatesTags: (_result, _error, arg) => {
+        const tags: any[] = [
+          { type: 'Payment', id: arg.paymentId },
+          { type: 'Payment', id: 'LIST' },
+          { type: 'Appointment', id: 'LIST' },
+          { type: 'Visit', id: 'LIST' },
+          'Report',
+        ];
+        if (arg.appointmentId) tags.push({ type: 'Appointment', id: arg.appointmentId });
+        if (arg.visitId) tags.push({ type: 'Visit', id: arg.visitId });
+        return tags;
+      },
     }),
     voidPayment: builder.mutation<
       PaymentVoidResult,
