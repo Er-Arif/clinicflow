@@ -1,8 +1,34 @@
-import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
+import { Platform, View, ActivityIndicator } from 'react-native';
 import { colors } from '@/theme/tokens';
+import { useMeQuery } from '@/api/api';
 
 export default function AssistantLayout() {
+  const { data: me, isLoading, isError } = useMeQuery();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (isError || !me) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  const isAssistant = me.roles.includes('ASSISTANT');
+  const isOwner = me.roles.includes('OWNER_ADMIN');
+  const isDoctor = me.roles.includes('DOCTOR');
+
+  if (!isAssistant && !isOwner) {
+    if (isDoctor) {
+      return <Redirect href="/doctor/today" />;
+    }
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
