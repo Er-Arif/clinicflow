@@ -119,6 +119,8 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
                 value={field.value ?? ''}
                 onChange={field.onChange}
                 placeholder="YYYY-MM-DD"
+                maximumDate={new Date()}
+                allowClear
               />
               {errors.dateOfBirth?.message ? (
                 <Text style={{ color: colors.danger, fontSize: 12, marginTop: spacing.xs }}>

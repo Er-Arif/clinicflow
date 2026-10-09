@@ -24,8 +24,13 @@ export const patientFormSchema = z
           path: ['dateOfBirth'],
           message: 'Use YYYY-MM-DD.',
         });
-      } else if (Number.isNaN(Date.parse(`${value.dateOfBirth}T00:00:00Z`))) {
-        ctx.addIssue({ code: 'custom', path: ['dateOfBirth'], message: 'Enter a valid date.' });
+      } else {
+        const d = new Date(`${value.dateOfBirth}T00:00:00Z`);
+        if (Number.isNaN(d.getTime())) {
+          ctx.addIssue({ code: 'custom', path: ['dateOfBirth'], message: 'Enter a valid date.' });
+        } else if (d > new Date()) {
+          ctx.addIssue({ code: 'custom', path: ['dateOfBirth'], message: 'Date of birth cannot be in the future.' });
+        }
       }
     } else {
       const age = Number(value.approximateAge);

@@ -7,10 +7,12 @@ interface DatePickerProps {
   value: string;
   onChange: (date: string) => void;
   minimumDate?: Date;
+  maximumDate?: Date;
+  allowClear?: boolean;
   placeholder?: string;
 }
 
-export function DatePicker({ value, onChange, minimumDate, placeholder = 'YYYY-MM-DD' }: DatePickerProps) {
+export function DatePicker({ value, onChange, minimumDate, maximumDate, allowClear, placeholder = 'YYYY-MM-DD' }: DatePickerProps) {
   const [show, setShow] = useState(false);
 
   const displayDate = value ? value : placeholder;
@@ -18,15 +20,23 @@ export function DatePicker({ value, onChange, minimumDate, placeholder = 'YYYY-M
 
   return (
     <View>
-      <Pressable style={styles.input} onPress={() => setShow(true)}>
-        <Text style={[styles.text, !value && { color: colors.muted }]}>{displayDate}</Text>
-      </Pressable>
+      <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
+        <Pressable style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => setShow(true)}>
+          <Text style={[styles.text, !value && { color: colors.muted }]}>{displayDate}</Text>
+        </Pressable>
+        {allowClear && value ? (
+          <Pressable style={{ paddingHorizontal: 14, paddingVertical: 10 }} onPress={() => onChange('')}>
+            <Text style={{ color: colors.danger, fontWeight: 'bold' }}>Clear</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {show && (
         <DateTimePicker
           value={dateObj}
           mode="date"
           display="default"
           minimumDate={minimumDate}
+          maximumDate={maximumDate}
           onChange={(event, selectedDate) => {
             if (Platform.OS === 'android') {
               setShow(false);
