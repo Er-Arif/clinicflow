@@ -33,3 +33,11 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | CF-UAT-002 | Walk-in current-session state unclear and Add & Check In blocked | Fallback/unclear UX for session tracking, active session derived with clock drift leading to blocked submit. | ac6ac77 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | 8DBEDEEBE8B9CC941DA70980F9DDE5143191E694CDB9FF3C48142479A49E61C4 | Yes |
 | CF-UAT-003 | Assistant navigation shell / More / Logout missing | No persistent tabs layout for assistant role; missing More screen and Logout behavior. | 1a1152d | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | 8DBEDEEBE8B9CC941DA70980F9DDE5143191E694CDB9FF3C48142479A49E61C4 | Yes |
 
+| CF-UAT-004 | Bottom Nav Visuals squished on Android | Missing Android padding/label styling for iconless Tabs | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-005 | Past-date Booking allowed | Missing server-side `clinic_date()` boundary checks. Missing frontend `minimumDate`. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-006 | Manual Dates via text inputs is error-prone | Standard `TextInput` used for dates without UI picker. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-007 | Follow-ups and Patients tabs retain stale state | Expo router Tabs maintain screen state by default unless unmounted. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-008 | Slot selector chips cause massive layout scaling issues | Direct grid rendering of chips instead of an overlay/modal component. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-009 | Book Follow-up buttons route to broken screen | Legacy routing pointing to followups/book.tsx instead of standard appointments/new. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-010 | Voiding payment/canceling doesn't refresh UI | Missing RTK Query invalidation tags on specific mutations. | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-011 | Assistants accidentally viewing Doctor Patients list | Expo Router group naming collisions ((assistant)/patients vs (doctor)/patients). | Pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |

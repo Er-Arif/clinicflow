@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import { useCompleteVisitMutation, useGetAppointmentQuery } from '@/api/api';
+import { apiError } from '@/api/errors';
+import { DatePicker } from '@/components/DatePicker';
+import { AppButton } from '@/components/AppButton';
+import { AppScreen } from '@/components/AppScreen';
+import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { colors, radius, spacing } from '@/theme/tokens';
+
+export default function CompleteVisitScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ appointmentId: string }>();
+  const appointmentId = String(params.appointmentId ?? '');
+  const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
+  const [completeVisit, completeState] = useCompleteVisitMutation();
+  const [followUpRequired, setFollowUpRequired] = useState(false);
+  const [mode, setMode] = useState<'INTERVAL' | 'DATE'>('INTERVAL');
+  const [intervalDays, setIntervalDays] = useState('7');
+  const [dueDate, setDueDate] = useState('');
+  const [resultFollowupId, setResultFollowupId] = useState<string | null>(null);
+  const [completed, setCompleted] = useState(false);
+  const [idempotencyKey] = useState(() => newIdempotencyKey('complete'));
+
+  if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
+  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment not found</Text></AppScreen>;
+  const item = appointment.data;
+
+  async function submit() {
+    if (!item.visit_id) return;
+    const body = !followUpRequired
+      ? { follow_up: null }
+      : mode === 'INTERVAL'
+        ? { follow_up: { interval_days: Number(intervalDays) } }
+        : { follow_up: { due_date: dueDate } };
+    try {
+      const result = await completeVisit({
+        visitId: item.visit_id,
+        body,
+        idempotencyKey,
+      }).unwrap();
+      setResultFollowupId(result.followup?.followup_id ?? null);
+      setCompleted(true);
+    } catch {
+      // Stable API error shown below.
+    }
+  }
+
+  if (completed) {
+    return (
+      <AppScreen>
+        <Text style={styles.title}>Visit Completed</Text>
+        <Text style={styles.subtitle}>{item.patient.full_name}</Text>
+        <View style={styles.card}>
+          <Text style={styles.strong}>Payment: {item.payment_status ?? 'Pending'}</Text>
+          <Text style={styles.subtitle}>
+            {resultFollowupId ? 'Follow-up recommendation saved.' : 'No follow-up recommendation.'}
+          </Text>
+        </View>
+        {resultFollowupId ? (
+          <AppButton
+            label="Book Follow-up Now"
+            onPress={() => router.replace({ pathname: '/assistant/appointments/new', params: { patientId: item.patient.patient_id, appointmentType: 'FOLLOW_UP' } })}
+          />
+        ) : null}
+        <AppButton label="Done" tone="secondary" onPress={() => router.replace('/assistant/appointments')} />
+      </AppScreen>
+    );
+  }
+
+  return (
+    <AppScreen>
+      <Text style={styles.title}>Complete Visit</Text>
+      <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.strong}>Follow-up required?</Text>
+        <View style={styles.actions}>
+          <AppButton label="No" tone={!followUpRequired ? 'primary' : 'secondary'} onPress={() => setFollowUpRequired(false)} />
+          <AppButton label="Yes" tone={followUpRequired ? 'primary' : 'secondary'} onPress={() => setFollowUpRequired(true)} />
+        </View>
+      </View>
+
+      {followUpRequired ? (
+        <View style={styles.card}>
+          <Text style={styles.strong}>Follow-up timing</Text>
+          <View style={styles.actions}>
+            <AppButton label="After N Days" tone={mode === 'INTERVAL' ? 'primary' : 'secondary'} onPress={() => setMode('INTERVAL')} />
+            <AppButton label="Specific Date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
+          </View>
+          {mode === 'INTERVAL' ? (
+            <TextInput
+              value={intervalDays}
+              onChangeText={setIntervalDays}
+              keyboardType="number-pad"
+              placeholder="7"
+              style={styles.input}
+            />
+          ) : (
+            <DatePicker value={dueDate} onChange={setDueDate} placeholder="YYYY-MM-DD" />
+          )}
+        </View>
+      ) : null}
+
+      {completeState.error ? <Text style={styles.error}>{apiError(completeState.error)?.message ?? 'Unable to complete visit.'}</Text> : null}
+      <AppButton
+        label="Complete Visit"
+        loading={completeState.isLoading}
+        disabled={
+          !item.visit_id ||
+          (followUpRequired && mode === 'INTERVAL' && (!Number.isInteger(Number(intervalDays)) || Number(intervalDays) < 1)) ||
+          (followUpRequired && mode === 'DATE' && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))
+        }
+        onPress={() => void submit()}
+      />
+      <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
+    </AppScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  title: { fontSize: 28, fontWeight: '800', color: colors.text },
+  subtitle: { color: colors.muted, lineHeight: 20 },
+  strong: { color: colors.text, fontWeight: '800' },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.md },
+  actions: { gap: spacing.sm },
+  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
+  error: { color: colors.danger },
+});
+
+
+

@@ -24,7 +24,7 @@ export default function ChangePasswordScreen() {
       await changePassword({ current_password: current, new_password: next }).unwrap();
       const refreshed = await me.refetch().unwrap();
       const doctorOwner = refreshed.roles.some((role) => ['DOCTOR', 'OWNER_ADMIN'].includes(role));
-      router.replace(doctorOwner ? '/(doctor)/today' : '/(assistant)/home');
+      router.replace(doctorOwner ? '/doctor/today' : '/assistant/home');
     } catch (error) {
       const detail = error as { data?: { error?: { message?: string } } };
       setMessage(detail.data?.error?.message ?? 'Unable to change password.');
@@ -56,3 +56,4 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md },
   error: { color: colors.danger, fontWeight: '700' },
 });
+

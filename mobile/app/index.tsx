@@ -22,7 +22,7 @@ export default function Index() {
       const isDoctorOwner = tokens.user.roles.some((role) =>
         ['DOCTOR', 'OWNER_ADMIN'].includes(role),
       );
-      router.replace(isDoctorOwner ? '/(doctor)/today' : '/(assistant)/home');
+      router.replace(isDoctorOwner ? '/doctor/today' : '/assistant/home');
     });
     return () => {
       mounted = false;
@@ -39,3 +39,4 @@ export default function Index() {
 const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7FAFC' },
 });
+

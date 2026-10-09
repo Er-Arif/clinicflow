@@ -320,6 +320,7 @@ export const api = createApi({
       invalidatesTags: [
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
+        { type: 'FollowUp', id: 'LIST' },
         'Report',
       ],
     }),
@@ -447,6 +448,7 @@ export const api = createApi({
         { type: 'Appointment', id: arg.appointmentId },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
+        { type: 'FollowUp', id: 'LIST' },
         'Report',
       ],
     }),
@@ -463,6 +465,7 @@ export const api = createApi({
       invalidatesTags: [
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
+        { type: 'FollowUp', id: 'LIST' },
         'Report',
       ],
     }),
@@ -558,6 +561,8 @@ export const api = createApi({
       invalidatesTags: (_result, _error, arg) => [
         { type: 'Payment', id: arg.paymentId },
         { type: 'Payment', id: 'LIST' },
+        { type: 'Appointment', id: 'LIST' },
+        { type: 'Visit', id: 'LIST' },
         'Report',
       ],
     }),

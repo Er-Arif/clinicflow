@@ -37,7 +37,7 @@ export default function LoginScreen() {
       const isDoctorOwner = tokens.user.roles.some((role) =>
         ['DOCTOR', 'OWNER_ADMIN'].includes(role),
       );
-      router.replace(isDoctorOwner ? '/(doctor)/today' : '/(assistant)/home');
+      router.replace(isDoctorOwner ? '/doctor/today' : '/assistant/home');
     } catch {
       // Structured backend error is presented from state.error below.
     }
@@ -123,3 +123,4 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.85 },
   buttonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
 });
+
