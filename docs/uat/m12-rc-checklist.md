@@ -35,7 +35,7 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 
 | CF-UAT-004 | Bottom Nav Visuals squished on Android | Missing Android padding/label styling for iconless Tabs | 6b27169 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-005 | Past-date Booking allowed | Missing server-side `clinic_date()` boundary checks. Missing frontend `minimumDate`. | 6b27169 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
-| CF-UAT-006 | Manual Dates via text inputs is error-prone | Standard `TextInput` used for dates without UI picker. | 3471c6d | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-006 | Manual Dates via text inputs is error-prone | Standard `TextInput` used for dates without UI picker. DOB now uses picker, future DOB blocked natively via schema and DatePicker maximumDate, DOB can be cleared, Approximate Age fallback preserved. | 3471c6d | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-007 | Follow-ups and Patients tabs retain stale state | Expo router Tabs maintain screen state by default unless unmounted. | 6b27169 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-008 | Slot selector chips cause massive layout scaling issues | Direct grid rendering of chips instead of an overlay/modal component. | 6b27169 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-009 | Book Follow-up buttons route to broken screen | Legacy routing pointing to followups/book.tsx instead of standard appointments/new. | 325d9a5 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
