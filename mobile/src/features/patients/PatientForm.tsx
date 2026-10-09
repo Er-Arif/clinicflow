@@ -2,6 +2,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
+import { DatePicker } from '@/components/DatePicker';
 import { FormField } from '@/components/FormField';
 import { PatientFormValues, patientFormSchema } from '@/features/patients/form';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -110,14 +111,21 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           control={control}
           name="dateOfBirth"
           render={({ field }) => (
-            <FormField
-              label="Date of Birth"
-              placeholder="YYYY-MM-DD"
-              value={field.value}
-              onChangeText={field.onChange}
-              error={errors.dateOfBirth?.message}
-              keyboardType="numbers-and-punctuation"
-            />
+            <View style={{ marginBottom: spacing.md }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
+                Date of Birth
+              </Text>
+              <DatePicker
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                placeholder="YYYY-MM-DD"
+              />
+              {errors.dateOfBirth?.message ? (
+                <Text style={{ color: colors.danger, fontSize: 12, marginTop: spacing.xs }}>
+                  {errors.dateOfBirth.message}
+                </Text>
+              ) : null}
+            </View>
           )}
         />
       ) : (
