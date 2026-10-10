@@ -41,3 +41,4 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | CF-UAT-009 | Book Follow-up buttons route to broken screen | Legacy routing pointing to followups/book.tsx instead of standard appointments/new. | 325d9a5 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-010 | Voiding payment/canceling doesn't refresh UI | Missing RTK Query invalidation tags on specific mutations. | fd71df6 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-011 | Assistants accidentally viewing Doctor Patients list | Expo Router group naming collisions ((assistant)/patients vs (doctor)/patients). | 9760500 | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-012 | Assistant bottom navigation still does NOT appear on physical device | `ActivityIndicator` early return inside layout intercepted Expo Router hydration, unmounting `<Tabs>` shell. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
