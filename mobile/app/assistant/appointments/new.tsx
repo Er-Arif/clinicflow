@@ -17,7 +17,14 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function NewAppointmentScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ patientId?: string; appointmentType?: string; followupId?: string }>();
+  const params = useLocalSearchParams<{
+    patientId?: string;
+    appointmentType?: string;
+    followupId?: string;
+    dueDate?: string;
+    doctorId?: string;
+    date?: string;
+  }>();
   const patientId = String(params.patientId ?? '');
   const followupId = params.followupId;
   const patient = useGetPatientQuery(patientId, { skip: !patientId });
@@ -26,9 +33,11 @@ export default function NewAppointmentScreen() {
   const clinicTime = useClinicTimeQuery();
   const fee = useGetCurrentFeeQuery();
 
-  const [date, setDate] = useState('');
-  const [doctorId, setDoctorId] = useState('');
-  const [appointmentType, setAppointmentType] = useState<'REGULAR' | 'FOLLOW_UP'>(params.appointmentType === 'FOLLOW_UP' ? 'FOLLOW_UP' : 'REGULAR');
+  const [date, setDate] = useState(params.date || '');
+  const [doctorId, setDoctorId] = useState(params.doctorId || '');
+  const [appointmentType, setAppointmentType] = useState<'REGULAR' | 'FOLLOW_UP'>(
+    params.appointmentType === 'FOLLOW_UP' ? 'FOLLOW_UP' : 'REGULAR',
+  );
   const [sessionDefinitionId, setSessionDefinitionId] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [overrideEnabled, setOverrideEnabled] = useState(false);
@@ -36,11 +45,32 @@ export default function NewAppointmentScreen() {
   const [slotModalVisible, setSlotModalVisible] = useState(false);
 
   useEffect(() => {
-    if (!date && clinicTime.data?.clinic_date) setDate(clinicTime.data.clinic_date);
-  }, [clinicTime.data?.clinic_date, date]);
+    if (!clinicTime.data?.clinic_date) return;
+    if (!date) {
+      if (params.dueDate) {
+        setDate(params.dueDate >= clinicTime.data.clinic_date ? params.dueDate : clinicTime.data.clinic_date);
+      } else if (params.date) {
+        setDate(params.date);
+      } else {
+        setDate(clinicTime.data.clinic_date);
+      }
+    }
+  }, [clinicTime.data?.clinic_date, date, params.date, params.dueDate]);
+
   useEffect(() => {
-    if (!doctorId && doctors.data?.[0]?.doctor_id) setDoctorId(doctors.data[0].doctor_id);
-  }, [doctorId, doctors.data]);
+    if (params.doctorId) {
+      setDoctorId(params.doctorId);
+    } else if (!doctorId && doctors.data?.[0]?.doctor_id) {
+      setDoctorId(doctors.data[0].doctor_id);
+    }
+  }, [params.doctorId, doctors.data, doctorId]);
+
+  useEffect(() => {
+    setSessionDefinitionId('');
+    setAppointmentTime('');
+    setOverrideEnabled(false);
+    setOverrideReason('');
+  }, [patientId]);
 
   const availability = useGetAvailabilityQuery(
     { doctorId, date },

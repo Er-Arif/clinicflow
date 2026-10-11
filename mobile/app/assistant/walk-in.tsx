@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import {
   useAddWalkInMutation,
@@ -21,6 +21,7 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function WalkInScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ patientId?: string }>();
   const initialPatientId = String(params.patientId ?? '');
   const initialPatient = useGetPatientQuery(initialPatientId, { skip: !initialPatientId });
@@ -41,6 +42,20 @@ export default function WalkInScreen() {
   const [adjustFee, setAdjustFee] = useState(false);
   const [adjustedAmount, setAdjustedAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
+
+  useEffect(() => {
+    const unsub = navigation.addListener('blur', () => {
+      if (!initialPatientId) {
+        setPatient(null);
+        setQuery('');
+      }
+      setOverrideEnabled(false);
+      setOverrideReason('');
+      setAdjustFee(false);
+      setAdjustReason('');
+    });
+    return unsub;
+  }, [navigation, initialPatientId]);
 
   useEffect(() => {
     if (initialPatient.data) setPatient(initialPatient.data);
@@ -204,7 +219,43 @@ export default function WalkInScreen() {
         </View>
       ) : null}
 
-      {addState.error ? <Text style={styles.error}>{apiError(addState.error)?.message ?? 'Unable to add walk-in.'}</Text> : null}
+      {(() => {
+        const activeErr = apiError(addState.error);
+        if (!activeErr) return null;
+        if (activeErr.code === 'APPOINTMENT_DUPLICATE_ACTIVE') {
+          const details = activeErr.details as {
+            appointment_id?: string;
+            date?: string;
+            time?: string | null;
+            status?: string;
+            appointment_type?: string;
+          } | undefined;
+          return (
+            <View style={styles.duplicateCard}>
+              <Text style={styles.duplicateTitle}>Active Appointment Conflict</Text>
+              <Text style={styles.duplicateText}>
+                {patient?.full_name ?? 'This patient'} already has an active {String(details?.appointment_type ?? '').replace('_', ' ').toLowerCase()} appointment with {doctors.data?.find((d) => d.doctor_id === doctorId)?.display_name ?? 'this doctor'} today.
+              </Text>
+              <View style={styles.duplicateMeta}>
+                {details?.time ? <Text style={styles.duplicateMetaText}>Time: {String(details.time).slice(0, 5)}</Text> : null}
+                <Text style={styles.duplicateMetaText}>Status: {String(details?.status ?? '')}</Text>
+              </View>
+              {details?.appointment_id ? (
+                <AppButton
+                  label="View Existing Appointment"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/assistant/appointments/[appointmentId]',
+                      params: { appointmentId: String(details.appointment_id) },
+                    })
+                  }
+                />
+              ) : null}
+            </View>
+          );
+        }
+        return <Text style={styles.error}>{activeErr.message ?? 'Unable to add walk-in.'}</Text>;
+      })()}
       <AppButton
         label="Add & Check In"
         loading={addState.isLoading}
@@ -238,5 +289,17 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   feeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, backgroundColor: colors.softPrimary, borderRadius: radius.md, padding: spacing.md },
   fee: { color: colors.primary, fontSize: 22, fontWeight: '900' },
+  duplicateCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  duplicateTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  duplicateText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  duplicateMeta: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.xs },
+  duplicateMetaText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
 });
 

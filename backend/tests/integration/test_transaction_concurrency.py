@@ -251,6 +251,46 @@ def test_two_users_cannot_consume_same_last_slot() -> None:
     engine.dispose()
 
 
+def test_concurrent_duplicate_appointment_only_one_succeeds() -> None:
+    session_factory, engine = _session_factory()
+    case = _seed_case(session_factory, capacity=2)
+    barrier = Barrier(2)
+    same_patient_id = case.patient_ids[0]
+
+    def worker(appt_time: time, key: str):
+        barrier.wait()
+        try:
+            def operation():
+                with session_factory.begin() as db:
+                    return AppointmentService(db, FrozenClock(), _context(case)).create(
+                        _create_request(case, same_patient_id, appt_time), idempotency_key=key
+                    )
+            return ("ok", _run_with_request_id(operation).appointment_id)
+        except AppError as exc:
+            return (exc.code, None)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(
+                lambda args: worker(*args),
+                [(time(10, 0), "dup-slot-a"), (time(10, 30), "dup-slot-b")],
+            )
+        )
+
+    assert sum(result[0] == "ok" for result in results) == 1
+    assert any(result[0] == "APPOINTMENT_DUPLICATE_ACTIVE" for result in results)
+    with session_factory() as db:
+        count = db.scalar(
+            select(func.count(Appointment.appointment_id)).where(
+                Appointment.clinic_id == case.clinic_id,
+                Appointment.patient_id == same_patient_id,
+                Appointment.status != "CANCELLED",
+            )
+        )
+        assert count == 1
+    engine.dispose()
+
+
 def test_same_idempotency_key_replays_one_appointment() -> None:
     session_factory, engine = _session_factory()
     case = _seed_case(session_factory, capacity=2)

@@ -53,10 +53,18 @@ export default function AppointmentReviewScreen() {
 
       let result;
       if (followupId) {
+        const followupBody = {
+          session_definition_id: String(params.sessionDefinitionId),
+          appointment_date: String(params.appointmentDate),
+          appointment_time: String(params.appointmentTime),
+          ...(params.overrideEnabled === '1'
+            ? { capacity_override: { enabled: true as const, reason: String(params.overrideReason ?? '') } }
+            : {}),
+        };
         const bookRes = await bookFollowup({
           followupId,
           idempotencyKey,
-          body,
+          body: followupBody,
         }).unwrap();
         result = bookRes.appointment;
       } else {
@@ -70,6 +78,16 @@ export default function AppointmentReviewScreen() {
       // RTK Query state renders the stable backend error below. The same key is kept for retry.
     }
   }
+
+  const activeError = apiError(createState.error || bookState.error);
+  const isDuplicateActive = activeError?.code === 'APPOINTMENT_DUPLICATE_ACTIVE';
+  const duplicateDetails = activeError?.details as {
+    appointment_id?: string;
+    date?: string;
+    time?: string | null;
+    status?: string;
+    appointment_type?: string;
+  } | undefined;
 
   return (
     <AppScreen>
@@ -95,7 +113,31 @@ export default function AppointmentReviewScreen() {
           </>) : null}
         </View>
       ) : null}
-      {(createState.error || bookState.error) ? <Text style={styles.error}>{apiError(createState.error || bookState.error)?.message ?? 'Unable to book appointment.'}</Text> : null}
+      {isDuplicateActive ? (
+        <View style={styles.duplicateCard}>
+          <Text style={styles.duplicateTitle}>Active Appointment Conflict</Text>
+          <Text style={styles.duplicateText}>
+            {patient.data?.full_name ?? 'This patient'} already has an active {String(duplicateDetails?.appointment_type ?? '').replace('_', ' ').toLowerCase()} appointment with {doctor?.display_name ?? 'this doctor'} on {String(duplicateDetails?.date ?? params.appointmentDate)}.
+          </Text>
+          <View style={styles.duplicateMeta}>
+            {duplicateDetails?.time ? <Text style={styles.duplicateMetaText}>Time: {String(duplicateDetails.time).slice(0, 5)}</Text> : null}
+            <Text style={styles.duplicateMetaText}>Status: {String(duplicateDetails?.status ?? '')}</Text>
+          </View>
+          {duplicateDetails?.appointment_id ? (
+            <AppButton
+              label="View Existing Appointment"
+              onPress={() =>
+                router.push({
+                  pathname: '/assistant/appointments/[appointmentId]',
+                  params: { appointmentId: String(duplicateDetails.appointment_id) },
+                })
+              }
+            />
+          ) : null}
+        </View>
+      ) : activeError ? (
+        <Text style={styles.error}>{activeError.message ?? 'Unable to book appointment.'}</Text>
+      ) : null}
       <AppButton label="Book Appointment" loading={createState.isLoading || bookState.isLoading} disabled={adjustFee && (!adjustedAmount || adjustmentReason.trim().length < 2)} onPress={() => void confirm()} />
       <AppButton label="Edit" tone="secondary" onPress={() => router.back()} />
     </AppScreen>
@@ -116,5 +158,17 @@ const styles = StyleSheet.create({
   adjustTitle: { color: colors.text, fontWeight: '800' },
   helper: { color: colors.muted, lineHeight: 20 },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
+  duplicateCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  duplicateTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  duplicateText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  duplicateMeta: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.xs },
+  duplicateMetaText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
 });
 

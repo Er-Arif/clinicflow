@@ -127,6 +127,12 @@ class FollowUpService:
             raise RuntimeError("Follow-up source visit integrity failure")
 
         appt_service = AppointmentService(self.db, self.clock, self.context)
+        appt_service._lock_patient(followup.patient_id)
+        appt_service._validate_no_duplicate_appointment(
+            patient_id=followup.patient_id,
+            doctor_id=source_visit.doctor_id,
+            appointment_date=request.appointment_date,
+        )
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
             request.session_definition_id, request.appointment_date
         )

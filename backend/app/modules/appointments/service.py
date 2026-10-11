@@ -121,14 +121,20 @@ class AppointmentService:
         if replay is not None:
             return replay
 
-        patient = self._patient(request.patient_id)
-        doctor = self._doctor(request.doctor_id)
         if request.appointment_date < self.clock.clinic_date():
             raise AppError(
                 "APPOINTMENT_DATE_PAST",
                 "Appointments cannot be booked for a past date.",
                 422,
             )
+
+        patient = self._lock_patient(request.patient_id)
+        doctor = self._doctor(request.doctor_id)
+        self._validate_no_duplicate_appointment(
+            patient_id=patient.patient_id,
+            doctor_id=doctor.doctor_id,
+            appointment_date=request.appointment_date,
+        )
 
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
             request.session_definition_id, request.appointment_date
@@ -324,6 +330,14 @@ class AppointmentService:
         if request.new_appointment_date < self.clock.clinic_date():
             raise AppError("APPOINTMENT_DATE_PAST", "Select today or a future date.", 422)
 
+        self._lock_patient(original.patient_id)
+        self._validate_no_duplicate_appointment(
+            patient_id=original.patient_id,
+            doctor_id=original.doctor_id,
+            appointment_date=request.new_appointment_date,
+            exclude_appointment_id=original.appointment_id,
+        )
+
         target = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
             request.new_session_definition_id, request.new_appointment_date
         )
@@ -516,6 +530,60 @@ class AppointmentService:
         if patient is None:
             raise AppError("PATIENT_NOT_FOUND", "Patient not found.", 404)
         return patient
+
+    def _lock_patient(self, patient_id: UUID) -> Patient:
+        patient = self.db.scalar(
+            select(Patient)
+            .where(
+                Patient.patient_id == patient_id,
+                Patient.clinic_id == self.context.clinic_id,
+            )
+            .with_for_update()
+        )
+        if patient is None:
+            raise AppError("PATIENT_NOT_FOUND", "Patient not found.", 404)
+        return patient
+
+    def _validate_no_duplicate_appointment(
+        self,
+        *,
+        patient_id: UUID,
+        doctor_id: UUID,
+        appointment_date: date,
+        exclude_appointment_id: UUID | None = None,
+    ) -> None:
+        query = (
+            select(Appointment, SessionOccurrence)
+            .join(
+                SessionOccurrence,
+                SessionOccurrence.session_occurrence_id == Appointment.session_occurrence_id,
+            )
+            .where(
+                Appointment.clinic_id == self.context.clinic_id,
+                Appointment.patient_id == patient_id,
+                Appointment.doctor_id == doctor_id,
+                SessionOccurrence.occurrence_date == appointment_date,
+                Appointment.status != "CANCELLED",
+            )
+        )
+        if exclude_appointment_id is not None:
+            query = query.where(Appointment.appointment_id != exclude_appointment_id)
+
+        existing = self.db.execute(query).first()
+        if existing is not None:
+            appt, occ = existing
+            raise AppError(
+                code="APPOINTMENT_DUPLICATE_ACTIVE",
+                message="An active appointment already exists for this patient, doctor, and date.",
+                status_code=409,
+                details={
+                    "appointment_id": str(appt.appointment_id),
+                    "date": occ.occurrence_date.isoformat(),
+                    "time": appt.appointment_time.isoformat() if appt.appointment_time else None,
+                    "status": appt.status,
+                    "appointment_type": appt.appointment_type,
+                },
+            )
 
     def _doctor(self, doctor_id: UUID) -> Doctor:
         doctor = self.db.scalar(

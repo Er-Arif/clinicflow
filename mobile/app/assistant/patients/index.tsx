@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
@@ -9,7 +9,16 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function PatientSearchScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    const unsub = navigation.getParent()?.addListener('blur', () => {
+      setQuery('');
+    });
+    return unsub;
+  }, [navigation]);
+
   const normalizedQuery = query.trim();
   const shouldSearch = normalizedQuery.length >= 2;
   const { data, isFetching, isError, refetch } = useSearchPatientsQuery(

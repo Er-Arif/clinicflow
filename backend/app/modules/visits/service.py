@@ -144,9 +144,14 @@ class VisitService:
             return replay
 
         appointment_service = AppointmentService(self.db, self.clock, self.context)
-        patient = appointment_service._patient(request.patient_id)
+        patient = appointment_service._lock_patient(request.patient_id)
         doctor = appointment_service._doctor(request.doctor_id)
         today = self.clock.clinic_date()
+        appointment_service._validate_no_duplicate_appointment(
+            patient_id=patient.patient_id,
+            doctor_id=doctor.doctor_id,
+            appointment_date=today,
+        )
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
             request.session_definition_id, today
         )

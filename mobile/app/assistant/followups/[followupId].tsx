@@ -47,7 +47,21 @@ export default function FollowUpDetailsScreen() {
 
       {item.status === 'OPEN' ? (
         <>
-          <AppButton label="Book Appointment" onPress={() => router.push({ pathname: '/assistant/appointments/new', params: { patientId: item.patient.patient_id, appointmentType: 'FOLLOW_UP' } })} />
+          <AppButton
+            label="Book Appointment"
+            onPress={() =>
+              router.push({
+                pathname: '/assistant/appointments/new',
+                params: {
+                  patientId: item.patient.patient_id,
+                  appointmentType: 'FOLLOW_UP',
+                  followupId: item.followup_id,
+                  dueDate: item.due_date,
+                  doctorId: item.doctor_id,
+                },
+              })
+            }
+          />
           {reminderQuery.data?.items[0] ? (
             <AppButton label="Send WhatsApp Reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
           ) : null}

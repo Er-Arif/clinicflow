@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation, useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useListAppointmentsQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
@@ -10,12 +10,25 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AppointmentsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const clinicTime = useClinicTimeQuery();
   const [date, setDate] = useState('');
   const [status, setStatus] = useState<string | undefined>();
+
   useEffect(() => {
     if (!date && clinicTime.data?.clinic_date) setDate(clinicTime.data.clinic_date);
   }, [clinicTime.data?.clinic_date, date]);
+
+  useEffect(() => {
+    const unsub = navigation.getParent()?.addListener('blur', () => {
+      setStatus(undefined);
+      if (clinicTime.data?.clinic_date) {
+        setDate(clinicTime.data.clinic_date);
+      }
+    });
+    return unsub;
+  }, [navigation, clinicTime.data?.clinic_date]);
+
   const appointments = useListAppointmentsQuery({ date, status }, { skip: !date });
 
   return (
