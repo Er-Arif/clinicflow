@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useGetOwnerDashboardQuery } from '@/api/api';
@@ -102,7 +102,6 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: colors.softPrimary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   chipText: { color: colors.primary, fontWeight: '800' },
   dateRow: { flexDirection: 'row', gap: spacing.sm },
-  input: { flex: 1, minHeight: 46, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginTop: spacing.sm },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

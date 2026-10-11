@@ -1,9 +1,10 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery } from '@/api/api';
+import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery, useListDoctorsQuery } from '@/api/api';
 import { clearSessionTokens } from '@/auth/session';
 import { AppScreen } from '@/components/AppScreen';
+import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function DoctorMoreScreen() {
@@ -11,7 +12,14 @@ export default function DoctorMoreScreen() {
   const [logoutMutation, logoutState] = useLogoutMutation();
   const systemInfo = useGetSystemInfoQuery();
   const me = useMeQuery();
+  const doctors = useListDoctorsQuery();
   const owner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
+
+  // ClinicFlow V1 Limitation: V1 is a single-doctor clinic architecture.
+  // AuthUser does not carry a doctor_id, and Doctor records are not linked to non-owner users in listDoctors.
+  // Therefore the singleton clinic doctor profile (doctors.data[0]) is the authoritative clinic doctor identity.
+  const clinicDoctor = doctors.data?.[0];
+  const doctorDisplayName = clinicDoctor?.display_name || me.data?.display_name || 'Doctor';
 
   const handleLogout = async () => {
     try {
@@ -20,6 +28,7 @@ export default function DoctorMoreScreen() {
       // Clear local session even if network is unavailable
     }
     await clearSessionTokens();
+    resetApiCache();
     router.replace('/(auth)/login');
   };
 
@@ -28,7 +37,7 @@ export default function DoctorMoreScreen() {
       <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
         <View>
           <Text style={styles.title}>More</Text>
-          <Text style={styles.subtitle}>{me.data?.display_name ?? 'Doctor'}</Text>
+          <Text style={styles.subtitle}>{doctorDisplayName}</Text>
         </View>
 
         {owner ? (

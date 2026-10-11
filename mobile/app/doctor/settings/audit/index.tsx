@@ -42,8 +42,12 @@ export default function AuditHistoryScreen() {
       <Text style={styles.subtitle}>Read-only history of important ClinicFlow actions.</Text>
 
       <View style={styles.dateRow}>
-        <DatePicker value={fromInput} onChange={setFromInput} placeholder="From YYYY-MM-DD" />
-        <DatePicker value={toInput} onChange={setToInput} placeholder="To YYYY-MM-DD" />
+        <View style={{ flex: 1 }}>
+          <DatePicker value={fromInput} onChange={setFromInput} placeholder="From YYYY-MM-DD" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <DatePicker value={toInput} onChange={setToInput} placeholder="To YYYY-MM-DD" />
+        </View>
       </View>
       <AppButton label="Use Today" tone="secondary" onPress={today} />
       <TextInput style={styles.input} autoCapitalize="characters" placeholder="Action e.g. PAYMENT_CONFIRMED" value={actionInput} onChangeText={setActionInput} />

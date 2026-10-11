@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
 import { useMeQuery } from '@/api/api';
+import { isDoctorOrOwner, isAssistantRole } from '@/auth/session';
 import { getSharedTabScreenOptions, TabIcon } from '@/navigation/tabOptions';
 
 export default function AssistantLayout() {
@@ -13,15 +14,14 @@ export default function AssistantLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  const isAssistant = me?.roles.includes('ASSISTANT');
-  const isOwner = me?.roles.includes('OWNER_ADMIN');
-  const isDoctor = me?.roles.includes('DOCTOR');
-
-  if (!isLoading && me && !isAssistant && !isOwner) {
-    if (isDoctor) {
+  // Role shell precedence: Doctor/Owner wins even if ASSISTANT is present
+  if (!isLoading && me) {
+    if (isDoctorOrOwner(me.roles)) {
       return <Redirect href="/doctor/today" />;
     }
-    return <Redirect href="/(auth)/login" />;
+    if (!isAssistantRole(me.roles)) {
+      return <Redirect href="/(auth)/login" />;
+    }
   }
 
   return (

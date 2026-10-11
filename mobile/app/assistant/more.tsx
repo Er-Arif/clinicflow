@@ -1,9 +1,10 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery } from '@/api/api';
 import { clearSessionTokens } from '@/auth/session';
 import { AppScreen } from '@/components/AppScreen';
+import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function MoreScreen() {
@@ -19,6 +20,7 @@ export default function MoreScreen() {
       // ignore
     }
     await clearSessionTokens();
+    resetApiCache();
     router.replace('/(auth)/login');
   };
 

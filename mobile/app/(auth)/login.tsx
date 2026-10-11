@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 
-import { useLoginMutation } from '@/api/api';
-import { setSessionTokens } from '@/auth/session';
+import { api, useLoginMutation } from '@/api/api';
+import { getInitialRouteForRoles, setSessionTokens } from '@/auth/session';
+import { resetApiCache, store } from '@/store/store';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,15 +30,14 @@ export default function LoginScreen() {
         password,
         device_label: 'ClinicFlow Android',
       }).unwrap();
+      resetApiCache();
       await setSessionTokens(tokens);
+      store.dispatch(api.util.upsertQueryData('me', undefined, tokens.user));
       if (tokens.user.must_change_password) {
         router.replace('/(auth)/change-password');
         return;
       }
-      const isDoctorOwner = tokens.user.roles.some((role) =>
-        ['DOCTOR', 'OWNER_ADMIN'].includes(role),
-      );
-      router.replace(isDoctorOwner ? '/doctor/today' : '/assistant/home');
+      router.replace(getInitialRouteForRoles(tokens.user.roles));
     } catch {
       // Structured backend error is presented from state.error below.
     }

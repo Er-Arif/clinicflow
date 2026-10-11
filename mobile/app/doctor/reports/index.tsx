@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -60,10 +60,14 @@ export default function ReportsScreen() {
       ) : null}
 
       <View style={styles.dateRow}>
-        <DatePicker value={from} onChange={setFrom} placeholder="From YYYY-MM-DD" />
-        <DatePicker value={to} onChange={setTo} placeholder="To YYYY-MM-DD" />
+        <View style={{ flex: 1 }}>
+          <DatePicker value={from} onChange={setFrom} placeholder="From YYYY-MM-DD" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <DatePicker value={to} onChange={setTo} placeholder="To YYYY-MM-DD" />
+        </View>
       </View>
-      {validRange ? <Text style={styles.subtitle}>{formatClinicDate(from)} → {formatClinicDate(to)}</Text> : null}
+      {validRange ? <Text style={styles.rangeText}>{formatClinicDate(from)}  →  {formatClinicDate(to)}</Text> : null}
       {refreshing && !appointments.data ? <ActivityIndicator /> : null}
 
       {appointments.data ? (
@@ -74,6 +78,51 @@ export default function ReportsScreen() {
           <MetricCard label="No-show" value={appointments.data.no_show} />
           <MetricCard label="Rescheduled" value={appointments.data.rescheduled} />
           <MetricCard label="Still booked" value={appointments.data.booked} />
+          <View style={styles.chartCard}>
+            <Text style={styles.chartHeading}>Status Distribution</Text>
+            {appointments.data.total_appointments === 0 ? (
+              <Text style={styles.emptyChart}>No appointments recorded for this period.</Text>
+            ) : (
+              <View style={styles.chartList}>
+                <ChartBarRow
+                  label="Completed"
+                  count={appointments.data.completed}
+                  total={appointments.data.total_appointments}
+                  color={colors.success}
+                />
+                <ChartBarRow
+                  label="Booked"
+                  count={appointments.data.booked}
+                  total={appointments.data.total_appointments}
+                  color={colors.primary}
+                />
+                <ChartBarRow
+                  label="Checked In"
+                  count={appointments.data.checked_in}
+                  total={appointments.data.total_appointments}
+                  color={colors.accent}
+                />
+                <ChartBarRow
+                  label="Cancelled"
+                  count={appointments.data.cancelled}
+                  total={appointments.data.total_appointments}
+                  color={colors.danger}
+                />
+                <ChartBarRow
+                  label="No-show"
+                  count={appointments.data.no_show}
+                  total={appointments.data.total_appointments}
+                  color={colors.warning}
+                />
+                <ChartBarRow
+                  label="Rescheduled"
+                  count={appointments.data.rescheduled}
+                  total={appointments.data.total_appointments}
+                  color={colors.muted}
+                />
+              </View>
+            )}
+          </View>
         </ReportSection>
       ) : null}
 
@@ -126,6 +175,21 @@ function ReportSection({ title, children }: { title: string; children: ReactNode
   );
 }
 
+function ChartBarRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <View style={styles.barItem}>
+      <View style={styles.barLabelRow}>
+        <Text style={styles.barLabel}>{label}</Text>
+        <Text style={styles.barValue}>{count} ({pct}%)</Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   link: { color: colors.primary, fontWeight: '800' },
   title: { fontSize: 28, fontWeight: '900', color: colors.text },
@@ -135,9 +199,28 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: colors.softPrimary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   chipText: { color: colors.primary, fontWeight: '800' },
   dateRow: { flexDirection: 'row', gap: spacing.sm },
-  input: { flex: 1, minHeight: 46, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 12 },
+  rangeText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   section: { gap: spacing.sm, marginTop: spacing.sm },
   sectionTitle: { fontSize: 19, fontWeight: '900', color: colors.text },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chartCard: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  chartHeading: { fontSize: 15, fontWeight: '800', color: colors.text },
+  emptyChart: { color: colors.muted, fontSize: 14, fontStyle: 'italic' },
+  chartList: { gap: spacing.sm },
+  barItem: { gap: 4 },
+  barLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  barLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
+  barValue: { fontSize: 13, fontWeight: '700', color: colors.muted },
+  barTrack: { height: 8, backgroundColor: colors.background, borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4 },
 });
 

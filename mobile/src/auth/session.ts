@@ -37,3 +37,5 @@ export async function clearSessionTokens() {
   accessToken = null;
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
+
+export { getInitialRouteForRoles, isDoctorOrOwner, isAssistantRole } from '@/auth/roles';

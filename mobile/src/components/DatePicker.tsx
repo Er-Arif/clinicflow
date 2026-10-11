@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, radius } from '@/theme/tokens';
 
 interface DatePickerProps {
   value: string;
@@ -10,16 +10,17 @@ interface DatePickerProps {
   maximumDate?: Date;
   allowClear?: boolean;
   placeholder?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function DatePicker({ value, onChange, minimumDate, maximumDate, allowClear, placeholder = 'YYYY-MM-DD' }: DatePickerProps) {
+export function DatePicker({ value, onChange, minimumDate, maximumDate, allowClear, placeholder = 'YYYY-MM-DD', style }: DatePickerProps) {
   const [show, setShow] = useState(false);
 
   const displayDate = value ? value : placeholder;
   const dateObj = value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value) : new Date();
 
   return (
-    <View>
+    <View style={style}>
       <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
         <Pressable style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => setShow(true)}>
           <Text style={[styles.text, !value && { color: colors.muted }]}>{displayDate}</Text>

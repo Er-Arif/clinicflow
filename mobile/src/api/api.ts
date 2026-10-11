@@ -208,6 +208,7 @@ export const api = createApi({
     }),
     me: builder.query<AuthUser, void>({
       query: () => '/api/v1/auth/me',
+      providesTags: ['User'],
     }),
     logout: builder.mutation<void, void>({
       query: () => ({ url: '/api/v1/auth/logout', method: 'POST' }),
@@ -683,7 +684,7 @@ export const api = createApi({
     }),
     updateDoctorSettings: builder.mutation<DoctorSettings, { doctorId: string; body: { display_name: string; professional_display_details?: string | null; expected_version: number } }>({
       query: ({ doctorId, body }) => ({ url: `/api/v1/doctors/${doctorId}/settings`, method: 'PATCH', body }),
-      invalidatesTags: (_r, _e, arg) => [{ type: 'DoctorSettings', id: arg.doctorId }, { type: 'Doctor', id: 'LIST' }, 'Audit'],
+      invalidatesTags: (_r, _e, arg) => [{ type: 'DoctorSettings', id: arg.doctorId }, { type: 'Doctor', id: 'LIST' }, 'Audit', 'User'],
     }),
     listRolePresets: builder.query<RolePreset[], void>({
       query: () => '/api/v1/roles',

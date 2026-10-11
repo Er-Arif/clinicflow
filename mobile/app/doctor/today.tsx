@@ -2,8 +2,7 @@ import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useGetDoctorTodayQuery, useMeQuery } from '@/api/api';
-import { AppButton } from '@/components/AppButton';
+import { useGetDoctorTodayQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
 import { MetricCard } from '@/components/MetricCard';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -11,9 +10,7 @@ import { formatClinicDate } from '@/utils/dates';
 
 export default function DoctorToday() {
   const router = useRouter();
-  const me = useMeQuery();
   const today = useGetDoctorTodayQuery();
-  const owner = me.data?.permissions.includes('reports.view') ?? false;
 
   return (
     <AppScreen refreshing={today.isFetching} onRefresh={() => void today.refetch()}>
@@ -43,17 +40,6 @@ export default function DoctorToday() {
               <PatientCard key={item.appointment_id} item={item} onPress={() => router.push(`/doctor/patients/${item.patient_id}`)} />
             ))}
           </Section>
-
-          <AppButton label="Patient Search" tone="secondary" onPress={() => router.push('/doctor/patients')} />
-
-          {owner ? (
-            <View style={styles.ownerActions}>
-              <Text style={styles.sectionTitle}>Owner</Text>
-              <AppButton label="Dashboard" onPress={() => router.push('/doctor/dashboard')} />
-              <AppButton label="Reports" tone="secondary" onPress={() => router.push('/doctor/reports')} />
-              <AppButton label="Settings" tone="secondary" onPress={() => router.push('/doctor/settings')} />
-            </View>
-          ) : null}
         </>
       ) : null}
     </AppScreen>
@@ -99,6 +85,5 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 13, marginTop: 3 },
   active: { color: colors.primary, fontWeight: '900' },
   time: { color: colors.text, fontWeight: '900' },
-  ownerActions: { marginTop: spacing.lg, gap: spacing.sm },
 });
 
