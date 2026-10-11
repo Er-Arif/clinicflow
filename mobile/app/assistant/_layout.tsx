@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
 import { useMeQuery } from '@/api/api';
+import { getSharedTabScreenOptions, TabIcon } from '@/navigation/tabOptions';
 
 export default function AssistantLayout() {
   const { data: me, isLoading, isError } = useMeQuery();
@@ -25,34 +26,43 @@ export default function AssistantLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          // @ts-expect-error Expo Router typings for unmountOnBlur are sometimes strict
-          unmountOnBlur: true,
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarShowLabel: true,
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            height: 64 + insets.bottom,
-            paddingTop: 8,
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-          },
-          tabBarLabelStyle: {
-            fontSize: 13,
-            fontWeight: '600',
-            textAlign: 'center',
-          },
-        }}
-      >
-        <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="appointments" options={{ title: 'Appointments' }} />
-        <Tabs.Screen name="patients" options={{ title: 'Patients' }} />
-        <Tabs.Screen name="followups" options={{ title: 'Follow-ups' }} />
-        <Tabs.Screen name="more" options={{ title: 'More' }} />
+      <Tabs screenOptions={getSharedTabScreenOptions(insets)}>
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color, size }) => <TabIcon name="home" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="appointments"
+          options={{
+            title: 'Appointments',
+            tabBarLabel: 'Appts',
+            tabBarIcon: ({ color, size }) => <TabIcon name="appointments" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="patients"
+          options={{
+            title: 'Patients',
+            tabBarIcon: ({ color, size }) => <TabIcon name="patients" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="followups"
+          options={{
+            title: 'Follow-ups',
+            tabBarIcon: ({ color, size }) => <TabIcon name="followups" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: 'More',
+            tabBarIcon: ({ color, size }) => <TabIcon name="more" color={color} size={size} />,
+          }}
+        />
         <Tabs.Screen name="payments" options={{ href: null }} />
         <Tabs.Screen name="reminders" options={{ href: null }} />
         <Tabs.Screen name="walk-in" options={{ href: null }} />

@@ -76,10 +76,6 @@ export default function AssistantHome() {
             <AttentionRow label="Overdue follow-ups" value={data.overdue_followups} onPress={() => router.push('/assistant/followups')} />
           </View>
 
-          <View style={styles.actions}>
-            <AppButton label="Today's Appointments" tone="secondary" onPress={() => router.push('/assistant/appointments')} />
-            <AppButton label="Patient Search" tone="secondary" onPress={() => router.push('/assistant/patients')} />
-          </View>
         </>
       ) : null}
     </AppScreen>
@@ -127,6 +123,5 @@ const styles = StyleSheet.create({
   attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   warning: { color: colors.warning, fontWeight: '900', fontSize: 18 },
   mutedStrong: { color: colors.muted, fontWeight: '900', fontSize: 18 },
-  actions: { gap: spacing.sm },
 });
 
