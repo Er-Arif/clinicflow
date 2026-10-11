@@ -1,7 +1,7 @@
 import { Stack, Redirect } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useMeQuery } from '@/api/api';
-import { colors, layout } from '@/theme/tokens';
+import { colors } from '@/theme/tokens';
 
 export default function DoctorLayout() {
   const { data: me, isLoading, isError } = useMeQuery();
@@ -28,7 +28,7 @@ export default function DoctorLayout() {
       <Stack screenOptions={{ headerShown: false }} />
       {isLoading && (
         <View style={{
-          ...layout.absoluteFill,
+          ...StyleSheet.absoluteFill,
           backgroundColor: colors.background,
           justifyContent: 'center',
           alignItems: 'center',
@@ -40,3 +40,4 @@ export default function DoctorLayout() {
     </View>
   );
 }
+

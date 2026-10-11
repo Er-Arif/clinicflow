@@ -1,10 +1,12 @@
 import { Tabs, Redirect } from 'expo-router';
-import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
 import { useMeQuery } from '@/api/api';
 
 export default function AssistantLayout() {
   const { data: me, isLoading, isError } = useMeQuery();
+  const insets = useSafeAreaInsets();
 
   if (isError || (!isLoading && !me)) {
     return <Redirect href="/(auth)/login" />;
@@ -26,18 +28,23 @@ export default function AssistantLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          // @ts-expect-error Expo Router typings for unmountOnBlur are sometimes strict
           unmountOnBlur: true,
           tabBarActiveTintColor: colors.primary,
-          tabBarIcon: () => null,
+          tabBarInactiveTintColor: colors.muted,
+          tabBarShowLabel: true,
           tabBarStyle: {
-            paddingBottom: Platform.OS === 'ios' ? 20 : 0,
-            height: Platform.OS === 'ios' ? 70 : 56,
-            justifyContent: 'center',
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            height: 64 + insets.bottom,
+            paddingTop: 8,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           },
           tabBarLabelStyle: {
-            fontSize: 14,
-            fontWeight: '700',
-            marginBottom: Platform.OS === 'android' ? 14 : 0,
+            fontSize: 13,
+            fontWeight: '600',
+            textAlign: 'center',
           },
         }}
       >
@@ -51,7 +58,7 @@ export default function AssistantLayout() {
         <Tabs.Screen name="walk-in" options={{ href: null }} />
       </Tabs>
       {isLoading && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', zIndex: 999 }]}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}

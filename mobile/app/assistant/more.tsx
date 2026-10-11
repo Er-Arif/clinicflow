@@ -38,7 +38,6 @@ export default function MoreScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <MenuItem label="My Account" onPress={() => router.push('/assistant/account')} />
           <MenuItem label="Change Password" onPress={() => router.push('/(auth)/change-password')} />
           <MenuItem label="Log Out" onPress={handleLogout} textStyle={{ color: colors.danger }} />
         </View>
