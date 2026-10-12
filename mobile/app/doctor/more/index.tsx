@@ -8,6 +8,17 @@ import { AppScreen } from '@/components/AppScreen';
 import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function getGreetingPrefix(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return 'Good morning';
+  }
+  if (hour >= 12 && hour < 17) {
+    return 'Good afternoon';
+  }
+  return 'Good evening';
+}
+
 export default function DoctorMoreScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -16,6 +27,8 @@ export default function DoctorMoreScreen() {
   const me = useMeQuery();
   const doctors = useListDoctorsQuery();
   const owner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
+
+  const [greetingPrefix, setGreetingPrefix] = useState(getGreetingPrefix);
 
   // CF-UAT-029: Collapsible accordion categories start COLLAPSED by default.
   // Reset to collapsed when leaving More root on navigation blur.
@@ -26,14 +39,24 @@ export default function DoctorMoreScreen() {
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('blur', () => {
+    const unsubFocus = navigation.addListener('focus', () => {
+      setGreetingPrefix(getGreetingPrefix());
+    });
+    const unsubParentFocus = navigation.getParent()?.addListener('focus', () => {
+      setGreetingPrefix(getGreetingPrefix());
+    });
+    const unsubBlur = navigation.addListener('blur', () => {
       setClinicExpanded(false);
       setCommunicationExpanded(false);
       setAdminExpanded(false);
       setAccountExpanded(false);
       setAboutExpanded(false);
     });
-    return unsubscribe;
+    return () => {
+      unsubFocus();
+      unsubParentFocus?.();
+      unsubBlur();
+    };
   }, [navigation]);
 
   // ClinicFlow V1 Limitation: V1 is a single-doctor clinic architecture.
@@ -57,8 +80,7 @@ export default function DoctorMoreScreen() {
     <AppScreen>
       <ScrollView contentContainerStyle={{ gap: spacing.md }}>
         <View style={styles.header}>
-          <Text style={styles.title}>More</Text>
-          <Text style={styles.subtitle}>{doctorDisplayName}</Text>
+          <Text style={styles.title}>{greetingPrefix}, {doctorDisplayName}</Text>
         </View>
 
         {/* 1. Clinic & Practice */}

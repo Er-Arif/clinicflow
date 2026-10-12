@@ -58,7 +58,8 @@ export default function DoctorLayout() {
         <Tabs.Screen
           name="more"
           options={{
-            title: 'More',
+            title: 'Settings',
+            tabBarLabel: 'Settings',
             tabBarIcon: ({ color, size }) => <TabIcon name="more" color={color} size={size} />,
           }}
         />
