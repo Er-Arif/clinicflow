@@ -64,6 +64,9 @@ export default function ScheduleSettingsScreen() {
 
   // Inspect existing schedules for selected weekdays to detect mixed configurations
   const selectedDaysData = (schedule.data?.days ?? []).filter((d) => selectedWeekdays.includes(d.weekday));
+  const distinctEffectiveFroms = Array.from(new Set(selectedDaysData.map((d) => d.effective_from)));
+  const hasMixedEffectiveDates = distinctEffectiveFroms.length > 1;
+  const hasUnscheduledAndScheduled = selectedDaysData.length > 0 && selectedDaysData.length < selectedWeekdays.length;
 
   // Determine if selected days have different schedules
   const hasMixedExistingSchedules = (() => {
@@ -80,22 +83,31 @@ export default function ScheduleSettingsScreen() {
         .join(';')
     );
     const allSame = signatures.every((sig) => sig === signatures[0]);
-    return !allSame || selectedDaysData.length < selectedWeekdays.length;
+    return !allSame || selectedDaysData.length < selectedWeekdays.length || hasMixedEffectiveDates;
   })();
 
   // When changing primary weekday, initialize the editor with that scheduled day's sessions or defaults
   const primaryWeekday = selectedWeekdays[0] ?? 0;
+  const isScheduleQueryLoaded = Boolean(schedule.data && !schedule.isLoading);
   const primaryDay = schedule.data?.days.find((day) => day.weekday === primaryWeekday);
-  const lastLoadedPrimaryRef = useRef<number | null>(null);
-  const lastDoctorIdRef = useRef<string | null>(null);
+
+  // Track hydration state using schedule identity and version to prevent premature fallback or edit-wiping
+  const hydratedScheduleKeyRef = useRef<string | null>(null);
+
+  const targetScheduleKey = isScheduleQueryLoaded
+    ? primaryDay
+      ? `${doctorId}:${primaryWeekday}:${primaryDay.schedule_definition_id}:v${primaryDay.version}`
+      : `${doctorId}:${primaryWeekday}:unscheduled`
+    : null;
 
   useEffect(() => {
-    const isNewDoctor = lastDoctorIdRef.current !== doctorId;
-    const isNewPrimary = lastLoadedPrimaryRef.current !== primaryWeekday;
+    if (!isScheduleQueryLoaded || targetScheduleKey === null) {
+      // Query is still in-flight. DO NOT mark as hydrated and DO NOT overwrite with fallback.
+      return;
+    }
 
-    if (isNewDoctor || isNewPrimary || !effectiveFrom) {
-      lastDoctorIdRef.current = doctorId;
-      lastLoadedPrimaryRef.current = primaryWeekday;
+    if (hydratedScheduleKeyRef.current !== targetScheduleKey) {
+      hydratedScheduleKeyRef.current = targetScheduleKey;
       setOverwriteConfirmed(false);
 
       if (primaryDay) {
@@ -113,12 +125,13 @@ export default function ScheduleSettingsScreen() {
               display_order: index,
             })),
         );
-      } else if (today) {
-        setEffectiveFrom(today);
+      } else {
+        // Query finished and confirmed no schedule exists for this weekday
+        if (today) setEffectiveFrom(today);
         setSessions([blankSession(0)]);
       }
     }
-  }, [primaryDay, primaryWeekday, doctorId, today, effectiveFrom]);
+  }, [isScheduleQueryLoaded, targetScheduleKey, primaryDay, today]);
 
   function toggleWeekday(index: number) {
     setSelectedWeekdays((prev) => {
@@ -137,9 +150,23 @@ export default function ScheduleSettingsScreen() {
 
   async function save() {
     if (!doctorId || selectedWeekdays.length === 0) return;
-    if (hasMixedExistingSchedules && !overwriteConfirmed) {
-      setMessage('Please confirm applying this schedule to all selected days before saving.');
-      return;
+    if (selectedWeekdays.length > 1) {
+      if (hasMixedEffectiveDates && effectiveFrom < today) {
+        setMessage(
+          `Selected days have different schedule version dates (${distinctEffectiveFroms.join(', ')}). To edit in-place, edit each weekday individually, or select an effective date from ${today} onwards.`
+        );
+        return;
+      }
+      if (hasUnscheduledAndScheduled && effectiveFrom < today) {
+        setMessage(
+          `Some selected days are not yet scheduled. To configure them together, select an effective date from ${today} onwards.`
+        );
+        return;
+      }
+      if (hasMixedExistingSchedules && !overwriteConfirmed) {
+        setMessage('Please confirm applying this schedule to all selected days before saving.');
+        return;
+      }
     }
     setMessage(null);
     try {

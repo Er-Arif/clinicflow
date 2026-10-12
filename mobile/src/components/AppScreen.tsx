@@ -53,25 +53,40 @@ export function AppScreen({
 
     try {
       if (typeof node.measureInWindow === 'function') {
-        node.measureInWindow((_x: number, y: number, _width: number, height: number) => {
-          if (isNaN(y) || (y === 0 && height === 0)) return;
+        const measureSv = typeof (sv as any).measureInWindow === 'function';
+        if (measureSv) {
+          (sv as any).measureInWindow((_svX: number, svY: number, _svWidth: number, svHeight: number) => {
+            node.measureInWindow((_x: number, y: number, _width: number, height: number) => {
+              if (isNaN(y) || (y === 0 && height === 0) || isNaN(svHeight) || svHeight === 0) return;
 
-          const windowHeight = Dimensions.get('window').height;
-          const currentKeyboard = keyboardHeightRef.current;
-          const keyboardTop = currentKeyboard > 0 ? windowHeight - currentKeyboard : windowHeight;
-          const bottom = y + height;
-          const bottomMargin = spacing.lg; // 24px clearance above keyboard
+              const clearance = 36; // 30–48px visual clearance above keyboard
+              const nodeTopInSv = y - svY;
+              const nodeBottomInSv = nodeTopInSv + height;
 
-          if (bottom > keyboardTop - bottomMargin) {
-            const overflow = bottom - (keyboardTop - bottomMargin);
-            const targetY = scrollYRef.current + overflow;
-            sv.scrollTo({ y: Math.max(0, targetY), animated: true });
-          } else if (y < spacing.xl) {
-            const underflow = spacing.xl - y;
-            const targetY = scrollYRef.current - underflow;
-            sv.scrollTo({ y: Math.max(0, targetY), animated: true });
-          }
-        });
+              if (nodeBottomInSv > svHeight - clearance) {
+                const overflow = nodeBottomInSv - (svHeight - clearance);
+                const targetY = scrollYRef.current + overflow;
+                sv.scrollTo({ y: Math.max(0, targetY), animated: true });
+              } else if (nodeTopInSv < spacing.sm) {
+                const underflow = spacing.sm - nodeTopInSv;
+                const targetY = scrollYRef.current - underflow;
+                sv.scrollTo({ y: Math.max(0, targetY), animated: true });
+              }
+            });
+          });
+        } else {
+          node.measureInWindow((_x: number, y: number, _width: number, height: number) => {
+            if (isNaN(y) || (y === 0 && height === 0)) return;
+            const windowHeight = Dimensions.get('window').height;
+            const clearance = 36;
+            const bottom = y + height;
+            if (bottom > windowHeight - clearance) {
+              const overflow = bottom - (windowHeight - clearance);
+              const targetY = scrollYRef.current + overflow;
+              sv.scrollTo({ y: Math.max(0, targetY), animated: true });
+            }
+          });
+        }
       }
     } catch {
       // Safe fallback
