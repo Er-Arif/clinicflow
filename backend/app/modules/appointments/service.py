@@ -34,6 +34,7 @@ from app.modules.identity.service import AuthContext
 from app.modules.messaging.service import ReminderService
 from app.modules.patients.models import Patient
 from app.modules.payments.models import Payment
+from app.modules.scheduling.concurrency import acquire_doctor_date_locks
 from app.modules.scheduling.models import FeeConfiguration, SessionOccurrence
 from app.modules.scheduling.service import SchedulingService, generate_slots
 from app.modules.visits.models import Visit
@@ -135,6 +136,8 @@ class AppointmentService:
             doctor_id=doctor.doctor_id,
             appointment_date=request.appointment_date,
         )
+
+        acquire_doctor_date_locks(self.db, doctor.doctor_id, [request.appointment_date])
 
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
             request.session_definition_id, request.appointment_date
@@ -329,6 +332,14 @@ class AppointmentService:
                 )
         if request.new_appointment_date < self.clock.clinic_date():
             raise AppError("APPOINTMENT_DATE_PAST", "Select today or a future date.", 422)
+
+        original_occ = self.db.get(SessionOccurrence, original.session_occurrence_id)
+        if original_occ is not None:
+            acquire_doctor_date_locks(
+                self.db, original.doctor_id, [original_occ.occurrence_date, request.new_appointment_date]
+            )
+        else:
+            acquire_doctor_date_locks(self.db, original.doctor_id, [request.new_appointment_date])
 
         self._lock_patient(original.patient_id)
         self._validate_no_duplicate_appointment(

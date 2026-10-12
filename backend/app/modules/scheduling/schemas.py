@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -57,6 +58,57 @@ class MultiDayScheduleReplaceRequest(BaseModel):
         return self
 
 
+class DayImpactResponse(BaseModel):
+    weekday: int
+    weekday_name: str
+    applies_from: date
+    reason: str
+    conflict_detected: bool = False
+    existing_appointments_count: int = 0
+    conflict_metadata: dict[str, Any] | None = None
+
+
+class SchedulePreviewImpactRequest(BaseModel):
+    weekdays: list[int] = Field(min_length=1, max_length=7)
+    sessions: list[SessionWrite] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def validate_request(self) -> SchedulePreviewImpactRequest:
+        for w in self.weekdays:
+            if w < 0 or w > 6:
+                raise ValueError("Weekday must be between 0 (Monday) and 6 (Sunday).")
+        if len(self.weekdays) != len(set(self.weekdays)):
+            raise ValueError("Duplicate weekdays are not permitted in request.")
+        orders = [session.display_order for session in self.sessions]
+        if len(orders) != len(set(orders)):
+            raise ValueError("Session display order must be unique within a weekday.")
+        return self
+
+
+class SchedulePreviewImpactResponse(BaseModel):
+    proposal_token: str
+    evaluated_at: datetime
+    impacts: list[DayImpactResponse]
+
+
+class SmartScheduleApplyRequest(BaseModel):
+    proposal_token: str
+    weekdays: list[int] = Field(min_length=1, max_length=7)
+    sessions: list[SessionWrite] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def validate_request(self) -> SmartScheduleApplyRequest:
+        for w in self.weekdays:
+            if w < 0 or w > 6:
+                raise ValueError("Weekday must be between 0 (Monday) and 6 (Sunday).")
+        if len(self.weekdays) != len(set(self.weekdays)):
+            raise ValueError("Duplicate weekdays are not permitted in request.")
+        orders = [session.display_order for session in self.sessions]
+        if len(orders) != len(set(orders)):
+            raise ValueError("Session display order must be unique within a weekday.")
+        return self
+
+
 class SessionDefinitionResponse(BaseModel):
     session_definition_id: UUID
     session_name: str
@@ -83,6 +135,19 @@ class WeeklyScheduleResponse(BaseModel):
     doctor_id: UUID
     effective_on: date
     days: list[ScheduleDefinitionResponse]
+
+
+class WeekdayOverviewResponse(BaseModel):
+    weekday: int
+    weekday_name: str
+    current: ScheduleDefinitionResponse | None = None
+    upcoming: ScheduleDefinitionResponse | None = None
+
+
+class ScheduleOverviewResponse(BaseModel):
+    doctor_id: UUID
+    effective_on: date
+    days: list[WeekdayOverviewResponse]
 
 
 class AvailabilitySlot(BaseModel):

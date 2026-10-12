@@ -18,8 +18,12 @@ from app.modules.scheduling.schemas import (
     FeeConfigurationResponse,
     MultiDayScheduleReplaceRequest,
     ScheduleDefinitionResponse,
+    ScheduleOverviewResponse,
+    SchedulePreviewImpactRequest,
+    SchedulePreviewImpactResponse,
     ScheduleReplaceRequest,
     SessionOccurrenceResponse,
+    SmartScheduleApplyRequest,
     WeeklyScheduleResponse,
 )
 from app.modules.scheduling.service import SchedulingService
@@ -51,6 +55,46 @@ def get_schedule(
 ) -> WeeklyScheduleResponse:
     _can_view_availability(context)
     return SchedulingService(db, clock, context).weekly_schedule(doctor_id, effective_on)
+
+
+@router.get("/doctors/{doctor_id}/schedule/overview", response_model=ScheduleOverviewResponse)
+def get_schedule_overview(
+    doctor_id: UUID,
+    context: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> ScheduleOverviewResponse:
+    _can_view_availability(context)
+    return SchedulingService(db, clock, context).schedule_overview(doctor_id)
+
+
+@router.post(
+    "/doctors/{doctor_id}/schedule/preview-impact",
+    response_model=SchedulePreviewImpactResponse,
+)
+def preview_schedule_impact(
+    doctor_id: UUID,
+    request: SchedulePreviewImpactRequest,
+    context: AuthContext = Depends(require_permission("schedule.manage")),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> SchedulePreviewImpactResponse:
+    return SchedulingService(db, clock, context).preview_schedule_impact(doctor_id, request)
+
+
+@router.put(
+    "/doctors/{doctor_id}/schedule/smart-apply",
+    response_model=ScheduleOverviewResponse,
+)
+def smart_apply_schedule(
+    doctor_id: UUID,
+    request: SmartScheduleApplyRequest,
+    context: AuthContext = Depends(require_permission("schedule.manage")),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> ScheduleOverviewResponse:
+    with db.begin():
+        return SchedulingService(db, clock, context).smart_apply_schedule(doctor_id, request)
 
 
 @router.put(
