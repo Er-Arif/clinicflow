@@ -1,5 +1,15 @@
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { useRef } from 'react';
+import {
+  NativeSyntheticEvent,
+  StyleSheet,
+  TargetedEvent,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+} from 'react-native';
 
+import { useScrollIntoView } from '@/components/AppScreen';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 type Props = TextInputProps & {
@@ -7,11 +17,29 @@ type Props = TextInputProps & {
   error?: string;
 };
 
-export function FormField({ label, error, ...props }: Props) {
+export function FormField({ label, error, onFocus, ...props }: Props) {
+  const containerRef = useRef<View>(null);
+  const inputRef = useRef<TextInput>(null);
+  const scrollContext = useScrollIntoView();
+
+  const handleFocus = (e: NativeSyntheticEvent<TargetedEvent>) => {
+    onFocus?.(e as any);
+    if (containerRef.current) {
+      scrollContext?.scrollIntoView(containerRef.current);
+    } else if (inputRef.current) {
+      scrollContext?.scrollIntoView(inputRef.current);
+    }
+  };
+
   return (
-    <View style={styles.wrapper}>
+    <View ref={containerRef} style={styles.wrapper} collapsable={false}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput {...props} style={[styles.input, error ? styles.inputError : null, props.style]} />
+      <TextInput
+        ref={inputRef}
+        {...props}
+        onFocus={handleFocus}
+        style={[styles.input, error ? styles.inputError : null, props.style]}
+      />
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );

@@ -15,10 +15,10 @@ export default function UsersScreen() {
       <BackButton />
       <Text style={styles.title}>Users</Text>
       <Text style={styles.subtitle}>Individual accounts with server-defined ClinicFlow roles.</Text>
-      <AppButton label="Add User" onPress={() => router.push('/doctor/settings/users/new')} />
+      <AppButton label="Add User" onPress={() => router.push('/doctor/more/users/new')} />
       {users.isLoading ? <ActivityIndicator /> : null}
       {users.data?.items.map((user) => (
-        <Pressable key={user.user_id} style={styles.card} onPress={() => router.push(`/doctor/settings/users/${user.user_id}`)}>
+        <Pressable key={user.user_id} style={styles.card} onPress={() => router.push(`/doctor/more/users/${user.user_id}`)}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{user.display_name}</Text>

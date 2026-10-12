@@ -64,7 +64,7 @@ export default function AuditHistoryScreen() {
       <Text style={styles.heading}>{events.data ? `${events.data.total} events` : 'Events'}</Text>
       {events.isLoading ? <ActivityIndicator /> : null}
       {events.data?.items.map((event) => (
-        <Pressable key={event.audit_id} style={styles.card} onPress={() => router.push(`/doctor/settings/audit/${event.audit_id}`)}>
+        <Pressable key={event.audit_id} style={styles.card} onPress={() => router.push(`/doctor/more/audit/${event.audit_id}`)}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.action}>{event.action_type}</Text>

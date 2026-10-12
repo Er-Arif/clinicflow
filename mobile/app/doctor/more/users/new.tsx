@@ -23,7 +23,7 @@ export default function NewUserScreen() {
     setMessage(null);
     try {
       const user = await create({ display_name: name.trim(), login_identifier: login.trim(), temporary_password: password, role_codes: selectedRoles }).unwrap();
-      router.replace(`/doctor/settings/users/${user.user_id}`);
+      router.replace(`/doctor/more/users/${user.user_id}`);
     } catch (error) {
       const e = error as { data?: { error?: { message?: string } } };
       setMessage(e.data?.error?.message ?? 'Unable to create user.');

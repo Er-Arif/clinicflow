@@ -101,7 +101,7 @@ class SchedulingService:
                 ScheduleDefinition.clinic_id == self.context.clinic_id,
                 ScheduleDefinition.doctor_id == doctor_id,
                 ScheduleDefinition.weekday == weekday,
-                ScheduleDefinition.effective_from >= request.effective_from,
+                ScheduleDefinition.effective_from > request.effective_from,
             )
         )
         if future is not None:
@@ -110,6 +110,88 @@ class SchedulingService:
                 "A schedule version already starts on or after this date.",
                 409,
             )
+
+        same_date = self.db.scalar(
+            select(ScheduleDefinition)
+            .where(
+                ScheduleDefinition.clinic_id == self.context.clinic_id,
+                ScheduleDefinition.doctor_id == doctor_id,
+                ScheduleDefinition.weekday == weekday,
+                ScheduleDefinition.effective_from == request.effective_from,
+            )
+            .with_for_update()
+        )
+        if same_date is not None:
+            same_date.version += 1
+            same_date.active = bool(request.sessions)
+            existing_sessions = list(
+                self.db.scalars(
+                    select(SessionDefinition)
+                    .where(
+                        SessionDefinition.schedule_definition_id == same_date.schedule_definition_id
+                    )
+                    .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
+                ).all()
+            )
+            min_len = min(len(existing_sessions), len(request.sessions))
+            for i in range(min_len):
+                sess = existing_sessions[i]
+                req_sess = request.sessions[i]
+                sess.session_name = req_sess.session_name.strip()
+                sess.start_time = req_sess.start_time
+                sess.end_time = req_sess.end_time
+                sess.slot_interval_minutes = req_sess.slot_interval_minutes
+                sess.maximum_capacity = req_sess.maximum_capacity
+                sess.active = req_sess.active
+                sess.display_order = req_sess.display_order
+
+            if len(request.sessions) > len(existing_sessions):
+                for i in range(len(existing_sessions), len(request.sessions)):
+                    req_sess = request.sessions[i]
+                    self.db.add(
+                        SessionDefinition(
+                            clinic_id=self.context.clinic_id,
+                            schedule_definition_id=same_date.schedule_definition_id,
+                            session_name=req_sess.session_name.strip(),
+                            start_time=req_sess.start_time,
+                            end_time=req_sess.end_time,
+                            slot_interval_minutes=req_sess.slot_interval_minutes,
+                            maximum_capacity=req_sess.maximum_capacity,
+                            active=req_sess.active,
+                            display_order=req_sess.display_order,
+                        )
+                    )
+            elif len(existing_sessions) > len(request.sessions):
+                for i in range(len(request.sessions), len(existing_sessions)):
+                    sess = existing_sessions[i]
+                    occ_count = self.db.scalar(
+                        select(func.count(SessionOccurrence.session_occurrence_id)).where(
+                            SessionOccurrence.session_definition_id == sess.session_definition_id
+                        )
+                    )
+                    if occ_count == 0:
+                        self.db.delete(sess)
+                    else:
+                        sess.active = False
+                        sess.display_order = 1000 + i
+
+            self.db.flush()
+            AuditService(self.db).record(
+                clinic_id=self.context.clinic_id,
+                actor_type="USER",
+                actor_user_id=self.context.user_id,
+                action_type="SCHEDULE_VERSION_CREATED",
+                entity_type="SCHEDULE_DEFINITION",
+                entity_id=same_date.schedule_definition_id,
+                request_id=_request_id(),
+                new_values={
+                    "doctor_id": str(doctor_id),
+                    "weekday": weekday,
+                    "effective_from": request.effective_from.isoformat(),
+                    "session_count": len(request.sessions),
+                },
+            )
+            return self._schedule_response(same_date)
 
         current = self.db.scalar(
             select(ScheduleDefinition)
@@ -493,7 +575,10 @@ class SchedulingService:
     def _schedule_response(self, definition: ScheduleDefinition) -> ScheduleDefinitionResponse:
         sessions = self.db.scalars(
             select(SessionDefinition)
-            .where(SessionDefinition.schedule_definition_id == definition.schedule_definition_id)
+            .where(
+                SessionDefinition.schedule_definition_id == definition.schedule_definition_id,
+                SessionDefinition.active.is_(True),
+            )
             .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
         ).all()
         return ScheduleDefinitionResponse(

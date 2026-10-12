@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 
 import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery, useListDoctorsQuery } from '@/api/api';
 import { clearSessionTokens } from '@/auth/session';
@@ -10,19 +10,31 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function DoctorMoreScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [logoutMutation, logoutState] = useLogoutMutation();
   const systemInfo = useGetSystemInfoQuery();
   const me = useMeQuery();
   const doctors = useListDoctorsQuery();
   const owner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
 
-  // Collapsible accordion section states
-  // Primary section expanded by default; secondary sections start collapsed
-  const [clinicExpanded, setClinicExpanded] = useState(true);
+  // CF-UAT-029: Collapsible accordion categories start COLLAPSED by default.
+  // Reset to collapsed when leaving More root on navigation blur.
+  const [clinicExpanded, setClinicExpanded] = useState(false);
   const [communicationExpanded, setCommunicationExpanded] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
-  const [accountExpanded, setAccountExpanded] = useState(true);
+  const [accountExpanded, setAccountExpanded] = useState(false);
   const [aboutExpanded, setAboutExpanded] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      setClinicExpanded(false);
+      setCommunicationExpanded(false);
+      setAdminExpanded(false);
+      setAccountExpanded(false);
+      setAboutExpanded(false);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // ClinicFlow V1 Limitation: V1 is a single-doctor clinic architecture.
   // AuthUser does not carry a doctor_id, and Doctor records are not linked to non-owner users in listDoctors.
@@ -57,16 +69,16 @@ export default function DoctorMoreScreen() {
         >
           {owner ? (
             <>
-              <MenuItem label="Clinic Settings" onPress={() => router.push('/doctor/settings/clinic')} />
-              <MenuItem label="Doctor Settings" onPress={() => router.push('/doctor/settings/doctor')} />
-              <MenuItem label="Schedule & Sessions" onPress={() => router.push('/doctor/settings/schedule')} />
-              <MenuItem label="Consultation Fees" onPress={() => router.push('/doctor/settings/fees')} />
-              <MenuItem label="UPI Payment Configuration" onPress={() => router.push('/doctor/settings/upi')} />
+              <MenuItem label="Clinic Settings" onPress={() => router.push('/doctor/more/clinic')} />
+              <MenuItem label="Doctor Settings" onPress={() => router.push('/doctor/more/doctor')} />
+              <MenuItem label="Schedule & Sessions" onPress={() => router.push('/doctor/more/schedule')} />
+              <MenuItem label="Consultation Fees" onPress={() => router.push('/doctor/more/fees')} />
+              <MenuItem label="UPI Payment Configuration" onPress={() => router.push('/doctor/more/upi')} />
             </>
           ) : (
             <>
-              <MenuItem label="Doctor Settings" onPress={() => router.push('/doctor/settings/doctor')} />
-              <MenuItem label="Schedule & Sessions" onPress={() => router.push('/doctor/settings/schedule')} />
+              <MenuItem label="Doctor Settings" onPress={() => router.push('/doctor/more/doctor')} />
+              <MenuItem label="Schedule & Sessions" onPress={() => router.push('/doctor/more/schedule')} />
             </>
           )}
         </AccordionSection>
@@ -78,7 +90,7 @@ export default function DoctorMoreScreen() {
             expanded={communicationExpanded}
             onToggle={() => setCommunicationExpanded((prev) => !prev)}
           >
-            <MenuItem label="Message Templates" onPress={() => router.push('/doctor/settings/messages')} />
+            <MenuItem label="Message Templates" onPress={() => router.push('/doctor/more/messages')} />
           </AccordionSection>
         )}
 
@@ -89,8 +101,8 @@ export default function DoctorMoreScreen() {
             expanded={adminExpanded}
             onToggle={() => setAdminExpanded((prev) => !prev)}
           >
-            <MenuItem label="User Management" onPress={() => router.push('/doctor/settings/users')} />
-            <MenuItem label="Audit History" onPress={() => router.push('/doctor/settings/audit')} />
+            <MenuItem label="User Management" onPress={() => router.push('/doctor/more/users')} />
+            <MenuItem label="Audit History" onPress={() => router.push('/doctor/more/audit')} />
           </AccordionSection>
         )}
 
@@ -114,7 +126,7 @@ export default function DoctorMoreScreen() {
           expanded={aboutExpanded}
           onToggle={() => setAboutExpanded((prev) => !prev)}
         >
-          <MenuItem label="About ClinicFlow" onPress={() => router.push('/doctor/settings/about')} />
+          <MenuItem label="About ClinicFlow" onPress={() => router.push('/doctor/more/about')} />
           <View style={styles.card}>
             <Text style={styles.text}>ClinicFlow V1</Text>
             {systemInfo.data ? (
