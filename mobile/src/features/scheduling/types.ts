@@ -79,3 +79,33 @@ export type FeeConfiguration = {
   followup_fee: string | number;
   assistant_adjustment_allowed: boolean;
 };
+
+export type ScheduleException = {
+  id: string;
+  occurrence_ids: string[];
+  date: string;
+  scope: 'FULL_DAY' | 'SESSION';
+  session_name: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  reason: string;
+  status: 'BLOCKED';
+  retained_appointments_count: number;
+};
+
+export type ScheduleExceptionsListResponse = {
+  doctor_id: string;
+  exceptions: ScheduleException[];
+  total_count: number;
+};
+
+export type BlockScheduleExceptionPayload = {
+  date: string;
+  scope: 'FULL_DAY' | 'SESSION';
+  session_definition_id?: string | null;
+  reason: string;
+};
+
+export type UnblockScheduleExceptionPayload = {
+  occurrence_ids: string[];
+};

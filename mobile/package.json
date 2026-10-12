@@ -8,6 +8,7 @@
     "android": "expo run:android",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
+    "test": "node --test __tests__/**/*.test.js",
     "postinstall": "patch-package"
   },
   "dependencies": {

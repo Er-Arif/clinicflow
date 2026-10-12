@@ -31,12 +31,15 @@ from app.modules.scheduling.schemas import (
     AvailabilityResponse,
     AvailabilitySession,
     AvailabilitySlot,
+    BlockScheduleExceptionRequest,
     BlockSessionRequest,
     DayImpactResponse,
     FeeConfigurationCreateRequest,
     FeeConfigurationResponse,
     MultiDayScheduleReplaceRequest,
     ScheduleDefinitionResponse,
+    ScheduleExceptionResponse,
+    ScheduleExceptionsListResponse,
     ScheduleOverviewResponse,
     SchedulePreviewImpactRequest,
     SchedulePreviewImpactResponse,
@@ -45,6 +48,8 @@ from app.modules.scheduling.schemas import (
     SessionOccurrenceResponse,
     SessionWrite,
     SmartScheduleApplyRequest,
+    UnblockScheduleExceptionRequest,
+    UnblockScheduleExceptionResponse,
     WeekdayOverviewResponse,
     WeeklyScheduleResponse,
 )
@@ -1177,6 +1182,33 @@ class SchedulingService:
             ).all()
         } if sessions else {}
 
+        occ_ids = [occ.session_occurrence_id for occ in occurrences.values()]
+        appt_counts: dict[UUID, int] = {}
+        booked_times_by_occ: dict[UUID, set[time]] = {}
+        if occ_ids:
+            count_rows = self.db.execute(
+                select(Appointment.session_occurrence_id, func.count(Appointment.appointment_id))
+                .where(
+                    Appointment.clinic_id == self.context.clinic_id,
+                    Appointment.session_occurrence_id.in_(occ_ids),
+                    Appointment.status != "CANCELLED",
+                )
+                .group_by(Appointment.session_occurrence_id)
+            ).all()
+            appt_counts = {r[0]: int(r[1]) for r in count_rows}
+
+            time_rows = self.db.execute(
+                select(Appointment.session_occurrence_id, Appointment.appointment_time)
+                .where(
+                    Appointment.clinic_id == self.context.clinic_id,
+                    Appointment.session_occurrence_id.in_(occ_ids),
+                    Appointment.status != "CANCELLED",
+                    Appointment.appointment_time.is_not(None),
+                )
+            ).all()
+            for occ_id, appt_time in time_rows:
+                booked_times_by_occ.setdefault(occ_id, set()).add(appt_time)
+
         result: list[AvailabilitySession] = []
         for session in sessions:
             occurrence = occurrences.get(session.session_definition_id)
@@ -1189,8 +1221,8 @@ class SchedulingService:
                 else session.slot_interval_minutes
             )
             capacity = occurrence.maximum_capacity_snapshot if occurrence else session.maximum_capacity
-            # M4 plugs Appointment occupancy into this read model. M3 has no appointment table yet.
-            used_capacity = 0
+            used_capacity = appt_counts.get(occurrence.session_occurrence_id, 0) if occurrence else 0
+            booked_slots = booked_times_by_occ.get(occurrence.session_occurrence_id, set()) if occurrence else set()
             remaining = max(capacity - used_capacity, 0)
             sendable = status == "AVAILABLE" and remaining > 0
             result.append(
@@ -1210,8 +1242,8 @@ class SchedulingService:
                     slots=[
                         AvailabilitySlot(
                             time=value,
-                            available=sendable,
-                            normal_booking_allowed=sendable,
+                            available=(status == "AVAILABLE" and value not in booked_slots),
+                            normal_booking_allowed=(sendable and value not in booked_slots),
                         )
                         for value in generate_slots(start, end, interval)
                     ],
@@ -1281,6 +1313,316 @@ class SchedulingService:
             new_values={"status": "AVAILABLE", "date": occurrence.occurrence_date.isoformat()},
         )
         return self._occurrence_response(occurrence)
+
+    def list_exceptions(
+        self, doctor_id: UUID, from_date: date | None = None
+    ) -> ScheduleExceptionsListResponse:
+        doctor = self._doctor(doctor_id)
+        effective_from = from_date or self.clock.now_utc().date()
+        blocked_occurrences = list(
+            self.db.scalars(
+                select(SessionOccurrence)
+                .where(
+                    SessionOccurrence.clinic_id == self.context.clinic_id,
+                    SessionOccurrence.doctor_id == doctor.doctor_id,
+                    SessionOccurrence.status == "BLOCKED",
+                    SessionOccurrence.occurrence_date >= effective_from,
+                )
+                .order_by(SessionOccurrence.occurrence_date.asc(), SessionOccurrence.start_time_snapshot.asc())
+            ).all()
+        )
+
+        occ_ids = [occ.session_occurrence_id for occ in blocked_occurrences]
+        appt_counts: dict[UUID, int] = {}
+        if occ_ids:
+            count_rows = self.db.execute(
+                select(Appointment.session_occurrence_id, func.count(Appointment.appointment_id))
+                .where(
+                    Appointment.clinic_id == self.context.clinic_id,
+                    Appointment.session_occurrence_id.in_(occ_ids),
+                    Appointment.status != "CANCELLED",
+                )
+                .group_by(Appointment.session_occurrence_id)
+            ).all()
+            appt_counts = {r[0]: int(r[1]) for r in count_rows}
+
+        occurrences_by_date: dict[date, list[SessionOccurrence]] = {}
+        for occ in blocked_occurrences:
+            occurrences_by_date.setdefault(occ.occurrence_date, []).append(occ)
+
+        exception_items: list[ScheduleExceptionResponse] = []
+        for occ_date, day_occs in sorted(occurrences_by_date.items(), key=lambda x: x[0]):
+            active_schedule = self.db.scalar(
+                select(ScheduleDefinition).where(
+                    ScheduleDefinition.clinic_id == self.context.clinic_id,
+                    ScheduleDefinition.doctor_id == doctor.doctor_id,
+                    ScheduleDefinition.weekday == occ_date.weekday(),
+                    ScheduleDefinition.active.is_(True),
+                    ScheduleDefinition.effective_from <= occ_date,
+                    or_(
+                        ScheduleDefinition.effective_to.is_(None),
+                        ScheduleDefinition.effective_to >= occ_date,
+                    ),
+                )
+            )
+            active_session_defs = (
+                list(
+                    self.db.scalars(
+                        select(SessionDefinition)
+                        .where(
+                            SessionDefinition.schedule_definition_id == active_schedule.schedule_definition_id,
+                            SessionDefinition.active.is_(True),
+                        )
+                    ).all()
+                )
+                if active_schedule
+                else []
+            )
+
+            distinct_reasons = [o.block_reason for o in day_occs if o.block_reason]
+            unique_reasons = list(dict.fromkeys(distinct_reasons))
+            is_full_day = (
+                len(active_session_defs) > 0
+                and len(day_occs) >= len(active_session_defs)
+            )
+
+            if is_full_day:
+                combined_reason = " / ".join(unique_reasons) if unique_reasons else ""
+                total_retained = sum(appt_counts.get(o.session_occurrence_id, 0) for o in day_occs)
+                exception_items.append(
+                    ScheduleExceptionResponse(
+                        id=f"fullday-{occ_date.isoformat()}",
+                        occurrence_ids=[o.session_occurrence_id for o in day_occs],
+                        date=occ_date,
+                        scope="FULL_DAY",
+                        session_name=None,
+                        start_time=None,
+                        end_time=None,
+                        reason=combined_reason,
+                        status="BLOCKED",
+                        retained_appointments_count=total_retained,
+                    )
+                )
+            else:
+                for occ in day_occs:
+                    exception_items.append(
+                        ScheduleExceptionResponse(
+                            id=str(occ.session_occurrence_id),
+                            occurrence_ids=[occ.session_occurrence_id],
+                            date=occ_date,
+                            scope="SESSION",
+                            session_name=occ.session_name_snapshot,
+                            start_time=occ.start_time_snapshot,
+                            end_time=occ.end_time_snapshot,
+                            reason=occ.block_reason or "",
+                            status="BLOCKED",
+                            retained_appointments_count=appt_counts.get(occ.session_occurrence_id, 0),
+                        )
+                    )
+
+        return ScheduleExceptionsListResponse(
+            doctor_id=doctor.doctor_id,
+            exceptions=exception_items,
+            total_count=len(exception_items),
+        )
+
+    def block_exception(
+        self, doctor_id: UUID, request: BlockScheduleExceptionRequest
+    ) -> ScheduleExceptionResponse:
+        doctor = self._doctor(doctor_id)
+        acquire_doctor_date_locks(self.db, doctor.doctor_id, [request.date])
+
+        definition = self.db.scalar(
+            select(ScheduleDefinition).where(
+                ScheduleDefinition.clinic_id == self.context.clinic_id,
+                ScheduleDefinition.doctor_id == doctor.doctor_id,
+                ScheduleDefinition.weekday == request.date.weekday(),
+                ScheduleDefinition.active.is_(True),
+                ScheduleDefinition.effective_from <= request.date,
+                or_(
+                    ScheduleDefinition.effective_to.is_(None),
+                    ScheduleDefinition.effective_to >= request.date,
+                ),
+            )
+        )
+        if definition is None:
+            raise AppError(
+                "NO_ACTIVE_SCHEDULE",
+                "No active schedule found for this doctor on the selected date.",
+                422,
+            )
+
+        active_sessions = list(
+            self.db.scalars(
+                select(SessionDefinition)
+                .where(
+                    SessionDefinition.schedule_definition_id == definition.schedule_definition_id,
+                    SessionDefinition.active.is_(True),
+                )
+                .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
+            ).all()
+        )
+        if not active_sessions:
+            raise AppError(
+                "NO_ACTIVE_SESSIONS",
+                "No active sessions configured for this doctor on the selected date.",
+                422,
+            )
+
+        if request.scope == "SESSION":
+            if not request.session_definition_id:
+                raise AppError(
+                    "SESSION_DEFINITION_REQUIRED",
+                    "A session must be selected when scope is SESSION.",
+                    422,
+                )
+            target_session = next(
+                (s for s in active_sessions if s.session_definition_id == request.session_definition_id),
+                None,
+            )
+            if target_session is None:
+                raise AppError(
+                    "SESSION_NOT_FOUND",
+                    "Selected session does not belong to the active schedule on this date.",
+                    404,
+                )
+            block_req = BlockSessionRequest(
+                session_definition_id=target_session.session_definition_id,
+                date=request.date,
+                reason=request.reason,
+            )
+            occ_res = self.block(block_req)
+            retained_count = int(
+                self.db.scalar(
+                    select(func.count(Appointment.appointment_id)).where(
+                        Appointment.clinic_id == self.context.clinic_id,
+                        Appointment.session_occurrence_id == occ_res.session_occurrence_id,
+                        Appointment.status != "CANCELLED",
+                    )
+                )
+                or 0
+            )
+            return ScheduleExceptionResponse(
+                id=str(occ_res.session_occurrence_id),
+                occurrence_ids=[occ_res.session_occurrence_id],
+                date=request.date,
+                scope="SESSION",
+                session_name=occ_res.name,
+                start_time=occ_res.start_time,
+                end_time=occ_res.end_time,
+                reason=request.reason.strip(),
+                status="BLOCKED",
+                retained_appointments_count=retained_count,
+            )
+        else:
+            target_occurrences: list[SessionOccurrence] = []
+            for s in active_sessions:
+                occ = self.materialize_occurrence(s.session_definition_id, request.date)
+                locked_occ = self.db.scalar(
+                    select(SessionOccurrence)
+                    .where(SessionOccurrence.session_occurrence_id == occ.session_occurrence_id)
+                    .with_for_update()
+                )
+                if locked_occ is None:  # pragma: no cover
+                    raise RuntimeError("Occurrence disappeared while blocking")
+                target_occurrences.append(locked_occ)
+
+            unblocked_occurrences = [o for o in target_occurrences if o.status != "BLOCKED"]
+            if not unblocked_occurrences:
+                raise AppError(
+                    "DATE_ALREADY_BLOCKED",
+                    "All sessions on this date are already blocked.",
+                    409,
+                )
+
+            now = self.clock.now_utc()
+            for locked_occ in unblocked_occurrences:
+                locked_occ.status = "BLOCKED"
+                locked_occ.block_reason = request.reason.strip()
+                locked_occ.blocked_by = self.context.user_id
+                locked_occ.blocked_at = now
+                locked_occ.version += 1
+                self.db.flush()
+                AuditService(self.db).record(
+                    clinic_id=self.context.clinic_id,
+                    actor_type="USER",
+                    actor_user_id=self.context.user_id,
+                    action_type="SESSION_BLOCKED",
+                    entity_type="SESSION_OCCURRENCE",
+                    entity_id=locked_occ.session_occurrence_id,
+                    request_id=_request_id(),
+                    reason=locked_occ.block_reason,
+                    new_values={"status": "BLOCKED", "date": locked_occ.occurrence_date.isoformat()},
+                )
+
+            occ_ids = [o.session_occurrence_id for o in target_occurrences]
+            total_retained = 0
+            if occ_ids:
+                total_retained = int(
+                    self.db.scalar(
+                        select(func.count(Appointment.appointment_id)).where(
+                            Appointment.clinic_id == self.context.clinic_id,
+                            Appointment.session_occurrence_id.in_(occ_ids),
+                            Appointment.status != "CANCELLED",
+                        )
+                    )
+                    or 0
+                )
+
+            return ScheduleExceptionResponse(
+                id=f"fullday-{request.date.isoformat()}",
+                occurrence_ids=occ_ids,
+                date=request.date,
+                scope="FULL_DAY",
+                session_name=None,
+                start_time=None,
+                end_time=None,
+                reason=request.reason.strip(),
+                status="BLOCKED",
+                retained_appointments_count=total_retained,
+            )
+
+    def unblock_exceptions(
+        self, doctor_id: UUID, request: UnblockScheduleExceptionRequest
+    ) -> UnblockScheduleExceptionResponse:
+        doctor = self._doctor(doctor_id)
+        if not request.occurrence_ids:
+            return UnblockScheduleExceptionResponse(unblocked_count=0)
+
+        unblocked_count = 0
+        for occ_id in request.occurrence_ids:
+            occ = self.db.scalar(
+                select(SessionOccurrence)
+                .where(
+                    SessionOccurrence.session_occurrence_id == occ_id,
+                    SessionOccurrence.clinic_id == self.context.clinic_id,
+                    SessionOccurrence.doctor_id == doctor.doctor_id,
+                )
+                .with_for_update()
+            )
+            if occ is None:
+                continue
+            acquire_doctor_date_locks(self.db, occ.doctor_id, [occ.occurrence_date])
+            if occ.status == "BLOCKED":
+                occ.status = "AVAILABLE"
+                occ.block_reason = None
+                occ.blocked_by = None
+                occ.blocked_at = None
+                occ.version += 1
+                self.db.flush()
+                AuditService(self.db).record(
+                    clinic_id=self.context.clinic_id,
+                    actor_type="USER",
+                    actor_user_id=self.context.user_id,
+                    action_type="SESSION_UNBLOCKED",
+                    entity_type="SESSION_OCCURRENCE",
+                    entity_id=occ.session_occurrence_id,
+                    request_id=_request_id(),
+                    new_values={"status": "AVAILABLE", "date": occ.occurrence_date.isoformat()},
+                )
+                unblocked_count += 1
+
+        return UnblockScheduleExceptionResponse(unblocked_count=unblocked_count)
 
     def materialize_occurrence(self, session_definition_id: UUID, target_date: date) -> SessionOccurrence:
         row = self.db.execute(

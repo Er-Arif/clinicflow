@@ -2144,3 +2144,283 @@ def test_stale_preview_rejected_when_exception_created_after_preview():
 
     app.dependency_overrides.clear()
     engine.dispose()
+
+
+def test_exceptions_hub_endpoints_and_lifecycle():
+    session_factory, engine = _session_factory()
+    redesign_case = _seed_redesign_case(session_factory)
+    clock = MockClock(instant=datetime(2026, 10, 12, 9, 0, tzinfo=UTC), current_date=date(2026, 10, 12))
+
+    # Seed Tuesday schedule: Morning 10-13, Evening 17-20
+    sched_id = _seed_schedule(
+        session_factory,
+        redesign_case,
+        weekday=1,
+        effective_from=date(2026, 10, 1),
+        effective_to=None,
+        version=1,
+        sessions_data=[
+            {"session_name": "Morning", "start_time": time(10, 0), "end_time": time(13, 0), "slot_interval_minutes": 15, "maximum_capacity": 10, "display_order": 0},
+            {"session_name": "Evening", "start_time": time(17, 0), "end_time": time(20, 0), "slot_interval_minutes": 15, "maximum_capacity": 10, "display_order": 1},
+        ],
+    )
+
+    with session_factory() as db:
+        sessions = db.scalars(
+            select(SessionDefinition)
+            .where(SessionDefinition.schedule_definition_id == sched_id)
+            .order_by(SessionDefinition.display_order)
+        ).all()
+        morn_id = sessions[0].session_definition_id
+        eve_id = sessions[1].session_definition_id
+
+    client = _client(session_factory, redesign_case, clock)
+
+    # 1. Book an appointment in Morning session on 2026-10-13
+    appt_id = _seed_appointment(
+        session_factory, redesign_case, date(2026, 10, 13), time(10, 30), morn_id
+    )
+
+    # 2. Query exceptions initially: should be empty
+    res = client.get(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions?from_date=2026-10-12"
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["total_count"] == 0
+    assert res.json()["exceptions"] == []
+
+    # 3. Block full day on Tuesday 2026-10-13
+    block_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": "2026-10-13",
+            "scope": "FULL_DAY",
+            "reason": "Doctor at Medical Summit",
+        },
+    )
+    assert block_res.status_code == 200
+    block_data = block_res.json()
+    assert block_data["scope"] == "FULL_DAY"
+    assert block_data["reason"] == "Doctor at Medical Summit"
+    assert block_data["status"] == "BLOCKED"
+    assert block_data["retained_appointments_count"] == 1
+    assert len(block_data["occurrence_ids"]) == 2
+
+    # 4. Duplicate block of the same full day -> 409 DATE_ALREADY_BLOCKED
+    dup_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": "2026-10-13",
+            "scope": "FULL_DAY",
+            "reason": "Doctor at Medical Summit",
+        },
+    )
+    assert dup_res.status_code == 409
+    assert dup_res.json()["error"]["code"] == "DATE_ALREADY_BLOCKED"
+
+    # 5. List exceptions -> shows the 1 full day exception with retained_appointments_count == 1
+    list_res = client.get(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions?from_date=2026-10-12"
+    )
+    assert list_res.status_code == 200
+    items = list_res.json()["exceptions"]
+    assert len(items) == 1
+    assert items[0]["scope"] == "FULL_DAY"
+    assert items[0]["date"] == "2026-10-13"
+    assert items[0]["retained_appointments_count"] == 1
+    assert items[0]["status"] == "BLOCKED"
+
+    # 6. Verify existing appointment row is NOT deleted or cancelled
+    with session_factory() as db:
+        stored_appt = db.get(Appointment, appt_id)
+        assert stored_appt is not None
+        assert stored_appt.status == "BOOKED"
+        assert stored_appt.session_occurrence_id is not None
+
+    # 7. Block a specific session on next Tuesday (2026-10-20, Evening only)
+    sess_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": "2026-10-20",
+            "scope": "SESSION",
+            "session_definition_id": str(eve_id),
+            "reason": "Family Dinner",
+        },
+    )
+    assert sess_res.status_code == 200
+    sess_data = sess_res.json()
+    assert sess_data["scope"] == "SESSION"
+    assert sess_data["session_name"] == "Evening"
+    assert sess_data["reason"] == "Family Dinner"
+    assert sess_data["retained_appointments_count"] == 0
+
+    # 8. Duplicate block of the same session -> 409 SESSION_ALREADY_BLOCKED
+    dup_sess_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": "2026-10-20",
+            "scope": "SESSION",
+            "session_definition_id": str(eve_id),
+            "reason": "Family Dinner",
+        },
+    )
+    assert dup_sess_res.status_code == 409
+    assert dup_sess_res.json()["error"]["code"] == "SESSION_ALREADY_BLOCKED"
+
+    # 9. List exceptions -> now has 2 exceptions (one FULL_DAY on 13 Oct, one SESSION on 20 Oct)
+    list2_res = client.get(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions?from_date=2026-10-12"
+    )
+    assert list2_res.status_code == 200
+    assert list2_res.json()["total_count"] == 2
+    assert list2_res.json()["exceptions"][0]["scope"] == "FULL_DAY"
+    assert list2_res.json()["exceptions"][1]["scope"] == "SESSION"
+    assert list2_res.json()["exceptions"][1]["session_name"] == "Evening"
+
+    # 10. Unblock the full day exception (2026-10-13)
+    unblock_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/unblock",
+        json={"occurrence_ids": [str(x) for x in block_data["occurrence_ids"]]},
+    )
+    assert unblock_res.status_code == 200
+    assert unblock_res.json()["unblocked_count"] == 2
+
+    # 11. List exceptions again -> only 1 remaining (the 20 Oct session)
+    list3_res = client.get(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions?from_date=2026-10-12"
+    )
+    assert list3_res.status_code == 200
+    assert list3_res.json()["total_count"] == 1
+    assert list3_res.json()["exceptions"][0]["date"] == "2026-10-20"
+
+    # 12. Appointment row on 13 Oct is still completely intact
+    with session_factory() as db:
+        stored_appt = db.get(Appointment, appt_id)
+        assert stored_appt is not None
+        assert stored_appt.status == "BOOKED"
+
+    engine.dispose()
+
+
+def test_partial_session_block_to_full_day_block_lifecycle():
+    session_factory, engine = _session_factory()
+    redesign_case = _seed_redesign_case(session_factory)
+    clock = MockClock(instant=datetime(2026, 10, 12, 9, 0, tzinfo=UTC), current_date=date(2026, 10, 12))
+
+    # Thursday schedule: Morning 10-13, Evening 17-20
+    sched_id = _seed_schedule(
+        session_factory,
+        redesign_case,
+        weekday=3,
+        effective_from=date(2026, 10, 1),
+        effective_to=None,
+        version=1,
+        sessions_data=[
+            {"session_name": "Morning", "start_time": time(10, 0), "end_time": time(13, 0), "slot_interval_minutes": 15, "maximum_capacity": 10, "display_order": 0},
+            {"session_name": "Evening", "start_time": time(17, 0), "end_time": time(20, 0), "slot_interval_minutes": 15, "maximum_capacity": 10, "display_order": 1},
+        ],
+    )
+
+    with session_factory() as db:
+        sessions = db.scalars(
+            select(SessionDefinition)
+            .where(SessionDefinition.schedule_definition_id == sched_id)
+            .order_by(SessionDefinition.display_order)
+        ).all()
+        morn_id = sessions[0].session_definition_id
+        eve_id = sessions[1].session_definition_id
+
+    client = _client(session_factory, redesign_case, clock)
+    target_date = date(2026, 10, 15)
+
+    # Seed appointments in both sessions
+    morn_appt_id = _seed_appointment(
+        session_factory, redesign_case, target_date, time(10, 30), morn_id
+    )
+    eve_appt_id = _seed_appointment(
+        session_factory, redesign_case, target_date, time(17, 30), eve_id
+    )
+
+    # Case A: Morning blocked, Evening open
+    morn_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": target_date.isoformat(),
+            "scope": "SESSION",
+            "session_definition_id": str(morn_id),
+            "reason": "Dentist Appointment",
+        },
+    )
+    assert morn_res.status_code == 200
+    assert morn_res.json()["scope"] == "SESSION"
+    assert morn_res.json()["retained_appointments_count"] == 1
+
+    # Full Day block request when Morning is already blocked and Evening is open
+    fullday_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": target_date.isoformat(),
+            "scope": "FULL_DAY",
+            "reason": "Full Day Emergency Leave",
+        },
+    )
+    assert fullday_res.status_code == 200, fullday_res.text
+    fullday_data = fullday_res.json()
+    assert fullday_data["scope"] == "FULL_DAY"
+    assert fullday_data["status"] == "BLOCKED"
+    assert fullday_data["retained_appointments_count"] == 2
+    assert len(fullday_data["occurrence_ids"]) == 2
+
+    # Verify Morning's original block reason is preserved, Evening has the new reason
+    with session_factory() as db:
+        occs = db.scalars(
+            select(SessionOccurrence)
+            .where(
+                SessionOccurrence.doctor_id == redesign_case.doctor_id,
+                SessionOccurrence.occurrence_date == target_date,
+            )
+            .order_by(SessionOccurrence.start_time_snapshot)
+        ).all()
+        assert len(occs) == 2
+        assert occs[0].session_name_snapshot == "Morning"
+        assert occs[0].status == "BLOCKED"
+        assert occs[0].block_reason == "Dentist Appointment"  # Preserved!
+        assert occs[1].session_name_snapshot == "Evening"
+        assert occs[1].status == "BLOCKED"
+        assert occs[1].block_reason == "Full Day Emergency Leave"
+
+    # Case B: Morning + Evening already blocked -> duplicate Full Day block rejected cleanly
+    dup_res = client.post(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions/block",
+        json={
+            "date": target_date.isoformat(),
+            "scope": "FULL_DAY",
+            "reason": "Another Full Day Request",
+        },
+    )
+    assert dup_res.status_code == 409
+    assert dup_res.json()["error"]["code"] == "DATE_ALREADY_BLOCKED"
+
+    # Case C: Existing appointments in either session remain untouched
+    with session_factory() as db:
+        morn_appt = db.get(Appointment, morn_appt_id)
+        eve_appt = db.get(Appointment, eve_appt_id)
+        assert morn_appt is not None
+        assert morn_appt.status == "BOOKED"
+        assert eve_appt is not None
+        assert eve_appt.status == "BOOKED"
+
+    # Expose resulting full-day state in list_exceptions
+    list_res = client.get(
+        f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/exceptions?from_date=2026-10-12"
+    )
+    assert list_res.status_code == 200
+    exceptions = list_res.json()["exceptions"]
+    assert len(exceptions) == 1
+    assert exceptions[0]["scope"] == "FULL_DAY"
+    assert exceptions[0]["date"] == target_date.isoformat()
+    assert exceptions[0]["retained_appointments_count"] == 2
+    assert "Dentist Appointment" in exceptions[0]["reason"]
+    assert "Full Day Emergency Leave" in exceptions[0]["reason"]
+
+    engine.dispose()

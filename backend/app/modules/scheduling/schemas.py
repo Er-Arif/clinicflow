@@ -199,6 +199,40 @@ class SessionOccurrenceResponse(BaseModel):
     version: int
 
 
+class ScheduleExceptionResponse(BaseModel):
+    id: str
+    occurrence_ids: list[UUID]
+    date: date
+    scope: str
+    session_name: str | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    reason: str
+    status: str
+    retained_appointments_count: int
+
+
+class ScheduleExceptionsListResponse(BaseModel):
+    doctor_id: UUID
+    exceptions: list[ScheduleExceptionResponse]
+    total_count: int
+
+
+class BlockScheduleExceptionRequest(BaseModel):
+    date: date
+    scope: str = Field(..., pattern="^(FULL_DAY|SESSION)$")
+    session_definition_id: UUID | None = None
+    reason: str = Field(min_length=2, max_length=500)
+
+
+class UnblockScheduleExceptionRequest(BaseModel):
+    occurrence_ids: list[UUID]
+
+
+class UnblockScheduleExceptionResponse(BaseModel):
+    unblocked_count: int
+
+
 class FeeConfigurationCreateRequest(BaseModel):
     effective_from: date
     regular_fee: Decimal = Field(ge=0, max_digits=12, decimal_places=2)

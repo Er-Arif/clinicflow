@@ -62,9 +62,13 @@ import type {
 } from '@/features/admin/types';
 import {
   AvailabilityResponse,
+  BlockScheduleExceptionPayload,
   Doctor,
   FeeConfiguration,
+  ScheduleException,
+  ScheduleExceptionsListResponse,
   SessionWrite,
+  UnblockScheduleExceptionPayload,
   WeeklySchedule,
 } from '@/features/scheduling/types';
 
@@ -499,6 +503,38 @@ export const api = createApi({
       }),
       invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
     }),
+    listScheduleExceptions: builder.query<
+      ScheduleExceptionsListResponse,
+      { doctorId: string; fromDate?: string }
+    >({
+      query: ({ doctorId, fromDate }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule/exceptions`,
+        params: fromDate ? { from_date: fromDate } : undefined,
+      }),
+      providesTags: [{ type: 'Schedule', id: 'LIST' }],
+    }),
+    blockScheduleException: builder.mutation<
+      ScheduleException,
+      { doctorId: string; body: BlockScheduleExceptionPayload }
+    >({
+      query: ({ doctorId, body }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule/exceptions/block`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+    }),
+    unblockScheduleExceptions: builder.mutation<
+      { unblocked_count: number },
+      { doctorId: string; body: UnblockScheduleExceptionPayload }
+    >({
+      query: ({ doctorId, body }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule/exceptions/unblock`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+    }),
     getCurrentFee: builder.query<FeeConfiguration, { asOf?: string } | void>({
       query: (arg) => ({
         url: '/api/v1/fee-configurations/current',
@@ -773,6 +809,9 @@ export const {
   useRescheduleAppointmentMutation,
   useBlockSessionMutation,
   useUnblockSessionMutation,
+  useListScheduleExceptionsQuery,
+  useBlockScheduleExceptionMutation,
+  useUnblockScheduleExceptionsMutation,
   useGetCurrentFeeQuery,
   useCreateFeeConfigurationMutation,
   useListPaymentsQuery,

@@ -13,17 +13,22 @@ from app.modules.identity.dependencies import (
 )
 from app.modules.identity.service import AuthContext
 from app.modules.scheduling.schemas import (
+    BlockScheduleExceptionRequest,
     BlockSessionRequest,
     FeeConfigurationCreateRequest,
     FeeConfigurationResponse,
     MultiDayScheduleReplaceRequest,
     ScheduleDefinitionResponse,
+    ScheduleExceptionResponse,
+    ScheduleExceptionsListResponse,
     ScheduleOverviewResponse,
     SchedulePreviewImpactRequest,
     SchedulePreviewImpactResponse,
     ScheduleReplaceRequest,
     SessionOccurrenceResponse,
     SmartScheduleApplyRequest,
+    UnblockScheduleExceptionRequest,
+    UnblockScheduleExceptionResponse,
     WeeklyScheduleResponse,
 )
 from app.modules.scheduling.service import SchedulingService
@@ -40,6 +45,20 @@ def _can_view_availability(context: AuthContext) -> AuthContext:
         raise AppError(
             code="PERMISSION_DENIED",
             message="You don't have permission to view availability.",
+            status_code=403,
+        )
+    return context
+
+
+def _can_manage_exceptions(context: AuthContext = Depends(get_auth_context)) -> AuthContext:
+    ensure_password_ready(context)
+    allowed = {"session.block", "schedule.manage"}
+    if not allowed.intersection(context.permissions):
+        from app.core.errors import AppError
+
+        raise AppError(
+            code="PERMISSION_DENIED",
+            message="You don't have permission to manage schedule exceptions.",
             status_code=403,
         )
     return context
@@ -150,6 +169,50 @@ def unblock_session(
 ) -> SessionOccurrenceResponse:
     with db.begin():
         return SchedulingService(db, clock, context).unblock(occurrence_id)
+
+
+@router.get(
+    "/doctors/{doctor_id}/schedule/exceptions",
+    response_model=ScheduleExceptionsListResponse,
+)
+def list_schedule_exceptions(
+    doctor_id: UUID,
+    from_date: date | None = Query(default=None),
+    context: AuthContext = Depends(_can_manage_exceptions),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> ScheduleExceptionsListResponse:
+    return SchedulingService(db, clock, context).list_exceptions(doctor_id, from_date)
+
+
+@router.post(
+    "/doctors/{doctor_id}/schedule/exceptions/block",
+    response_model=ScheduleExceptionResponse,
+)
+def block_schedule_exception(
+    doctor_id: UUID,
+    request: BlockScheduleExceptionRequest,
+    context: AuthContext = Depends(_can_manage_exceptions),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> ScheduleExceptionResponse:
+    with db.begin():
+        return SchedulingService(db, clock, context).block_exception(doctor_id, request)
+
+
+@router.post(
+    "/doctors/{doctor_id}/schedule/exceptions/unblock",
+    response_model=UnblockScheduleExceptionResponse,
+)
+def unblock_schedule_exceptions(
+    doctor_id: UUID,
+    request: UnblockScheduleExceptionRequest,
+    context: AuthContext = Depends(_can_manage_exceptions),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> UnblockScheduleExceptionResponse:
+    with db.begin():
+        return SchedulingService(db, clock, context).unblock_exceptions(doctor_id, request)
 
 
 @router.get("/fee-configurations/current", response_model=FeeConfigurationResponse)
