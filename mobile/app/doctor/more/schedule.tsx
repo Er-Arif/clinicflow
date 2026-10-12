@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { apiError } from '@/api/errors';
@@ -35,7 +35,6 @@ const blankSession = (order: number): SessionWrite => ({
 export default function ScheduleSettingsScreen() {
   const clinicTime = useClinicTimeQuery();
   const today = clinicTime.data?.clinic_date ?? '';
-  const tomorrow = today ? addDays(today, 1) : '';
   const doctors = useListDoctorsQuery();
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const doctorId = selectedDoctor ?? doctors.data?.[0]?.doctor_id ?? '';
@@ -60,9 +59,8 @@ export default function ScheduleSettingsScreen() {
   const [unblockSession, unblockState] = useUnblockSessionMutation();
 
   useEffect(() => {
-    if (today && !effectiveFrom) setEffectiveFrom(today);
     if (today && !blockDate) setBlockDate(today);
-  }, [today, effectiveFrom, blockDate]);
+  }, [today, blockDate]);
 
   // Inspect existing schedules for selected weekdays to detect mixed configurations
   const selectedDaysData = (schedule.data?.days ?? []).filter((d) => selectedWeekdays.includes(d.weekday));
@@ -76,7 +74,8 @@ export default function ScheduleSettingsScreen() {
     // Compare session signatures of the scheduled days
     const signatures = selectedDaysData.map((d) =>
       d.sessions
-        .map((s) => `${s.session_name}|${shortTime(s.start_time)}|${shortTime(s.end_time)}|${s.slot_interval_minutes}|${s.maximum_capacity}`)
+        .filter((s) => s.active !== false)
+        .map((s) => `${s.session_name.trim()}|${shortTime(s.start_time)}|${shortTime(s.end_time)}|${s.slot_interval_minutes}|${s.maximum_capacity}`)
         .sort()
         .join(';')
     );
@@ -84,30 +83,42 @@ export default function ScheduleSettingsScreen() {
     return !allSame || selectedDaysData.length < selectedWeekdays.length;
   })();
 
-  // When changing weekday selection, initialize the editor with the first scheduled day's sessions or defaults
+  // When changing primary weekday, initialize the editor with that scheduled day's sessions or defaults
   const primaryWeekday = selectedWeekdays[0] ?? 0;
   const primaryDay = schedule.data?.days.find((day) => day.weekday === primaryWeekday);
+  const lastLoadedPrimaryRef = useRef<number | null>(null);
+  const lastDoctorIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setOverwriteConfirmed(false);
-    if (!primaryDay) {
-      setEffectiveFrom(today);
-      setSessions([blankSession(0)]);
-      return;
+    const isNewDoctor = lastDoctorIdRef.current !== doctorId;
+    const isNewPrimary = lastLoadedPrimaryRef.current !== primaryWeekday;
+
+    if (isNewDoctor || isNewPrimary || !effectiveFrom) {
+      lastDoctorIdRef.current = doctorId;
+      lastLoadedPrimaryRef.current = primaryWeekday;
+      setOverwriteConfirmed(false);
+
+      if (primaryDay) {
+        setEffectiveFrom(primaryDay.effective_from);
+        setSessions(
+          primaryDay.sessions
+            .filter((s) => s.active !== false)
+            .map((item, index) => ({
+              session_name: item.session_name,
+              start_time: normalizeTime(item.start_time),
+              end_time: normalizeTime(item.end_time),
+              slot_interval_minutes: item.slot_interval_minutes,
+              maximum_capacity: item.maximum_capacity,
+              active: item.active,
+              display_order: index,
+            })),
+        );
+      } else if (today) {
+        setEffectiveFrom(today);
+        setSessions([blankSession(0)]);
+      }
     }
-    setEffectiveFrom(tomorrow);
-    setSessions(
-      primaryDay.sessions.map((item, index) => ({
-        session_name: item.session_name,
-        start_time: normalizeTime(item.start_time),
-        end_time: normalizeTime(item.end_time),
-        slot_interval_minutes: item.slot_interval_minutes,
-        maximum_capacity: item.maximum_capacity,
-        active: item.active,
-        display_order: index,
-      })),
-    );
-  }, [primaryDay, today, tomorrow, selectedWeekdays]);
+  }, [primaryDay, primaryWeekday, doctorId, today, effectiveFrom]);
 
   function toggleWeekday(index: number) {
     setSelectedWeekdays((prev) => {
@@ -143,7 +154,9 @@ export default function ScheduleSettingsScreen() {
       void schedule.refetch();
       void availability.refetch();
     } catch (error) {
-      setMessage(apiError(error)?.message ?? 'Unable to save the schedule.');
+      const err = apiError(error);
+      const detailMsg = (err?.details as any)?.fields?.[0]?.message;
+      setMessage(detailMsg || err?.message || 'Unable to save the schedule.');
     }
   }
 
@@ -216,7 +229,9 @@ export default function ScheduleSettingsScreen() {
                 {session.session_name}: {shortTime(session.start_time)}–{shortTime(session.end_time)} · {session.slot_interval_minutes} min · capacity {session.maximum_capacity}
               </Text>
             ))}
-            <Text style={styles.subtitle}>Changes below default to {tomorrow} as a new version.</Text>
+            <Text style={styles.subtitle}>
+              Version {primaryDay.version} active from {primaryDay.effective_from}. Saving updates this schedule version.
+            </Text>
           </View>
         ) : (
           <Text style={styles.subtitle}>No active schedule for {weekdays[primaryWeekday]}.</Text>
@@ -318,12 +333,6 @@ export default function ScheduleSettingsScreen() {
       ))}
     </AppScreen>
   );
-}
-
-function addDays(value: string, days: number) {
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return date.toISOString().slice(0, 10);
 }
 
 function normalizeTime(value: string) {

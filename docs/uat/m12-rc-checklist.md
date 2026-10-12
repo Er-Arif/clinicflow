@@ -22,7 +22,7 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | Restore drill passed | PASS | scripts/verify_restore.sh verified |
 | Signed production APK installed | PENDING | Requires keystore signing & device adb install |
 | APK manifest/checksum archived | PASS | scripts/create_release_manifest.py verified with SHA-256 and Alembic head 0010 |
-| No critical/high defects | PASS | All 84 tests green (75 unit, 9 concurrency integration), 0 lint/TS errors, 0 runtime bundling errors |
+| No critical/high defects | PASS | All 100 tests green (75 unit, 25 integration [17 concurrency/integrity + 8 schedule API]), 0 lint/TS errors, 0 runtime bundling errors |
 | Owner UAT approval | PENDING | Awaiting physical sign-off |
 
 ## Physical UAT Defect Tracking (RC2)

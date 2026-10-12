@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -7,8 +8,11 @@ import {
   PropsWithChildren,
 } from 'react';
 import {
+  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   RefreshControl,
   ScrollView,
@@ -37,62 +41,91 @@ export function AppScreen({
 }: PropsWithChildren<{ contentStyle?: ViewStyle; refreshing?: boolean; onRefresh?: () => void }>) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardHeightRef = useRef(0);
   const activeNodeRef = useRef<any>(null);
+  const scrollYRef = useRef(0);
+  const scrollTimerRef = useRef<any>(null);
 
-  const scrollIntoView = (targetNode: any) => {
-    if (!targetNode || !scrollViewRef.current) return;
-    activeNodeRef.current = targetNode;
+  const performScroll = useCallback(() => {
+    const node = activeNodeRef.current;
+    const sv = scrollViewRef.current;
+    if (!node || !sv) return;
 
-    const executeScroll = () => {
-      if (!scrollViewRef.current || !activeNodeRef.current) return;
-      const sv = scrollViewRef.current as any;
-      try {
-        const innerNode = sv.getInnerViewNode?.() || sv;
-        if (typeof activeNodeRef.current.measureLayout === 'function') {
-          activeNodeRef.current.measureLayout(
-            innerNode,
-            (_x: number, y: number) => {
-              sv.scrollTo?.({ y: Math.max(0, y - 60), animated: true });
-            },
-            () => {
-              if (typeof sv.scrollResponderScrollNativeHandleToKeyboard === 'function') {
-                sv.scrollResponderScrollNativeHandleToKeyboard(activeNodeRef.current, 80, true);
-              }
-            }
-          );
-        } else if (typeof sv.scrollResponderScrollNativeHandleToKeyboard === 'function') {
-          sv.scrollResponderScrollNativeHandleToKeyboard(activeNodeRef.current, 80, true);
-        }
-      } catch {
-        // Safe fallback
+    try {
+      if (typeof node.measureInWindow === 'function') {
+        node.measureInWindow((_x: number, y: number, _width: number, height: number) => {
+          if (isNaN(y) || (y === 0 && height === 0)) return;
+
+          const windowHeight = Dimensions.get('window').height;
+          const currentKeyboard = keyboardHeightRef.current;
+          const keyboardTop = currentKeyboard > 0 ? windowHeight - currentKeyboard : windowHeight;
+          const bottom = y + height;
+          const bottomMargin = spacing.lg; // 24px clearance above keyboard
+
+          if (bottom > keyboardTop - bottomMargin) {
+            const overflow = bottom - (keyboardTop - bottomMargin);
+            const targetY = scrollYRef.current + overflow;
+            sv.scrollTo({ y: Math.max(0, targetY), animated: true });
+          } else if (y < spacing.xl) {
+            const underflow = spacing.xl - y;
+            const targetY = scrollYRef.current - underflow;
+            sv.scrollTo({ y: Math.max(0, targetY), animated: true });
+          }
+        });
       }
-    };
+    } catch {
+      // Safe fallback
+    }
+  }, []);
 
-    setTimeout(executeScroll, 100);
-  };
+  const scheduleScroll = useCallback((delay = 80) => {
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+    }
+    scrollTimerRef.current = setTimeout(() => {
+      requestAnimationFrame(() => {
+        performScroll();
+      });
+    }, delay);
+  }, [performScroll]);
+
+  const scrollIntoView = useCallback((targetNode: any) => {
+    if (!targetNode) return;
+    activeNodeRef.current = targetNode;
+    if (keyboardHeightRef.current > 0) {
+      scheduleScroll(50);
+    }
+  }, [scheduleScroll]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-        if (activeNodeRef.current) {
-          scrollIntoView(activeNodeRef.current);
-        }
+        const height = e.endCoordinates.height;
+        keyboardHeightRef.current = height;
+        setKeyboardHeight(height);
+        scheduleScroll(100);
       }
     );
     const hideSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
+        keyboardHeightRef.current = 0;
         setKeyboardHeight(0);
         activeNodeRef.current = null;
+        if (scrollTimerRef.current) {
+          clearTimeout(scrollTimerRef.current);
+        }
       }
     );
     return () => {
       showSub.remove();
       hideSub.remove();
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
     };
-  }, []);
+  }, [scheduleScroll]);
 
   return (
     <ScrollContext.Provider value={{ scrollIntoView }}>
@@ -105,6 +138,10 @@ export function AppScreen({
             ref={scrollViewRef}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              scrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
             contentContainerStyle={[
               styles.content,
               contentStyle,

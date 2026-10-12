@@ -89,28 +89,6 @@ class SchedulingService:
         if weekday < 0 or weekday > 6:
             raise AppError("INVALID_WEEKDAY", "Weekday must be between 0 and 6.", 422)
         self._doctor(doctor_id)
-        if request.effective_from < self.clock.clinic_date():
-            raise AppError(
-                "SCHEDULE_EFFECTIVE_DATE_PAST",
-                "Schedule changes cannot start before the clinic's current date.",
-                422,
-            )
-
-        future = self.db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.clinic_id == self.context.clinic_id,
-                ScheduleDefinition.doctor_id == doctor_id,
-                ScheduleDefinition.weekday == weekday,
-                ScheduleDefinition.effective_from > request.effective_from,
-            )
-        )
-        if future is not None:
-            raise AppError(
-                "SCHEDULE_EFFECTIVE_DATE_CONFLICT",
-                "A schedule version already starts on or after this date.",
-                409,
-            )
-
         same_date = self.db.scalar(
             select(ScheduleDefinition)
             .where(
@@ -121,6 +99,32 @@ class SchedulingService:
             )
             .with_for_update()
         )
+
+        if same_date is None:
+            if request.effective_from < self.clock.clinic_date():
+                raise AppError(
+                    "SCHEDULE_EFFECTIVE_DATE_PAST",
+                    "Schedule changes cannot start before the clinic's current date.",
+                    422,
+                )
+
+            future = self.db.scalar(
+                select(ScheduleDefinition).where(
+                    ScheduleDefinition.clinic_id == self.context.clinic_id,
+                    ScheduleDefinition.doctor_id == doctor_id,
+                    ScheduleDefinition.weekday == weekday,
+                    ScheduleDefinition.effective_from > request.effective_from,
+                )
+            )
+            if future is not None:
+                conflict_date_str = future.effective_from.strftime("%d %b %Y")
+                raise AppError(
+                    "SCHEDULE_EFFECTIVE_DATE_CONFLICT",
+                    f"A newer schedule version is already planned starting {conflict_date_str}.",
+                    409,
+                    details={"conflicting_effective_from": future.effective_from.isoformat()},
+                )
+
         if same_date is not None:
             same_date.version += 1
             same_date.active = bool(request.sessions)
@@ -266,13 +270,6 @@ class SchedulingService:
         self, doctor_id: UUID, request: MultiDayScheduleReplaceRequest
     ) -> list[ScheduleDefinitionResponse]:
         self._doctor(doctor_id)
-        if request.effective_from < self.clock.clinic_date():
-            raise AppError(
-                "SCHEDULE_EFFECTIVE_DATE_PAST",
-                "Schedule changes cannot start before the clinic's current date.",
-                422,
-            )
-
         results: list[ScheduleDefinitionResponse] = []
         for weekday in sorted(request.weekdays):
             req = ScheduleReplaceRequest(

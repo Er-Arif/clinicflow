@@ -22,5 +22,11 @@ export function apiError(error: unknown): ApiErrorEnvelope['error'] | null {
     return { code: 'SERVER_RESPONSE_INVALID', message: 'ClinicFlow received an unexpected server response. Try again.' };
   }
   if (!('data' in fetchError) || !fetchError.data || typeof fetchError.data !== 'object') return null;
-  return (fetchError.data as ApiErrorEnvelope).error ?? null;
+  const data = fetchError.data as any;
+  if (data.error) return data.error;
+  if (data.detail) {
+    const msg = Array.isArray(data.detail) ? data.detail[0]?.msg : String(data.detail);
+    return { code: 'VALIDATION_ERROR', message: msg || 'Check the entered information.' };
+  }
+  return null;
 }
