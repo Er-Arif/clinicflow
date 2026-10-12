@@ -12,6 +12,7 @@ import {
 } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { DatePicker } from '@/components/DatePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -95,6 +96,7 @@ export default function NewAppointmentScreen() {
   if (!patientId) {
     return (
       <AppScreen>
+        <BackButton />
         <Text style={styles.title}>New Appointment</Text>
         <Text style={styles.subtitle}>Select a patient before booking.</Text>
         <AppButton label="Search Patient" onPress={() => router.push('/assistant/patients')} />
@@ -104,15 +106,11 @@ export default function NewAppointmentScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>New Appointment</Text>
-          <Text style={styles.subtitle}>
-            {patient.data ? `${patient.data.full_name} · ${patient.data.patient_code}` : 'Loading patient…'}
-          </Text>
-        </View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
-      </View>
+      <BackButton />
+      <Text style={styles.title}>New Appointment</Text>
+      <Text style={styles.subtitle}>
+        {patient.data ? `${patient.data.full_name} · ${patient.data.patient_code}` : 'Loading patient…'}
+      </Text>
 
       <Text style={styles.label}>Appointment Type</Text>
       <View style={styles.chips}>

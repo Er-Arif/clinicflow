@@ -16,10 +16,12 @@ def test_whatsapp_url_uses_international_digits_and_prefilled_text() -> None:
 
 
 def test_template_variables_are_allowlisted() -> None:
-    assert extract_template_variables("Hi {patient_name} {appointment_date}") == {
+    assert extract_template_variables("Hi {patient_name} {appointment_date} {clinic_contact_number}") == {
         "patient_name",
         "appointment_date",
+        "clinic_contact_number",
     }
+    validate_template_body("Call us at {clinic_contact_number}")
     with pytest.raises(AppError) as error:
         validate_template_body("Diagnosis: {diagnosis}")
     assert error.value.code == "UNSUPPORTED_TEMPLATE_VARIABLE"

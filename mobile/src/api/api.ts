@@ -276,6 +276,17 @@ export const api = createApi({
       }),
       invalidatesTags: (_result, _error, arg) => [{ type: 'Schedule', id: arg.doctorId }],
     }),
+    replaceMultiDaySchedule: builder.mutation<
+      WeeklySchedule['days'],
+      { doctorId: string; weekdays: number[]; effectiveFrom: string; sessions: SessionWrite[] }
+    >({
+      query: ({ doctorId, weekdays, effectiveFrom, sessions }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule`,
+        method: 'PUT',
+        body: { weekdays, effective_from: effectiveFrom, sessions },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Schedule', id: arg.doctorId }],
+    }),
     getAvailability: builder.query<AvailabilityResponse, { doctorId: string; date: string }>({
       query: ({ doctorId, date }) => ({
         url: `/api/v1/doctors/${doctorId}/availability`,
@@ -745,6 +756,7 @@ export const {
   useListDoctorsQuery,
   useGetScheduleQuery,
   useReplaceWeekdayScheduleMutation,
+  useReplaceMultiDayScheduleMutation,
   useGetAvailabilityQuery,
   useListAppointmentsQuery,
   useGetAppointmentQuery,

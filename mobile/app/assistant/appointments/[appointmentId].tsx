@@ -11,6 +11,7 @@ import {
 } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -28,7 +29,14 @@ export default function AppointmentDetailsScreen() {
   const [note, setNote] = useState('');
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment not found</Text></AppScreen>;
+  if (!appointment.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.title}>Appointment not found</Text>
+      </AppScreen>
+    );
+  }
   const item = appointment.data;
 
   async function doCheckIn() {
@@ -72,6 +80,7 @@ export default function AppointmentDetailsScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={styles.status}>{item.status.replace('_', ' ')}</Text>
       <View style={styles.card}>

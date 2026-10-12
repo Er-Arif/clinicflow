@@ -7,6 +7,7 @@ import { useMarkReminderSentMutation, usePrepareReminderMutation } from '@/api/a
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import type { PreparedMessage } from '@/features/messaging/types';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -56,6 +57,7 @@ export default function MessagePreviewScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>WhatsApp Message</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {prepared ? (
@@ -77,7 +79,6 @@ export default function MessagePreviewScreen() {
           ) : null}
         </>
       ) : <Text style={styles.subtitle}>Preparing message…</Text>}
-      <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
     </AppScreen>
   );
 }

@@ -6,6 +6,7 @@ import { apiError } from '@/api/errors';
 import { useCreatePatientMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { PatientForm } from '@/features/patients/PatientForm';
 import { PatientFormValues, patientFormDefaults } from '@/features/patients/form';
 import { DuplicateCandidate, PatientCreatePayload } from '@/features/patients/types';
@@ -55,6 +56,7 @@ export default function NewPatientScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>New Patient</Text>
       <Text style={styles.subtitle}>Enter only the administrative information ClinicFlow needs.</Text>
 

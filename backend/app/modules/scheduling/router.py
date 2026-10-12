@@ -16,6 +16,7 @@ from app.modules.scheduling.schemas import (
     BlockSessionRequest,
     FeeConfigurationCreateRequest,
     FeeConfigurationResponse,
+    MultiDayScheduleReplaceRequest,
     ScheduleDefinitionResponse,
     ScheduleReplaceRequest,
     SessionOccurrenceResponse,
@@ -50,6 +51,22 @@ def get_schedule(
 ) -> WeeklyScheduleResponse:
     _can_view_availability(context)
     return SchedulingService(db, clock, context).weekly_schedule(doctor_id, effective_on)
+
+
+@router.put(
+    "/doctors/{doctor_id}/schedule", response_model=list[ScheduleDefinitionResponse]
+)
+def replace_multiple_weekdays_schedule(
+    doctor_id: UUID,
+    request: MultiDayScheduleReplaceRequest,
+    context: AuthContext = Depends(require_permission("schedule.manage")),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> list[ScheduleDefinitionResponse]:
+    with db.begin():
+        return SchedulingService(db, clock, context).replace_multiple_weekdays(
+            doctor_id, request
+        )
 
 
 @router.put(

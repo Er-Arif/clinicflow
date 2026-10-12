@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import {
   useClinicTimeQuery,
@@ -17,7 +16,6 @@ import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicDate, isIsoDate, startOfIsoMonth, startOfIsoWeek } from '@/utils/dates';
 
 export default function ReportsScreen() {
-  const router = useRouter();
   const clinicTime = useClinicTimeQuery();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -47,7 +45,6 @@ export default function ReportsScreen() {
 
   return (
     <AppScreen refreshing={refreshing} onRefresh={refreshAll}>
-      <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
       <Text style={styles.title}>Reports</Text>
       <Text style={styles.subtitle}>All totals are derived from transactional ClinicFlow records.</Text>
 

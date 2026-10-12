@@ -6,6 +6,7 @@ import { useClinicTimeQuery, useListRemindersQuery, useSkipReminderMutation } fr
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function RemindersScreen() {
@@ -29,6 +30,7 @@ export default function RemindersScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Reminders</Text>
       <Text style={styles.subtitle}>Due through {clinicTime.data?.clinic_date ?? 'today'} · WhatsApp is sent manually.</Text>
       {reminders.isFetching ? <ActivityIndicator /> : null}

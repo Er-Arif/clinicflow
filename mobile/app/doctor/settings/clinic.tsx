@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { useGetClinicSettingsQuery, useUpdateClinicSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function ClinicSettingsScreen() {
-  const router = useRouter();
   const query = useGetClinicSettingsQuery();
   const [save, saveState] = useUpdateClinicSettingsMutation();
   const [name, setName] = useState('');
@@ -37,7 +36,7 @@ export default function ClinicSettingsScreen() {
 
   return (
     <AppScreen>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Clinic Settings</Text>
       {query.isLoading ? <ActivityIndicator /> : null}
       <TextInput style={styles.input} placeholder="Clinic name" value={name} onChangeText={setName} />

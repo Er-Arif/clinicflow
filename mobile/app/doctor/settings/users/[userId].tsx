@@ -1,15 +1,15 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { useGetAdminUserQuery, useListRolePresetsQuery, useMeQuery, useResetAdminUserPasswordMutation, useUpdateAdminUserMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { RolePicker } from '@/features/admin/RolePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function EditUserScreen() {
-  const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const user = useGetAdminUserQuery(userId);
   const roles = useListRolePresetsQuery();
@@ -57,7 +57,7 @@ export default function EditUserScreen() {
   const editingSelf = me.data?.user_id === userId;
   return (
     <AppScreen refreshing={user.isFetching} onRefresh={() => void user.refetch()}>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Edit User</Text>
       {user.isLoading ? <ActivityIndicator /> : null}
       <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />

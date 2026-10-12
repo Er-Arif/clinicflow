@@ -30,12 +30,9 @@ export default function PatientSearchScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Patients</Text>
-          <Text style={styles.subtitle}>Search before creating a new patient.</Text>
-        </View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
+      <View>
+        <Text style={styles.title}>Patients</Text>
+        <Text style={styles.subtitle}>Search before creating a new patient.</Text>
       </View>
 
       <TextInput

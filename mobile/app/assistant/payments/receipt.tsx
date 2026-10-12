@@ -5,6 +5,7 @@ import { apiError } from '@/api/errors';
 import { useGetReceiptQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function ReceiptScreen() {
@@ -14,11 +15,19 @@ export default function ReceiptScreen() {
   const receipt = useGetReceiptQuery(paymentId, { skip: !paymentId });
 
   if (receipt.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!receipt.data) return <AppScreen><Text style={styles.error}>{apiError(receipt.error)?.message ?? 'Receipt not found.'}</Text></AppScreen>;
+  if (!receipt.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.error}>{apiError(receipt.error)?.message ?? 'Receipt not found.'}</Text>
+      </AppScreen>
+    );
+  }
   const item = receipt.data;
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Digital Receipt</Text>
       {item.voided ? <Text style={styles.voided}>VOIDED PAYMENT · retained for history</Text> : null}
       <View style={styles.card}>

@@ -5,6 +5,7 @@ import { useListMessageTemplatesQuery, useUpdateMessageTemplateMutation } from '
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function MessageTemplatesScreen() {
@@ -34,8 +35,15 @@ export default function MessageTemplatesScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Message Templates</Text>
       <Text style={styles.subtitle}>Operational messages only. Do not include diagnosis, medicines, or sensitive clinical information.</Text>
+      <View style={styles.helperCard}>
+        <Text style={styles.helperTitle}>Available Variables:</Text>
+        <Text style={styles.helperText}>
+          {'{patient_name}'}, {'{doctor_name}'}, {'{clinic_name}'}, {'{clinic_contact_number}'}, {'{appointment_date}'}, {'{appointment_time}'}, {'{followup_due_date}'}
+        </Text>
+      </View>
       {query.isFetching ? <ActivityIndicator /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {query.data?.map((item) => (
@@ -58,6 +66,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
   error: { color: colors.danger },
+  helperCard: { backgroundColor: colors.softPrimary, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.primary },
+  helperTitle: { fontSize: 13, fontWeight: '800', color: colors.primary, marginBottom: 2 },
+  helperText: { fontSize: 12, color: colors.text, lineHeight: 18 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   heading: { color: colors.text, fontWeight: '800' },
   input: { minHeight: 150, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, color: colors.text, backgroundColor: colors.background },

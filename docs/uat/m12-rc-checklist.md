@@ -6,7 +6,7 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 |---|---|---|
 | Dependency lockfiles committed | PASS | backend/uv.lock and mobile/package-lock.json cleanly generated and verified with uv sync --frozen and npm ci |
 | Local PostgreSQL RC verifier | PASS | scripts/rc_local_verify.ps1 executed cleanly end-to-end (code 0) |
-| Six concurrency/integrity tests on PostgreSQL | PASS | tests/integration/test_transaction_concurrency.py (6 passed on PostgreSQL 17) |
+| Six concurrency/integrity tests on PostgreSQL | PASS | tests/integration/test_transaction_concurrency.py (9 passed on PostgreSQL 17) |
 | Mobile lint + full TypeScript check | PASS | tsc --noEmit (0 diagnostics), expo lint (0 errors), expo-doctor (21/21 passed) |
 | Staging deployed smoke | PASS | scripts/uat_smoke.py 10/10 pass against live FastAPI + PostgreSQL instance |
 | Scenario A scheduled patient | READY | Scripted backend & mobile endpoints ready for physical execution |
@@ -22,7 +22,7 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | Restore drill passed | PASS | scripts/verify_restore.sh verified |
 | Signed production APK installed | PENDING | Requires keystore signing & device adb install |
 | APK manifest/checksum archived | PASS | scripts/create_release_manifest.py verified with SHA-256 and Alembic head 0010 |
-| No critical/high defects | PASS | All 73 tests green, 0 lint/TS errors, 0 runtime bundling errors |
+| No critical/high defects | PASS | All 84 tests green (75 unit, 9 concurrency integration), 0 lint/TS errors, 0 runtime bundling errors |
 | Owner UAT approval | PENDING | Awaiting physical sign-off |
 
 ## Physical UAT Defect Tracking (RC2)
@@ -50,3 +50,11 @@ Use PASS / FAIL / BLOCKED and attach date/operator/evidence.
 | CF-UAT-018 | Doctor Today contains redundant navigation buttons after persistent tabs | Patient Search, Dashboard, Reports, and Settings action buttons remained on Doctor Today screen despite persistent bottom tabs and More hub. Removed redundant navigation buttons, preserving operational overview (metrics, checked-in, upcoming). | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-019 | Doctor More displays stale doctor name after profile update | Doctor More read display name solely from un-invalidated user session rather than querying active doctor profile settings with appropriate cache invalidation tags. Subscribed to listDoctors query and added 'User' tag invalidation to updateDoctorSettings mutation. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
 | CF-UAT-020 | Doctor Reports chart renders malformed/unreadable visualization | DatePicker input containers lacked flex expansion causing horizontal collapse into thin vertical bars, date range text lacked clean spacing, and appointment status distribution lacked structured visual representation. Wrapped DatePickers in flex containers, cleaned date range formatting, and added responsive horizontal status distribution chart. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-021 | More nested back-stack behavior | Root tab screens contained redundant back links; nested sub-screens in More stack needed predictable stack unwind. Harmonized More tab press to dismiss back to More root and removed redundant back links from root tabs. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-022 | Inconsistent Back controls / placement | Inconsistent Back controls, placement, and visual treatment across nested screens. Standardized Back navigation with shared header component across Doctor and Assistant nested screens. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-023 | Manual time entry | Schedule Settings required typing HH:mm manually as text. Built reusable TimePicker wrapping @react-native-community/datetimepicker with 24-hour clinic semantics. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-024 | Dashboard redundant navigation/title | Screen titled "Owner Dashboard" despite being Doctor role shell analytics destination; duplicated root tab buttons (Open Reports, Patient Search). Renamed to "Dashboard" and removed redundant tab navigation buttons. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-025 | Doctor Patients search reset | Doctor Patients search query persisted indefinitely across tab switches. Implemented navigation parent blur listener to reset search on tab blur while preserving query across drill-down/back workflow. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-026 | Keyboard obscures focused fields | Long forms obscured lower inputs on Android when keyboard opened. Added softwareKeyboardLayoutMode resize in app.json and wrapped AppScreen with KeyboardAvoidingView + keyboardDismissMode="on-drag". | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-027 | Clinic contact template variable | Template engine lacked clinic contact variable. Added {{clinic_contact_number}} to allowed variables, renderer defaults, and frontend reference chips. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |
+| CF-UAT-028 | Multi-day schedule editor | Schedule editor only allowed editing one day at a time. Added multi-day chip selector, atomic backend PUT /doctors/{id}/schedule, mixed existing schedule detection, and explicit overwrite confirmation. | pending | FIX IMPLEMENTED / AWAITING PHYSICAL RETEST | - | Yes |

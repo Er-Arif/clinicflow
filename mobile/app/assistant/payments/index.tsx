@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useListPaymentsQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 const filters = ['PENDING', 'CONFIRMED', 'TODAY'] as const;
@@ -25,6 +26,7 @@ export default function PaymentsScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Payments</Text>
       <Text style={styles.subtitle}>Pending collections and confirmed financial history.</Text>
       <View style={styles.filters}>

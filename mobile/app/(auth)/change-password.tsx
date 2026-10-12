@@ -5,6 +5,7 @@ import { StyleSheet, Text, TextInput } from 'react-native';
 import { useChangePasswordMutation, useMeQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function ChangePasswordScreen() {
@@ -33,6 +34,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <AppScreen>
+      {!me.data?.must_change_password ? <BackButton /> : null}
       <Text style={styles.brand}>ClinicFlow</Text>
       <Text style={styles.title}>Change Password</Text>
       <Text style={styles.subtitle}>

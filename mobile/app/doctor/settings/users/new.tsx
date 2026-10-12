@@ -5,6 +5,7 @@ import { StyleSheet, Text, TextInput } from 'react-native';
 import { useCreateAdminUserMutation, useListRolePresetsQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { RolePicker } from '@/features/admin/RolePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -31,7 +32,7 @@ export default function NewUserScreen() {
 
   return (
     <AppScreen>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Add User</Text>
       <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
       <TextInput style={styles.input} autoCapitalize="none" placeholder="Login identifier" value={login} onChangeText={setLogin} />

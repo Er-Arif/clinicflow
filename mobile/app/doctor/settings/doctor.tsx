@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { useGetDoctorSettingsQuery, useListDoctorsQuery, useUpdateDoctorSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function DoctorSettingsScreen() {
-  const router = useRouter();
   const doctors = useListDoctorsQuery();
   const doctorId = doctors.data?.[0]?.doctor_id ?? '';
   const settings = useGetDoctorSettingsQuery(doctorId, { skip: !doctorId });
@@ -37,7 +36,7 @@ export default function DoctorSettingsScreen() {
 
   return (
     <AppScreen>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Doctor Settings</Text>
       {doctors.isLoading || settings.isLoading ? <ActivityIndicator /> : null}
       {!doctorId && !doctors.isLoading ? <Text style={styles.error}>No active doctor is configured.</Text> : null}

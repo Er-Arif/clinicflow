@@ -11,6 +11,7 @@ import {
 } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -29,7 +30,14 @@ export default function PaymentDetailsScreen() {
   const [voidIdempotencyKey] = useState(() => newIdempotencyKey('pay-void'));
 
   if (payment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!payment.data) return <AppScreen><Text style={styles.title}>Payment not found</Text></AppScreen>;
+  if (!payment.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.title}>Payment not found</Text>
+      </AppScreen>
+    );
+  }
   const item = payment.data;
   const canVoid = me.data?.permissions.includes('payment.void') ?? false;
 
@@ -57,6 +65,7 @@ export default function PaymentDetailsScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>{item.patient_name}</Text>
       <Text style={styles.status}>{item.status}</Text>
       <View style={styles.card}>
@@ -93,7 +102,6 @@ export default function PaymentDetailsScreen() {
       ) : null}
       {confirmState.error ? <Text style={styles.error}>{apiError(confirmState.error)?.message ?? 'Unable to confirm payment.'}</Text> : null}
       {voidState.error ? <Text style={styles.error}>{apiError(voidState.error)?.message ?? 'Unable to void payment.'}</Text> : null}
-      <AppButton label="Back to Payments" tone="secondary" onPress={() => router.replace('/assistant/payments')} />
     </AppScreen>
   );
 }

@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useGetPatientQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function PatientProfileScreen() {
@@ -21,6 +22,7 @@ export default function PatientProfileScreen() {
   if (isError || !patient) {
     return (
       <AppScreen>
+        <BackButton />
         <Text style={styles.title}>Unable to load patient</Text>
         <AppButton label="Retry" onPress={() => void refetch()} />
       </AppScreen>
@@ -29,6 +31,7 @@ export default function PatientProfileScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{patient.full_name}</Text>

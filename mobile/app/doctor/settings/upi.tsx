@@ -5,6 +5,7 @@ import { apiError } from '@/api/errors';
 import { useGetUpiConfigurationQuery, useUpdateUpiConfigurationMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function UpiSettingsScreen() {
@@ -40,6 +41,7 @@ export default function UpiSettingsScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>UPI Settings</Text>
       <Text style={styles.subtitle}>{missing ? 'Configure UPI before accepting UPI payments.' : 'Clinic-wide payee details used to generate dynamic QR codes.'}</Text>
       <Text style={styles.label}>UPI ID</Text>

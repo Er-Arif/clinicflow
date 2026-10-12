@@ -33,9 +33,9 @@ export default function AppointmentsScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}><Text style={styles.title}>Appointments</Text><Text style={styles.subtitle}>Bookings for the selected clinic date.</Text></View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
+      <View>
+        <Text style={styles.title}>Appointments</Text>
+        <Text style={styles.subtitle}>Bookings for the selected clinic date.</Text>
       </View>
       <DatePicker value={date} onChange={setDate} placeholder="YYYY-MM-DD" />
       <View style={styles.chips}>

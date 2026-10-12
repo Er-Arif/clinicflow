@@ -6,6 +6,7 @@ import { apiError } from '@/api/errors';
 import { useGetPatientQuery, useUpdatePatientMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { PatientForm } from '@/features/patients/PatientForm';
 import { PatientFormValues } from '@/features/patients/form';
 import { DuplicateCandidate, Patient, PatientUpdatePayload } from '@/features/patients/types';
@@ -24,7 +25,14 @@ export default function EditPatientScreen() {
   const initial = useMemo(() => (patient ? toFormValues(patient) : null), [patient]);
 
   if (isLoading || !initial) {
-    if (isError) return <AppScreen><Text>Unable to load patient.</Text></AppScreen>;
+    if (isError) {
+      return (
+        <AppScreen>
+          <BackButton />
+          <Text>Unable to load patient.</Text>
+        </AppScreen>
+      );
+    }
     return <AppScreen><ActivityIndicator /></AppScreen>;
   }
 
@@ -60,6 +68,7 @@ export default function EditPatientScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Edit Patient</Text>
       {duplicateCandidates.length ? (
         <View style={styles.warning}>

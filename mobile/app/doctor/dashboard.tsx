@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useGetOwnerDashboardQuery } from '@/api/api';
-import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { DatePicker } from '@/components/DatePicker';
 import { MetricCard } from '@/components/MetricCard';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, spacing } from '@/theme/tokens';
 import { formatClinicDate, isIsoDate, startOfIsoMonth, startOfIsoWeek } from '@/utils/dates';
 
 export default function OwnerDashboardScreen() {
-  const router = useRouter();
   const clinicTime = useClinicTimeQuery();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -34,8 +31,7 @@ export default function OwnerDashboardScreen() {
 
   return (
     <AppScreen refreshing={dashboard.isFetching} onRefresh={() => void dashboard.refetch()}>
-      <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
-      <Text style={styles.title}>Owner Dashboard</Text>
+      <Text style={styles.title}>Dashboard</Text>
       <Text style={styles.subtitle}>Clinic activity and confirmed financial totals.</Text>
 
       {today ? (
@@ -82,9 +78,6 @@ export default function OwnerDashboardScreen() {
           </View>
         </>
       ) : null}
-
-      <AppButton label="Open Reports" onPress={() => router.push('/doctor/reports')} />
-      <AppButton label="Patient Search" tone="secondary" onPress={() => router.push('/doctor/patients')} />
     </AppScreen>
   );
 }

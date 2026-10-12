@@ -7,6 +7,7 @@ import { apiError } from '@/api/errors';
 import { useConfirmPaymentMutation, useGetUpiIntentQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -28,10 +29,18 @@ export default function UpiPaymentScreen() {
   }
 
   if (intent.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!intent.data) return <AppScreen><Text style={styles.error}>{apiError(intent.error)?.message ?? 'Unable to prepare UPI payment.'}</Text></AppScreen>;
+  if (!intent.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.error}>{apiError(intent.error)?.message ?? 'Unable to prepare UPI payment.'}</Text>
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen contentStyle={styles.content}>
+      <BackButton />
       <Text style={styles.title}>UPI Payment</Text>
       <Text style={styles.amount}>₹{intent.data.amount}</Text>
       <View style={styles.qrCard}>
@@ -41,7 +50,6 @@ export default function UpiPaymentScreen() {
       <Text style={styles.meta}>{intent.data.upi_id}</Text>
       <Text style={styles.warning}>Payment is not confirmed automatically. Verify receipt in the UPI app/bank view before confirming.</Text>
       <AppButton label="Confirm Payment Received" loading={confirmState.isLoading} onPress={() => void confirm()} />
-      <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
       {confirmState.error ? <Text style={styles.error}>{apiError(confirmState.error)?.message ?? 'Unable to confirm payment.'}</Text> : null}
     </AppScreen>
   );

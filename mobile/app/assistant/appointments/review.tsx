@@ -6,6 +6,7 @@ import { apiError } from '@/api/errors';
 import { useCreateAppointmentMutation, useBookFollowUpMutation, useGetCurrentFeeQuery, useGetPatientQuery, useListDoctorsQuery, useMeQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -91,6 +92,7 @@ export default function AppointmentReviewScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Review Appointment</Text>
       <View style={styles.card}>
         <Row label="Patient" value={patient.data?.full_name ?? '—'} />

@@ -6,6 +6,7 @@ import { useClinicTimeQuery, useListAuditEventsQuery, useListUsersQuery } from '
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AuditHistoryScreen() {
@@ -37,7 +38,7 @@ export default function AuditHistoryScreen() {
 
   return (
     <AppScreen refreshing={events.isFetching} onRefresh={() => void events.refetch()}>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Audit History</Text>
       <Text style={styles.subtitle}>Read-only history of important ClinicFlow actions.</Text>
 

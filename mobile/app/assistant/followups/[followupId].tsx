@@ -6,6 +6,7 @@ import { useCloseFollowUpMutation, useGetFollowUpQuery, useListRemindersQuery } 
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function FollowUpDetailsScreen() {
@@ -20,7 +21,14 @@ export default function FollowUpDetailsScreen() {
   const [note, setNote] = useState('');
 
   if (query.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!query.data) return <AppScreen><Text style={styles.title}>Follow-up not found</Text></AppScreen>;
+  if (!query.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.title}>Follow-up not found</Text>
+      </AppScreen>
+    );
+  }
   const item = query.data;
 
   async function close() {
@@ -34,6 +42,7 @@ export default function FollowUpDetailsScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'OVERDUE' : item.status}</Text>
       <View style={styles.card}>

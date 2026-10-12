@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useListUsersQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function UsersScreen() {
@@ -11,7 +12,7 @@ export default function UsersScreen() {
   const users = useListUsersQuery();
   return (
     <AppScreen refreshing={users.isFetching} onRefresh={() => void users.refetch()}>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Users</Text>
       <Text style={styles.subtitle}>Individual accounts with server-defined ClinicFlow roles.</Text>
       <AppButton label="Add User" onPress={() => router.push('/doctor/settings/users/new')} />

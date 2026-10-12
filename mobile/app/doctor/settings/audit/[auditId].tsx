@@ -1,18 +1,18 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useGetAuditEventQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AuditDetailScreen() {
-  const router = useRouter();
   const { auditId } = useLocalSearchParams<{ auditId: string }>();
   const event = useGetAuditEventQuery(auditId);
 
   return (
     <AppScreen>
-      <Text style={styles.link} onPress={() => router.back()}>Back</Text>
+      <BackButton />
       <Text style={styles.title}>Audit Event</Text>
       {event.isLoading ? <ActivityIndicator /> : null}
       {event.data ? (

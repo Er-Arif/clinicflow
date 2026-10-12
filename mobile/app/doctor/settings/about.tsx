@@ -1,20 +1,20 @@
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { useGetSystemInfoQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AboutScreen() {
-  const router = useRouter();
   const system = useGetSystemInfoQuery();
   const appVersion = Constants.expoConfig?.version ?? 'unknown';
   const buildNumber = Constants.expoConfig?.android?.versionCode?.toString() ?? 'unknown';
 
   return (
     <AppScreen>
+      <BackButton />
       <View style={styles.brandHeader}>
         <Image
           source={require('../../../assets/clinicflow-lockup.png')}
@@ -39,7 +39,6 @@ export default function AboutScreen() {
         <Text style={styles.warning}>Backend build information could not be loaded.</Text>
       ) : null}
       <AppButton label="Refresh" tone="secondary" onPress={() => system.refetch()} />
-      <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
     </AppScreen>
   );
 }

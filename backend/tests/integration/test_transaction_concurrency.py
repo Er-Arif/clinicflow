@@ -32,6 +32,11 @@ from app.modules.scheduling.models import (
     SessionDefinition,
     SessionOccurrence,
 )
+from app.modules.scheduling.schemas import (
+    MultiDayScheduleReplaceRequest,
+    SessionWrite,
+)
+from app.modules.scheduling.service import SchedulingService
 from app.modules.visits.models import Visit
 from app.modules.visits.service import VisitService
 
@@ -87,6 +92,7 @@ def _context(case: Case) -> AuthContext:
             "appointment.check_in",
             "appointment.reschedule",
             "payment.confirm",
+            "schedule.manage",
         }),
         must_change_password=False,
     )
@@ -477,4 +483,181 @@ def test_audit_rows_are_database_immutable() -> None:
             .where(AuditEvent.audit_id == audit_id)
             .values(action_type="TAMPERED")
         )
+    engine.dispose()
+
+
+def test_multiday_schedule_applies_to_all_selected_days_and_preserves_appointments() -> None:
+    session_factory, engine = _session_factory()
+    case = _seed_case(session_factory, capacity=2)
+
+    # 1. First, book an appointment on TARGET_DATE (Monday, Oct 5)
+    def book():
+        with session_factory.begin() as db:
+            return AppointmentService(db, FrozenClock(), _context(case)).create(
+                _create_request(case, case.patient_ids[0], time(10, 0)),
+                idempotency_key="multiday-appt-1",
+            )
+
+    appt_response = _run_with_request_id(book)
+    original_appt_id = appt_response.appointment_id
+
+    # 2. Apply a new multi-day schedule for Mon (0), Wed (2), Fri (4) effective Oct 10
+    sessions_payload = [
+        SessionWrite(
+            session_name="Morning Consultations",
+            start_time=time(10, 0),
+            end_time=time(13, 0),
+            slot_interval_minutes=15,
+            maximum_capacity=10,
+            active=True,
+            display_order=0,
+        )
+    ]
+    multiday_req = MultiDayScheduleReplaceRequest(
+        weekdays=[0, 2, 4],
+        effective_from=date(2026, 10, 10),
+        sessions=sessions_payload,
+    )
+
+    def apply_multiday():
+        with session_factory.begin() as db:
+            return SchedulingService(db, FrozenClock(), _context(case)).replace_multiple_weekdays(
+                case.doctor_id, multiday_req
+            )
+
+    results = _run_with_request_id(apply_multiday)
+    assert len(results) == 3
+
+    # 3. Verify each day (Mon, Wed, Fri) now has the identical schedule definition and sessions
+    with session_factory() as db:
+        for w in [0, 2, 4]:
+            sched = db.scalar(
+                select(ScheduleDefinition).where(
+                    ScheduleDefinition.clinic_id == case.clinic_id,
+                    ScheduleDefinition.doctor_id == case.doctor_id,
+                    ScheduleDefinition.weekday == w,
+                    ScheduleDefinition.effective_from == date(2026, 10, 10),
+                )
+            )
+            assert sched is not None
+            assert sched.active is True
+            sess = db.scalars(
+                select(SessionDefinition).where(
+                    SessionDefinition.schedule_definition_id == sched.schedule_definition_id
+                )
+            ).all()
+            assert len(sess) == 1
+            assert sess[0].session_name == "Morning Consultations"
+            assert sess[0].start_time == time(10, 0)
+            assert sess[0].end_time == time(13, 0)
+            assert sess[0].slot_interval_minutes == 15
+            assert sess[0].maximum_capacity == 10
+
+        # 4. Verify existing appointment from step 1 was NOT modified or moved
+        existing_appt = db.scalar(
+            select(Appointment).where(Appointment.appointment_id == original_appt_id)
+        )
+        assert existing_appt is not None
+        assert existing_appt.status == "BOOKED"
+        assert existing_appt.appointment_time == time(10, 0)
+
+        # 5. Apply a different schedule group to Tue (1) and Thu (3)
+        tue_thu_sessions = [
+            SessionWrite(
+                session_name="Evening Consultations",
+                start_time=time(15, 0),
+                end_time=time(18, 0),
+                slot_interval_minutes=20,
+                maximum_capacity=8,
+                active=True,
+                display_order=0,
+            )
+        ]
+        tue_thu_req = MultiDayScheduleReplaceRequest(
+            weekdays=[1, 3],
+            effective_from=date(2026, 10, 10),
+            sessions=tue_thu_sessions,
+        )
+
+        def apply_tue_thu():
+            with session_factory.begin() as db_inner:
+                return SchedulingService(db_inner, FrozenClock(), _context(case)).replace_multiple_weekdays(
+                    case.doctor_id, tue_thu_req
+                )
+
+        _run_with_request_id(apply_tue_thu)
+
+        # Verify Tue and Thu have their separate Evening schedule
+        for w in [1, 3]:
+            sched = db.scalar(
+                select(ScheduleDefinition).where(
+                    ScheduleDefinition.clinic_id == case.clinic_id,
+                    ScheduleDefinition.doctor_id == case.doctor_id,
+                    ScheduleDefinition.weekday == w,
+                    ScheduleDefinition.effective_from == date(2026, 10, 10),
+                )
+            )
+            assert sched is not None
+            sess = db.scalars(
+                select(SessionDefinition).where(
+                    SessionDefinition.schedule_definition_id == sched.schedule_definition_id
+                )
+            ).all()
+            assert len(sess) == 1
+            assert sess[0].session_name == "Evening Consultations"
+            assert sess[0].start_time == time(15, 0)
+            assert sess[0].end_time == time(18, 0)
+
+    engine.dispose()
+
+
+def test_multiday_schedule_operation_is_atomic_on_conflict() -> None:
+    session_factory, engine = _session_factory()
+    case = _seed_case(session_factory, capacity=1)
+
+    # Pre-create a schedule conflict on Wednesday (weekday 2) on effective_from date 2026-10-15
+    with session_factory.begin() as db:
+        conflicting_sched = ScheduleDefinition(
+            clinic_id=case.clinic_id,
+            doctor_id=case.doctor_id,
+            weekday=2,
+            effective_from=date(2026, 10, 15),
+            active=True,
+            version=5,
+            created_by=case.user_id,
+        )
+        db.add(conflicting_sched)
+
+    # Now attempt a multi-day update for [1, 2] (Tue, Wed) on effective_from date 2026-10-15
+    # Tuesday (1) would succeed on its own, but Wednesday (2) will raise SCHEDULE_EFFECTIVE_DATE_CONFLICT.
+    # The atomic transaction must roll back Tuesday completely.
+    failing_req = MultiDayScheduleReplaceRequest(
+        weekdays=[1, 2],
+        effective_from=date(2026, 10, 15),
+        sessions=[],
+    )
+
+    def failing_op():
+        with session_factory.begin() as db:
+            SchedulingService(db, FrozenClock(), _context(case)).replace_multiple_weekdays(
+                case.doctor_id, failing_req
+            )
+
+    with pytest.raises(AppError) as exc_info:
+        _run_with_request_id(failing_op)
+
+    assert exc_info.value.code == "SCHEDULE_EFFECTIVE_DATE_CONFLICT"
+
+    # Verify Tuesday was NOT updated because the transaction rolled back atomically
+    with session_factory() as db:
+        tue_sched = db.scalar(
+            select(ScheduleDefinition).where(
+                ScheduleDefinition.clinic_id == case.clinic_id,
+                ScheduleDefinition.doctor_id == case.doctor_id,
+                ScheduleDefinition.weekday == 1,
+                ScheduleDefinition.effective_from == date(2026, 10, 15),
+            )
+        )
+        assert tue_sched is None, "Tuesday must not be created when transaction fails on Wednesday"
+
     engine.dispose()

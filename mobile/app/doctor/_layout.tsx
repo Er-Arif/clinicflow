@@ -1,4 +1,4 @@
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter, usePathname } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
@@ -7,6 +7,8 @@ import { isDoctorOrOwner, isAssistantRole } from '@/auth/session';
 import { getSharedTabScreenOptions, TabIcon } from '@/navigation/tabOptions';
 
 export default function DoctorLayout() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: me, isLoading, isError } = useMeQuery();
   const insets = useSafeAreaInsets();
 
@@ -57,6 +59,18 @@ export default function DoctorLayout() {
         />
         <Tabs.Screen
           name="more"
+          listeners={{
+            tabPress: (e) => {
+              if (pathname.startsWith('/doctor/settings') || pathname === '/(auth)/change-password') {
+                e.preventDefault();
+                if (router.canDismiss()) {
+                  router.dismissTo('/doctor/more');
+                } else {
+                  router.navigate('/doctor/more');
+                }
+              }
+            },
+          }}
           options={{
             title: 'More',
             tabBarIcon: ({ color, size }) => <TabIcon name="more" color={color} size={size} />,

@@ -1,14 +1,14 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useGetPatientOperationalSummaryQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicDate } from '@/utils/dates';
 
 export default function DoctorPatientSummaryScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ patientId: string }>();
   const patientId = String(params.patientId ?? '');
   const summary = useGetPatientOperationalSummaryQuery(patientId, { skip: !patientId });
@@ -18,16 +18,16 @@ export default function DoctorPatientSummaryScreen() {
   if (!data) {
     return (
       <AppScreen>
+        <BackButton />
         <Text style={styles.title}>Unable to load patient</Text>
         <AppButton label="Retry" onPress={() => void summary.refetch()} />
-        <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
       </AppScreen>
     );
   }
 
   return (
     <AppScreen refreshing={summary.isFetching} onRefresh={() => void summary.refetch()}>
-      <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
+      <BackButton />
       <Text style={styles.title}>{data.patient.full_name}</Text>
       <Text style={styles.subtitle}>{data.patient.patient_code} · Age {data.patient.age ?? '—'} · {data.patient.gender.replaceAll('_', ' ')}</Text>
       <Text style={styles.subtitle}>{formatPhone(data.patient.mobile_number)}</Text>

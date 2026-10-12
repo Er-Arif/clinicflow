@@ -15,6 +15,7 @@ import {
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import type { Patient } from '@/features/patients/types';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -120,13 +121,9 @@ export default function WalkInScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Add Walk-in</Text>
-          <Text style={styles.subtitle}>Create the appointment and check the patient in as one transaction.</Text>
-        </View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
-      </View>
+      <BackButton />
+      <Text style={styles.title}>Add Walk-in</Text>
+      <Text style={styles.subtitle}>Create the appointment and check the patient in as one transaction.</Text>
 
       {!patient ? (
         <View style={styles.card}>

@@ -1,10 +1,14 @@
-from datetime import time
+from datetime import date, time
 from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
-from app.modules.scheduling.schemas import FeeConfigurationCreateRequest, SessionWrite
+from app.modules.scheduling.schemas import (
+    FeeConfigurationCreateRequest,
+    MultiDayScheduleReplaceRequest,
+    SessionWrite,
+)
 from app.modules.scheduling.service import generate_slots
 
 
@@ -47,3 +51,37 @@ def test_fee_values_are_quantized() -> None:
     )
     assert request.regular_fee == Decimal("500.00")
     assert request.followup_fee == Decimal("300.50")
+
+
+def test_multiday_schedule_request_validation() -> None:
+    # Valid multi-day request
+    req = MultiDayScheduleReplaceRequest(
+        weekdays=[0, 2, 4],
+        effective_from=date(2026, 10, 15),
+        sessions=[],
+    )
+    assert req.weekdays == [0, 2, 4]
+
+    # Duplicate weekdays rejected
+    with pytest.raises(ValidationError):
+        MultiDayScheduleReplaceRequest(
+            weekdays=[0, 1, 0],
+            effective_from=date(2026, 10, 15),
+            sessions=[],
+        )
+
+    # Out-of-range weekday rejected
+    with pytest.raises(ValidationError):
+        MultiDayScheduleReplaceRequest(
+            weekdays=[0, 7],
+            effective_from=date(2026, 10, 15),
+            sessions=[],
+        )
+
+    # Empty weekdays rejected
+    with pytest.raises(ValidationError):
+        MultiDayScheduleReplaceRequest(
+            weekdays=[],
+            effective_from=date(2026, 10, 15),
+            sessions=[],
+        )

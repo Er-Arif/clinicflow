@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useCreateFeeConfigurationMutation, useGetCurrentFeeQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function FeeSettingsScreen() {
-  const router = useRouter();
   const clinicTime = useClinicTimeQuery();
   const current = useGetCurrentFeeQuery();
   const [save, saveState] = useCreateFeeConfigurationMutation();
@@ -52,13 +51,9 @@ export default function FeeSettingsScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Fee Settings</Text>
-          <Text style={styles.subtitle}>Fee changes apply to new bookings only.</Text>
-        </View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
-      </View>
+      <BackButton />
+      <Text style={styles.title}>Fee Settings</Text>
+      <Text style={styles.subtitle}>Fee changes apply to new bookings only.</Text>
 
       {current.data ? (
         <View style={styles.card}>

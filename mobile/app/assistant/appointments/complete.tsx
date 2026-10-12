@@ -7,6 +7,7 @@ import { apiError } from '@/api/errors';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -25,7 +26,14 @@ export default function CompleteVisitScreen() {
   const [idempotencyKey] = useState(() => newIdempotencyKey('complete'));
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment not found</Text></AppScreen>;
+  if (!appointment.data) {
+    return (
+      <AppScreen>
+        <BackButton />
+        <Text style={styles.title}>Appointment not found</Text>
+      </AppScreen>
+    );
+  }
   const item = appointment.data;
 
   async function submit() {
@@ -72,6 +80,7 @@ export default function CompleteVisitScreen() {
 
   return (
     <AppScreen>
+      <BackButton />
       <Text style={styles.title}>Complete Visit</Text>
       <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>
 

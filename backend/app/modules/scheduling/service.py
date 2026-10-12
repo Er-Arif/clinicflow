@@ -27,6 +27,7 @@ from app.modules.scheduling.schemas import (
     BlockSessionRequest,
     FeeConfigurationCreateRequest,
     FeeConfigurationResponse,
+    MultiDayScheduleReplaceRequest,
     ScheduleDefinitionResponse,
     ScheduleReplaceRequest,
     SessionDefinitionResponse,
@@ -178,6 +179,26 @@ class SchedulingService:
             },
         )
         return self._schedule_response(definition)
+
+    def replace_multiple_weekdays(
+        self, doctor_id: UUID, request: MultiDayScheduleReplaceRequest
+    ) -> list[ScheduleDefinitionResponse]:
+        self._doctor(doctor_id)
+        if request.effective_from < self.clock.clinic_date():
+            raise AppError(
+                "SCHEDULE_EFFECTIVE_DATE_PAST",
+                "Schedule changes cannot start before the clinic's current date.",
+                422,
+            )
+
+        results: list[ScheduleDefinitionResponse] = []
+        for weekday in sorted(request.weekdays):
+            req = ScheduleReplaceRequest(
+                effective_from=request.effective_from,
+                sessions=request.sessions,
+            )
+            results.append(self.replace_weekday(doctor_id, weekday, req))
+        return results
 
     def availability(self, doctor_id: UUID, target_date: date) -> AvailabilityResponse:
         self._doctor(doctor_id)

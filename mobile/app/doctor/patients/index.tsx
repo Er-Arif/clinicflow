@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from 'react-native';
 
 import { useSearchPatientsQuery } from '@/api/api';
@@ -8,12 +8,20 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function DoctorPatientSearchScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    const unsub = navigation.getParent()?.addListener('blur', () => {
+      setQuery('');
+    });
+    return unsub;
+  }, [navigation]);
+
   const patients = useSearchPatientsQuery({ q: query.trim() }, { skip: query.trim().length < 2 });
 
   return (
     <AppScreen>
-      <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
       <Text style={styles.title}>Patients</Text>
       <Text style={styles.subtitle}>Search operational patient history.</Text>
       <TextInput

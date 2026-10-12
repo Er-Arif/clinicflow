@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
 import {
@@ -9,12 +8,14 @@ import {
   useGetAvailabilityQuery,
   useGetScheduleQuery,
   useListDoctorsQuery,
-  useReplaceWeekdayScheduleMutation,
+  useReplaceMultiDayScheduleMutation,
   useUnblockSessionMutation,
 } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
+import { TimePicker } from '@/components/TimePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { SessionWrite } from '@/features/scheduling/types';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -32,7 +33,6 @@ const blankSession = (order: number): SessionWrite => ({
 });
 
 export default function ScheduleSettingsScreen() {
-  const router = useRouter();
   const clinicTime = useClinicTimeQuery();
   const today = clinicTime.data?.clinic_date ?? '';
   const tomorrow = today ? addDays(today, 1) : '';
@@ -40,12 +40,15 @@ export default function ScheduleSettingsScreen() {
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const doctorId = selectedDoctor ?? doctors.data?.[0]?.doctor_id ?? '';
   const schedule = useGetScheduleQuery({ doctorId, effectiveOn: today }, { skip: !doctorId });
-  const [weekday, setWeekday] = useState(0);
-  const currentDay = schedule.data?.days.find((day) => day.weekday === weekday);
+
+  // Multi-day selection: array of selected weekday indexes (e.g. [0, 1, 2, 3, 4] for Mon-Fri)
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([0]);
+
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [sessions, setSessions] = useState<SessionWrite[]>([blankSession(0)]);
   const [message, setMessage] = useState<string | null>(null);
-  const [saveSchedule, saveState] = useReplaceWeekdayScheduleMutation();
+  const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
+  const [saveMultiDaySchedule, saveState] = useReplaceMultiDayScheduleMutation();
 
   const [blockDate, setBlockDate] = useState('');
   const [blockReason, setBlockReason] = useState('Doctor unavailable');
@@ -61,15 +64,40 @@ export default function ScheduleSettingsScreen() {
     if (today && !blockDate) setBlockDate(today);
   }, [today, effectiveFrom, blockDate]);
 
+  // Inspect existing schedules for selected weekdays to detect mixed configurations
+  const selectedDaysData = (schedule.data?.days ?? []).filter((d) => selectedWeekdays.includes(d.weekday));
+
+  // Determine if selected days have different schedules
+  const hasMixedExistingSchedules = (() => {
+    if (selectedDaysData.length <= 1) {
+      // If some days have schedules and others don't, that's mixed
+      return selectedDaysData.length > 0 && selectedDaysData.length < selectedWeekdays.length;
+    }
+    // Compare session signatures of the scheduled days
+    const signatures = selectedDaysData.map((d) =>
+      d.sessions
+        .map((s) => `${s.session_name}|${shortTime(s.start_time)}|${shortTime(s.end_time)}|${s.slot_interval_minutes}|${s.maximum_capacity}`)
+        .sort()
+        .join(';')
+    );
+    const allSame = signatures.every((sig) => sig === signatures[0]);
+    return !allSame || selectedDaysData.length < selectedWeekdays.length;
+  })();
+
+  // When changing weekday selection, initialize the editor with the first scheduled day's sessions or defaults
+  const primaryWeekday = selectedWeekdays[0] ?? 0;
+  const primaryDay = schedule.data?.days.find((day) => day.weekday === primaryWeekday);
+
   useEffect(() => {
-    if (!currentDay) {
+    setOverwriteConfirmed(false);
+    if (!primaryDay) {
       setEffectiveFrom(today);
       setSessions([blankSession(0)]);
       return;
     }
     setEffectiveFrom(tomorrow);
     setSessions(
-      currentDay.sessions.map((item, index) => ({
+      primaryDay.sessions.map((item, index) => ({
         session_name: item.session_name,
         start_time: normalizeTime(item.start_time),
         end_time: normalizeTime(item.end_time),
@@ -79,18 +107,39 @@ export default function ScheduleSettingsScreen() {
         display_order: index,
       })),
     );
-  }, [currentDay?.schedule_definition_id, today, tomorrow]);
+  }, [primaryDay, today, tomorrow, selectedWeekdays]);
+
+  function toggleWeekday(index: number) {
+    setSelectedWeekdays((prev) => {
+      if (prev.includes(index)) {
+        if (prev.length === 1) return prev; // Keep at least one selected
+        return prev.filter((w) => w !== index);
+      } else {
+        return [...prev, index].sort((a, b) => a - b);
+      }
+    });
+  }
 
   function patchSession(index: number, patch: Partial<SessionWrite>) {
     setSessions((previous) => previous.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
 
   async function save() {
-    if (!doctorId) return;
+    if (!doctorId || selectedWeekdays.length === 0) return;
+    if (hasMixedExistingSchedules && !overwriteConfirmed) {
+      setMessage('Please confirm applying this schedule to all selected days before saving.');
+      return;
+    }
     setMessage(null);
     try {
-      await saveSchedule({ doctorId, weekday, effectiveFrom, sessions }).unwrap();
-      setMessage('Schedule version saved.');
+      await saveMultiDaySchedule({
+        doctorId,
+        weekdays: selectedWeekdays,
+        effectiveFrom,
+        sessions,
+      }).unwrap();
+      setMessage(`Schedule version saved for ${selectedWeekdays.map((w) => weekdays[w]).join(', ')}.`);
+      setOverwriteConfirmed(false);
       void schedule.refetch();
       void availability.refetch();
     } catch (error) {
@@ -122,13 +171,9 @@ export default function ScheduleSettingsScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Schedule Settings</Text>
-          <Text style={styles.subtitle}>Recurring schedule versions never move existing bookings.</Text>
-        </View>
-        <Pressable onPress={() => router.back()}><Text style={styles.link}>Back</Text></Pressable>
-      </View>
+      <BackButton />
+      <Text style={styles.title}>Schedule Settings</Text>
+      <Text style={styles.subtitle}>Recurring schedule versions never move existing bookings.</Text>
 
       <Text style={styles.label}>Doctor</Text>
       <View style={styles.chips}>
@@ -145,31 +190,57 @@ export default function ScheduleSettingsScreen() {
         ))}
       </View>
 
-      <Text style={styles.label}>Working Day</Text>
+      <Text style={styles.label}>Working Days (Select one or multiple)</Text>
       <View style={styles.chips}>
-        {weekdays.map((label, index) => (
-          <Pressable
-            key={label}
-            onPress={() => setWeekday(index)}
-            style={[styles.dayChip, weekday === index && styles.chipActive]}
-          >
-            <Text style={weekday === index ? styles.chipTextActive : styles.chipText}>{label}</Text>
-          </Pressable>
-        ))}
+        {weekdays.map((label, index) => {
+          const isSelected = selectedWeekdays.includes(index);
+          return (
+            <Pressable
+              key={label}
+              onPress={() => toggleWeekday(index)}
+              style={[styles.dayChip, isSelected && styles.chipActive]}
+            >
+              <Text style={isSelected ? styles.chipTextActive : styles.chipText}>{label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {currentDay ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Current {weekdays[weekday]} schedule</Text>
-          {currentDay.sessions.map((session) => (
-            <Text key={session.session_definition_id} style={styles.subtitle}>
-              {session.session_name}: {shortTime(session.start_time)}–{shortTime(session.end_time)} · {session.slot_interval_minutes} min · capacity {session.maximum_capacity}
-            </Text>
-          ))}
-          <Text style={styles.subtitle}>Changes below default to {tomorrow} as a new version.</Text>
-        </View>
+      {/* Overview of current schedules for selected days */}
+      {selectedWeekdays.length === 1 ? (
+        primaryDay ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Current {weekdays[primaryWeekday]} schedule</Text>
+            {primaryDay.sessions.map((session) => (
+              <Text key={session.session_definition_id} style={styles.subtitle}>
+                {session.session_name}: {shortTime(session.start_time)}–{shortTime(session.end_time)} · {session.slot_interval_minutes} min · capacity {session.maximum_capacity}
+              </Text>
+            ))}
+            <Text style={styles.subtitle}>Changes below default to {tomorrow} as a new version.</Text>
+          </View>
+        ) : (
+          <Text style={styles.subtitle}>No active schedule for {weekdays[primaryWeekday]}.</Text>
+        )
       ) : (
-        <Text style={styles.subtitle}>No active schedule for {weekdays[weekday]}.</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Selected: {selectedWeekdays.map((w) => weekdays[w]).join(', ')}</Text>
+          {hasMixedExistingSchedules ? (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>Selected days currently have different schedules or some days are unscheduled.</Text>
+              {!overwriteConfirmed ? (
+                <AppButton
+                  label="Apply this schedule to all selected days"
+                  tone="secondary"
+                  onPress={() => setOverwriteConfirmed(true)}
+                />
+              ) : (
+                <Text style={styles.success}>✓ Overwrite confirmed. Saving will apply this schedule to {selectedWeekdays.map((w) => weekdays[w]).join(', ')}.</Text>
+              )}
+            </View>
+          ) : (
+            <Text style={styles.subtitle}>All selected days currently share the same schedule.</Text>
+          )}
+        </View>
       )}
 
       <View style={{ gap: 4 }}><Text style={{ fontWeight: '800' }}>Effective From</Text><DatePicker value={effectiveFrom} onChange={setEffectiveFrom} placeholder="YYYY-MM-DD" /></View>
@@ -186,8 +257,22 @@ export default function ScheduleSettingsScreen() {
           </View>
           <FormField label="Session Name" value={session.session_name} onChangeText={(value) => patchSession(index, { session_name: value })} />
           <View style={styles.twoColumns}>
-            <View style={{ flex: 1 }}><FormField label="Start" value={shortTime(session.start_time)} onChangeText={(value) => patchSession(index, { start_time: normalizeTime(value) })} placeholder="10:00" /></View>
-            <View style={{ flex: 1 }}><FormField label="End" value={shortTime(session.end_time)} onChangeText={(value) => patchSession(index, { end_time: normalizeTime(value) })} placeholder="13:00" /></View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.timeLabel}>Start</Text>
+              <TimePicker
+                value={shortTime(session.start_time)}
+                onChange={(value) => patchSession(index, { start_time: normalizeTime(value) })}
+                placeholder="10:00"
+              />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.timeLabel}>End</Text>
+              <TimePicker
+                value={shortTime(session.end_time)}
+                onChange={(value) => patchSession(index, { end_time: normalizeTime(value) })}
+                placeholder="13:00"
+              />
+            </View>
           </View>
           <View style={styles.twoColumns}>
             <View style={{ flex: 1 }}><FormField label="Slot Minutes" value={String(session.slot_interval_minutes)} onChangeText={(value) => patchSession(index, { slot_interval_minutes: Number(value) || 0 })} keyboardType="number-pad" /></View>
@@ -197,9 +282,13 @@ export default function ScheduleSettingsScreen() {
       ))}
 
       <AppButton label="Add Session" tone="secondary" onPress={() => setSessions((items) => [...items, blankSession(items.length)])} />
-      <AppButton label="Disable This Day From Date" tone="secondary" onPress={() => setSessions([])} />
+      <AppButton label="Disable Selected Day(s) From Date" tone="secondary" onPress={() => setSessions([])} />
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
-      <AppButton label="Save Schedule Version" loading={saveState.isLoading} onPress={() => void save()} />
+      <AppButton
+        label={selectedWeekdays.length > 1 ? `Save Schedule for ${selectedWeekdays.length} Days` : 'Save Schedule Version'}
+        loading={saveState.isLoading}
+        onPress={() => void save()}
+      />
 
       <View style={styles.divider} />
       <Text style={styles.sectionTitle}>Date-specific Doctor Unavailability</Text>
@@ -264,10 +353,12 @@ const styles = StyleSheet.create({
   sessionCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
   cardTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
   twoColumns: { flexDirection: 'row', gap: spacing.sm },
+  timeLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
+  warningBox: { backgroundColor: colors.softWarning, borderColor: colors.warning, borderWidth: 1, borderRadius: radius.sm, padding: spacing.sm, gap: spacing.sm },
+  warningText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   remove: { color: colors.danger, fontWeight: '700' },
   success: { color: colors.success, fontWeight: '700' },
   error: { color: colors.danger },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   sectionTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
 });
-

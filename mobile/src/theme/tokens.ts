@@ -8,6 +8,7 @@ export const colors = {
   border: '#CBD5E1',
   success: '#18794E',
   warning: '#B45309',
+  softWarning: '#FEF3C7',
   danger: '#B42318',
   softPrimary: '#EAF4FB',
 };
