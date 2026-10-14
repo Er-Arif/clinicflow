@@ -1,3 +1,4 @@
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -5,7 +6,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { apiError } from '@/api/errors';
 import { useCreatePatientMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { PatientForm } from '@/features/patients/PatientForm';
 import { PatientFormValues, patientFormDefaults } from '@/features/patients/form';
@@ -55,7 +55,7 @@ export default function NewPatientScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>New Patient</Text>
       <Text style={styles.subtitle}>Enter only the administrative information ClinicFlow needs.</Text>
@@ -92,7 +92,7 @@ export default function NewPatientScreen() {
         loading={mutation.isLoading}
         onSubmit={(values) => void submit(values)}
       />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

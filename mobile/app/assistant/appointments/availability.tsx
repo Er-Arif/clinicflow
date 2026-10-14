@@ -1,11 +1,12 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useGetAvailabilityQuery, useListDoctorsQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AvailabilityScreen() {
@@ -24,7 +25,7 @@ export default function AvailabilityScreen() {
   );
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Availability</Text>
@@ -49,7 +50,7 @@ export default function AvailabilityScreen() {
       </View>
 
       <Text style={styles.label}>Date</Text>
-      <TextInput
+      <KeyboardSafeTextInput
         value={date}
         onChangeText={setDate}
         placeholder="YYYY-MM-DD"
@@ -100,7 +101,7 @@ export default function AvailabilityScreen() {
           </View>
         </View>
       ))}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

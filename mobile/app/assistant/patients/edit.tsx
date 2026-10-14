@@ -1,3 +1,4 @@
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -67,7 +68,7 @@ export default function EditPatientScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Edit Patient</Text>
       {duplicateCandidates.length ? (
@@ -90,7 +91,7 @@ export default function EditPatientScreen() {
         loading={mutation.isLoading}
         onSubmit={(values) => void submit(values)}
       />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

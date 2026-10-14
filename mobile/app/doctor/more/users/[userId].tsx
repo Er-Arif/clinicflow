@@ -1,10 +1,11 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useGetAdminUserQuery, useListRolePresetsQuery, useMeQuery, useResetAdminUserPasswordMutation, useUpdateAdminUserMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { RolePicker } from '@/features/admin/RolePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -56,12 +57,12 @@ export default function EditUserScreen() {
 
   const editingSelf = me.data?.user_id === userId;
   return (
-    <AppScreen refreshing={user.isFetching} onRefresh={() => void user.refetch()}>
+    <KeyboardSafeFormScreen refreshing={user.isFetching} onRefresh={() => void user.refetch()}>
       <BackButton />
       <Text style={styles.title}>Edit User</Text>
       {user.isLoading ? <ActivityIndicator /> : null}
-      <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} autoCapitalize="none" placeholder="Login identifier" value={login} onChangeText={setLogin} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
+      <KeyboardSafeTextInput style={styles.input} autoCapitalize="none" placeholder="Login identifier" value={login} onChangeText={setLogin} />
       <Text style={styles.heading}>Roles</Text>
       <RolePicker roles={roles.data ?? []} selected={selectedRoles} onChange={setSelectedRoles} />
       <View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.heading}>Account active</Text><Text style={styles.subtitle}>{editingSelf ? 'You cannot disable your own account.' : 'Disabled users cannot authenticate.'}</Text></View><Switch value={active} disabled={editingSelf} onValueChange={setActive} /></View>
@@ -71,11 +72,11 @@ export default function EditUserScreen() {
       <View style={styles.divider} />
       <Text style={styles.heading}>Reset Password</Text>
       <Text style={styles.subtitle}>Sets a temporary password and immediately revokes the user&apos;s active sessions.</Text>
-      <TextInput style={styles.input} secureTextEntry placeholder="New temporary password" value={temporaryPassword} onChangeText={setTemporaryPassword} />
-      <TextInput style={styles.input} placeholder="Reason" value={resetReason} onChangeText={setResetReason} />
+      <KeyboardSafeTextInput style={styles.input} secureTextEntry placeholder="New temporary password" value={temporaryPassword} onChangeText={setTemporaryPassword} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Reason" value={resetReason} onChangeText={setResetReason} />
       <AppButton label="Reset Password" tone="danger" loading={resetState.isLoading} disabled={editingSelf || temporaryPassword.length < 10 || !resetReason.trim()} onPress={reset} />
       {message ? <Text style={message.includes('saved') || message.includes('set and') ? styles.success : styles.error}>{message}</Text> : null}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
@@ -57,7 +59,7 @@ export default function RescheduleAppointmentScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <Text style={styles.title}>Reschedule Appointment</Text>
       <Text style={styles.subtitle}>Original: {appointment.data.session.date} · {appointment.data.appointment_time?.slice(0, 5)}</Text>
         <DatePicker
@@ -112,13 +114,13 @@ export default function RescheduleAppointmentScreen() {
       {isOwner ? (
         <View style={styles.card}>
           <Pressable onPress={() => setOverrideEnabled((value) => !value)}><Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Owner override</Text></Pressable>
-          {overrideEnabled ? <TextInput value={overrideReason} onChangeText={setOverrideReason} style={styles.input} placeholder="Required override reason" /> : null}
+          {overrideEnabled ? <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} style={styles.input} placeholder="Required override reason" /> : null}
         </View>
       ) : null}
       {rescheduleState.error ? <Text style={styles.error}>{apiError(rescheduleState.error)?.message ?? 'Unable to reschedule appointment.'}</Text> : null}
       <AppButton label="Confirm Reschedule" loading={rescheduleState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => void confirm()} />
       <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

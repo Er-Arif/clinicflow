@@ -1,10 +1,11 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text, } from 'react-native';
 
 import { useChangePasswordMutation, useMeQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -33,7 +34,7 @@ export default function ChangePasswordScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       {!me.data?.must_change_password ? <BackButton /> : null}
       <Text style={styles.brand}>ClinicFlow</Text>
       <Text style={styles.title}>Change Password</Text>
@@ -42,12 +43,12 @@ export default function ChangePasswordScreen() {
           ? 'Your administrator issued a temporary password. Choose a new password before continuing.'
           : 'Update your ClinicFlow password.'}
       </Text>
-      <TextInput style={styles.input} placeholder="Current password" secureTextEntry value={current} onChangeText={setCurrent} />
-      <TextInput style={styles.input} placeholder="New password" secureTextEntry value={next} onChangeText={setNext} />
-      <TextInput style={styles.input} placeholder="Confirm new password" secureTextEntry value={confirm} onChangeText={setConfirm} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Current password" secureTextEntry value={current} onChangeText={setCurrent} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="New password" secureTextEntry value={next} onChangeText={setNext} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Confirm new password" secureTextEntry value={confirm} onChangeText={setConfirm} />
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <AppButton label="Change Password" loading={state.isLoading} disabled={!current || !next || !confirm} onPress={submit} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

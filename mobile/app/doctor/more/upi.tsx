@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { apiError } from '@/api/errors';
 import { useGetUpiConfigurationQuery, useUpdateUpiConfigurationMutation } from '@/api/api';
@@ -40,19 +42,19 @@ export default function UpiSettingsScreen() {
   if (config.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>UPI Settings</Text>
       <Text style={styles.subtitle}>{missing ? 'Configure UPI before accepting UPI payments.' : 'Clinic-wide payee details used to generate dynamic QR codes.'}</Text>
       <Text style={styles.label}>UPI ID</Text>
-      <TextInput value={upiId} onChangeText={setUpiId} autoCapitalize="none" placeholder="clinic@upi" style={styles.input} />
+      <KeyboardSafeTextInput value={upiId} onChangeText={setUpiId} autoCapitalize="none" placeholder="clinic@upi" style={styles.input} />
       <Text style={styles.label}>Payee Name</Text>
-      <TextInput value={payeeName} onChangeText={setPayeeName} placeholder="Clinic name" style={styles.input} />
+      <KeyboardSafeTextInput value={payeeName} onChangeText={setPayeeName} placeholder="Clinic name" style={styles.input} />
       <View style={styles.toggle}><Text style={styles.label}>UPI enabled</Text><Switch value={active} onValueChange={setActive} /></View>
       {updateState.data ? <Text style={styles.success}>UPI settings saved.</Text> : null}
       {updateState.error ? <Text style={styles.error}>{apiError(updateState.error)?.message ?? 'Unable to save UPI settings.'}</Text> : null}
       <AppButton label="Save UPI Details" loading={updateState.isLoading} disabled={upiId.trim().length < 3 || payeeName.trim().length < 1} onPress={() => void save()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
@@ -91,7 +93,7 @@ export default function AppointmentReviewScreen() {
   } | undefined;
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Review Appointment</Text>
       <View style={styles.card}>
@@ -110,8 +112,8 @@ export default function AppointmentReviewScreen() {
             <Text style={styles.helper}>Requires a reason and is preserved in fee-adjustment history.</Text>
           </Pressable>
           {adjustFee ? (<>
-            <TextInput value={adjustedAmount} onChangeText={setAdjustedAmount} keyboardType="decimal-pad" placeholder="Amount" style={styles.input} />
-            <TextInput value={adjustmentReason} onChangeText={setAdjustmentReason} placeholder="Required reason" style={styles.input} />
+            <KeyboardSafeTextInput value={adjustedAmount} onChangeText={setAdjustedAmount} keyboardType="decimal-pad" placeholder="Amount" style={styles.input} />
+            <KeyboardSafeTextInput value={adjustmentReason} onChangeText={setAdjustmentReason} placeholder="Required reason" style={styles.input} />
           </>) : null}
         </View>
       ) : null}
@@ -142,7 +144,7 @@ export default function AppointmentReviewScreen() {
       ) : null}
       <AppButton label="Book Appointment" loading={createState.isLoading || bookState.isLoading} disabled={adjustFee && (!adjustedAmount || adjustmentReason.trim().length < 2)} onPress={() => void confirm()} />
       <AppButton label="Edit" tone="secondary" onPress={() => router.back()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

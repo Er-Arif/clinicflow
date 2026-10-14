@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useBookFollowUpMutation, useClinicTimeQuery, useGetAvailabilityQuery, useGetFollowUpQuery, useMeQuery } from '@/api/api';
@@ -63,10 +65,10 @@ export default function BookFollowUpScreen() {
   if (!followup.data) return <AppScreen><Text style={styles.title}>Follow-up not found</Text></AppScreen>;
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <Text style={styles.title}>Book Follow-up</Text>
       <Text style={styles.subtitle}>{followup.data.patient.full_name} · Due {followup.data.due_date}</Text>
-      <TextInput value={date} onChangeText={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} placeholder="YYYY-MM-DD" style={styles.input} />
+      <KeyboardSafeTextInput value={date} onChangeText={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} placeholder="YYYY-MM-DD" style={styles.input} />
       {availability.isFetching ? <ActivityIndicator /> : null}
       {availability.data?.sessions.map((session) => (
         <View key={session.session_definition_id} style={styles.card}>
@@ -92,14 +94,14 @@ export default function BookFollowUpScreen() {
       {override && canOverride ? (
         <View style={styles.card}>
           <Text style={styles.session}>Owner override</Text>
-          <TextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Reason for extra/double booking" style={styles.input} />
+          <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Reason for extra/double booking" style={styles.input} />
           <AppButton label="Cancel Override" tone="secondary" onPress={() => setOverride(false)} />
         </View>
       ) : null}
       {bookState.error ? <Text style={styles.error}>{apiError(bookState.error)?.message ?? 'Unable to book follow-up.'}</Text> : null}
       <AppButton label="Book Follow-up" loading={bookState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (override && overrideReason.trim().length < 2)} onPress={() => void submit()} />
       <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

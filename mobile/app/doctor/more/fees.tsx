@@ -1,3 +1,4 @@
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -5,7 +6,6 @@ import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useCreateFeeConfigurationMutation, useGetCurrentFeeQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -50,7 +50,7 @@ export default function FeeSettingsScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Fee Settings</Text>
       <Text style={styles.subtitle}>Fee changes apply to new bookings only.</Text>
@@ -77,7 +77,7 @@ export default function FeeSettingsScreen() {
       </View>
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
       <AppButton label="Save Fee Version" onPress={() => void submit()} loading={saveState.isLoading} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

@@ -1,44 +1,34 @@
-import { useRef } from 'react';
+import type { RefObject } from 'react';
 import {
-  NativeSyntheticEvent,
   StyleSheet,
-  TargetedEvent,
   Text,
   TextInput,
   TextInputProps,
   View,
 } from 'react-native';
 
-import { useScrollIntoView } from '@/components/AppScreen';
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 type Props = TextInputProps & {
   label: string;
   error?: string;
+  inputRef?: RefObject<TextInput | null>;
 };
 
-export function FormField({ label, error, onFocus, ...props }: Props) {
-  const containerRef = useRef<View>(null);
-  const inputRef = useRef<TextInput>(null);
-  const scrollContext = useScrollIntoView();
-
-  const handleFocus = (e: NativeSyntheticEvent<TargetedEvent>) => {
-    onFocus?.(e as any);
-    if (containerRef.current) {
-      scrollContext?.scrollIntoView(containerRef.current);
-    } else if (inputRef.current) {
-      scrollContext?.scrollIntoView(inputRef.current);
-    }
-  };
-
+export function FormField({ label, error, inputRef, ...props }: Props) {
   return (
-    <View ref={containerRef} style={styles.wrapper} collapsable={false}>
+    <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <KeyboardSafeTextInput
         ref={inputRef}
         {...props}
-        onFocus={handleFocus}
-        style={[styles.input, error ? styles.inputError : null, props.style]}
+        style={[
+          styles.input,
+          props.multiline ? styles.multilineInput : null,
+          error ? styles.inputError : null,
+          props.style,
+        ]}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
@@ -57,6 +47,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     color: colors.text,
     fontSize: 16,
+  },
+  multilineInput: {
+    textAlignVertical: 'top',
+    verticalAlign: 'top',
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   inputError: { borderColor: colors.danger },
   error: { color: colors.danger, fontSize: 13 },

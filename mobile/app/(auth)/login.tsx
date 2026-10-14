@@ -1,13 +1,13 @@
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
@@ -53,7 +53,7 @@ export default function LoginScreen() {
           : null;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <KeyboardSafeFormScreen contentStyle={styles.screen}>
       <View style={styles.card}>
         <Image
           source={require('../../assets/clinicflow-lockup.png')}
@@ -62,7 +62,7 @@ export default function LoginScreen() {
           accessibilityLabel="ClinicFlow — Appointments · Payments · Follow-ups"
         />
         <View style={styles.form}>
-          <TextInput
+          <KeyboardSafeTextInput
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Username / Mobile / Email"
@@ -70,7 +70,7 @@ export default function LoginScreen() {
             onChangeText={setLoginIdentifier}
             style={styles.input}
           />
-          <TextInput
+          <KeyboardSafeTextInput
             placeholder="Password"
             secureTextEntry
             value={password}
@@ -92,12 +92,12 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </View>
-    </SafeAreaView>
+    </KeyboardSafeFormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#F7FAFC' },
+  screen: { flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: '#F7FAFC' },
   card: { gap: 12 },
   logo: { width: '100%', height: 80, alignSelf: 'center', marginBottom: 8 },
   brand: { fontSize: 32, fontWeight: '700', color: '#1264A3' },

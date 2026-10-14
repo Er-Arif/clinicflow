@@ -1,11 +1,12 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useClinicTimeQuery, useListAuditEventsQuery, useListUsersQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -37,7 +38,7 @@ export default function AuditHistoryScreen() {
   }
 
   return (
-    <AppScreen refreshing={events.isFetching} onRefresh={() => void events.refetch()}>
+    <KeyboardSafeFormScreen refreshing={events.isFetching} onRefresh={() => void events.refetch()}>
       <BackButton />
       <Text style={styles.title}>Audit History</Text>
       <Text style={styles.subtitle}>Read-only history of important ClinicFlow actions.</Text>
@@ -51,8 +52,8 @@ export default function AuditHistoryScreen() {
         </View>
       </View>
       <AppButton label="Use Today" tone="secondary" onPress={today} />
-      <TextInput style={styles.input} autoCapitalize="characters" placeholder="Action e.g. PAYMENT_CONFIRMED" value={actionInput} onChangeText={setActionInput} />
-      <TextInput style={styles.input} autoCapitalize="characters" placeholder="Entity e.g. PAYMENT" value={entityInput} onChangeText={setEntityInput} />
+      <KeyboardSafeTextInput style={styles.input} autoCapitalize="characters" placeholder="Action e.g. PAYMENT_CONFIRMED" value={actionInput} onChangeText={setActionInput} />
+      <KeyboardSafeTextInput style={styles.input} autoCapitalize="characters" placeholder="Entity e.g. PAYMENT" value={entityInput} onChangeText={setEntityInput} />
 
       <Text style={styles.heading}>User</Text>
       <View style={styles.chips}>
@@ -75,7 +76,7 @@ export default function AuditHistoryScreen() {
         </Pressable>
       ))}
       {!events.isLoading && events.data?.items.length === 0 ? <Text style={styles.subtitle}>No audit events match these filters.</Text> : null}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

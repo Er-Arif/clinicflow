@@ -1,9 +1,10 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, } from 'react-native';
 
 import { useGetClinicSettingsQuery, useUpdateClinicSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -35,16 +36,16 @@ export default function ClinicSettingsScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Clinic Settings</Text>
       {query.isLoading ? <ActivityIndicator /> : null}
-      <TextInput style={styles.input} placeholder="Clinic name" value={name} onChangeText={setName} />
-      <TextInput style={[styles.input, styles.multiline]} placeholder="Address" multiline value={address} onChangeText={setAddress} />
-      <TextInput style={styles.input} placeholder="Contact number" keyboardType="phone-pad" value={contact} onChangeText={setContact} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Clinic name" value={name} onChangeText={setName} />
+      <KeyboardSafeTextInput style={[styles.input, styles.multiline]} placeholder="Address" multiline value={address} onChangeText={setAddress} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Contact number" keyboardType="phone-pad" value={contact} onChangeText={setContact} />
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
       <AppButton label="Save Changes" loading={saveState.isLoading} disabled={!query.data || !name.trim()} onPress={submit} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

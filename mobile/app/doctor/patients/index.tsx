@@ -1,9 +1,10 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, } from 'react-native';
 
 import { useSearchPatientsQuery } from '@/api/api';
-import { AppScreen } from '@/components/AppScreen';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function DoctorPatientSearchScreen() {
@@ -21,10 +22,10 @@ export default function DoctorPatientSearchScreen() {
   const patients = useSearchPatientsQuery({ q: query.trim() }, { skip: query.trim().length < 2 });
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <Text style={styles.title}>Patients</Text>
       <Text style={styles.subtitle}>Search operational patient history.</Text>
-      <TextInput
+      <KeyboardSafeTextInput
         value={query}
         onChangeText={setQuery}
         placeholder="Mobile, patient name or patient ID"
@@ -40,7 +41,7 @@ export default function DoctorPatientSearchScreen() {
         </Pressable>
       ))}
       {query.trim().length >= 2 && !patients.isFetching && patients.data?.items.length === 0 ? <Text style={styles.subtitle}>No patient found.</Text> : null}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

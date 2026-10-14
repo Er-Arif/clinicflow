@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
@@ -79,7 +81,7 @@ export default function AppointmentDetailsScreen() {
     : ['PATIENT_CANCELLED', 'NO_SHOW', 'DOCTOR_UNAVAILABLE', 'OTHER'];
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={styles.status}>{item.status.replace('_', ' ')}</Text>
@@ -153,7 +155,7 @@ export default function AppointmentDetailsScreen() {
               />
             ))}
           </View>
-          {reason === 'OTHER' ? <TextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}
+          {reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}
           {cancelState.error ? <Text style={styles.error}>{apiError(cancelState.error)?.message ?? 'Unable to cancel appointment.'}</Text> : null}
           <AppButton
             label="Confirm Cancellation"
@@ -165,7 +167,7 @@ export default function AppointmentDetailsScreen() {
         </View>
       ) : null}
       <AppButton label="Back to Appointments" tone="secondary" onPress={() => router.replace('/assistant/appointments')} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

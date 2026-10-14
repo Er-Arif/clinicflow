@@ -1,10 +1,11 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useListMessageTemplatesQuery, useUpdateMessageTemplateMutation } from '@/api/api';
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -34,7 +35,7 @@ export default function MessageTemplatesScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Message Templates</Text>
       <Text style={styles.subtitle}>Operational messages only. Do not include diagnosis, medicines, or sensitive clinical information.</Text>
@@ -49,7 +50,7 @@ export default function MessageTemplatesScreen() {
       {query.data?.map((item) => (
         <View key={item.template_id} style={styles.card}>
           <Text style={styles.heading}>{item.template_type.replaceAll('_', ' ')} · {item.language}</Text>
-          <TextInput
+          <KeyboardSafeTextInput
             multiline
             value={drafts[item.template_id] ?? ''}
             onChangeText={(value) => setDrafts((current) => ({ ...current, [item.template_id]: value }))}
@@ -58,7 +59,7 @@ export default function MessageTemplatesScreen() {
           <AppButton label="Save Template" loading={updateState.isLoading} onPress={() => void save(item.template_id, item.version, item.active)} />
         </View>
       ))}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

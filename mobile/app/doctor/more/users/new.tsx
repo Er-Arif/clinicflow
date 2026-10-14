@@ -1,10 +1,11 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text, } from 'react-native';
 
 import { useCreateAdminUserMutation, useListRolePresetsQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { RolePicker } from '@/features/admin/RolePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -31,18 +32,18 @@ export default function NewUserScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Add User</Text>
-      <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} autoCapitalize="none" placeholder="Login identifier" value={login} onChangeText={setLogin} />
-      <TextInput style={styles.input} secureTextEntry placeholder="Temporary password (10+ characters)" value={password} onChangeText={setPassword} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
+      <KeyboardSafeTextInput style={styles.input} autoCapitalize="none" placeholder="Login identifier" value={login} onChangeText={setLogin} />
+      <KeyboardSafeTextInput style={styles.input} secureTextEntry placeholder="Temporary password (10+ characters)" value={password} onChangeText={setPassword} />
       <Text style={styles.heading}>Roles</Text>
       <RolePicker roles={roles.data ?? []} selected={selectedRoles} onChange={setSelectedRoles} />
       <Text style={styles.subtitle}>The user must change the temporary password after first sign-in.</Text>
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <AppButton label="Create User" loading={state.isLoading} disabled={!name.trim() || !login.trim() || password.length < 10 || selectedRoles.length === 0} onPress={submit} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

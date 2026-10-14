@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useCompleteVisitMutation, useGetAppointmentQuery } from '@/api/api';
@@ -79,7 +81,7 @@ export default function CompleteVisitScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Complete Visit</Text>
       <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>
@@ -100,7 +102,7 @@ export default function CompleteVisitScreen() {
             <AppButton label="Specific Date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
           </View>
           {mode === 'INTERVAL' ? (
-            <TextInput
+            <KeyboardSafeTextInput
               value={intervalDays}
               onChangeText={setIntervalDays}
               keyboardType="number-pad"
@@ -125,7 +127,7 @@ export default function CompleteVisitScreen() {
         onPress={() => void submit()}
       />
       <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

@@ -1,9 +1,10 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { useSearchPatientsQuery } from '@/api/api';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -29,13 +30,13 @@ export default function PatientSearchScreen() {
   const mobilePrefill = useMemo(() => query.replace(/\D/g, ''), [query]);
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <View>
         <Text style={styles.title}>Patients</Text>
         <Text style={styles.subtitle}>Search before creating a new patient.</Text>
       </View>
 
-      <TextInput
+      <KeyboardSafeTextInput
         autoFocus
         placeholder="Mobile, patient name or patient ID"
         value={query}
@@ -85,7 +86,7 @@ export default function PatientSearchScreen() {
           router.push({ pathname: '/assistant/patients/new', params: { mobile: mobilePrefill } })
         }
       />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

@@ -1,9 +1,10 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, } from 'react-native';
 
 import { useGetDoctorSettingsQuery, useListDoctorsQuery, useUpdateDoctorSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -35,16 +36,16 @@ export default function DoctorSettingsScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Doctor Settings</Text>
       {doctors.isLoading || settings.isLoading ? <ActivityIndicator /> : null}
       {!doctorId && !doctors.isLoading ? <Text style={styles.error}>No active doctor is configured.</Text> : null}
-      <TextInput style={styles.input} placeholder="Doctor name" value={name} onChangeText={setName} />
-      <TextInput style={[styles.input, styles.multiline]} placeholder="Professional display details" multiline value={details} onChangeText={setDetails} />
+      <KeyboardSafeTextInput style={styles.input} placeholder="Doctor name" value={name} onChangeText={setName} />
+      <KeyboardSafeTextInput style={[styles.input, styles.multiline]} placeholder="Professional display details" multiline value={details} onChangeText={setDetails} />
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
       <AppButton label="Save Changes" loading={saveState.isLoading} disabled={!settings.data || !name.trim()} onPress={submit} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

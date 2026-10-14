@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import {
@@ -14,7 +16,6 @@ import {
 } from '@/api/api';
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { newIdempotencyKey } from '@/features/appointments/idempotency';
 import type { Patient } from '@/features/patients/types';
@@ -120,7 +121,7 @@ export default function WalkInScreen() {
   const adjustmentValid = !adjustFee || (/^\d+(\.\d{1,2})?$/.test(adjustedAmount) && adjustReason.trim().length >= 2);
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>Add Walk-in</Text>
       <Text style={styles.subtitle}>Create the appointment and check the patient in as one transaction.</Text>
@@ -128,7 +129,7 @@ export default function WalkInScreen() {
       {!patient ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Patient</Text>
-          <TextInput value={query} onChangeText={setQuery} placeholder="Search mobile, name or patient ID" style={styles.input} />
+          <KeyboardSafeTextInput value={query} onChangeText={setQuery} placeholder="Search mobile, name or patient ID" style={styles.input} />
           {search.isFetching ? <ActivityIndicator /> : null}
           {search.data?.items.map((item) => (
             <Pressable key={item.patient_id} style={styles.patientRow} onPress={() => setPatient(item)}>
@@ -197,7 +198,7 @@ export default function WalkInScreen() {
             <Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Add Extra Walk-in</Text>
             <Text style={styles.subtitle}>The selected session is full. Owner override requires a reason.</Text>
           </Pressable>
-          {overrideEnabled ? <TextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Override reason" style={styles.input} /> : null}
+          {overrideEnabled ? <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Override reason" style={styles.input} /> : null}
         </View>
       ) : null}
       {activeSession && sessionFull && !isOwner ? <Text style={styles.warning}>This session is full. Ask the Owner/Doctor before adding another patient.</Text> : null}
@@ -211,8 +212,8 @@ export default function WalkInScreen() {
       </View>
       {adjustFee ? (
         <View style={styles.card}>
-          <TextInput value={adjustedAmount} onChangeText={setAdjustedAmount} keyboardType="decimal-pad" placeholder="Adjusted amount" style={styles.input} />
-          <TextInput value={adjustReason} onChangeText={setAdjustReason} placeholder="Required reason" style={styles.input} />
+          <KeyboardSafeTextInput value={adjustedAmount} onChangeText={setAdjustedAmount} keyboardType="decimal-pad" placeholder="Adjusted amount" style={styles.input} />
+          <KeyboardSafeTextInput value={adjustReason} onChangeText={setAdjustReason} placeholder="Required reason" style={styles.input} />
         </View>
       ) : null}
 
@@ -259,7 +260,7 @@ export default function WalkInScreen() {
         disabled={!patient || !doctorId || !activeSession || blocked || !canSubmitOverride || !adjustmentValid}
         onPress={() => void submit()}
       />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

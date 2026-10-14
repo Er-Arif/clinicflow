@@ -11,9 +11,10 @@ import {
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { formatWorkingDays } from '@/features/scheduling/formatters';
 import { colors, radius, spacing } from '@/theme/tokens';
 
-const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export { formatWorkingDays };
 
 export default function ScheduleHubScreen() {
   const router = useRouter();
@@ -33,9 +34,9 @@ export default function ScheduleHubScreen() {
     { skip: !doctorId }
   );
 
-  const activeDays = (scheduleQuery.data?.days ?? [])
+  const activeDayIndices = (scheduleQuery.data?.days ?? [])
     .filter((d) => d.active && d.sessions.some((s) => s.active))
-    .map((d) => weekdays[d.weekday]);
+    .map((d) => d.weekday);
 
   const exceptions = exceptionsQuery.data?.exceptions ?? [];
   const exceptionCount = exceptionsQuery.data?.total_count ?? 0;
@@ -80,7 +81,7 @@ export default function ScheduleHubScreen() {
         <View style={styles.summaryBox}>
           <Text style={styles.summaryLabel}>Working Days:</Text>
           <Text style={styles.summaryValue}>
-            {activeDays.length > 0 ? activeDays.join(', ') : 'No recurring hours active'}
+            {formatWorkingDays(activeDayIndices)}
           </Text>
         </View>
 
@@ -97,7 +98,11 @@ export default function ScheduleHubScreen() {
 
       {/* Section 2: Exceptions & Time Off */}
       <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/doctor/more/schedule/exceptions')}
+          style={styles.cardHeaderRow}
+        >
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Exceptions & Time Off</Text>
             <Text style={styles.cardSubtitle}>
@@ -107,7 +112,7 @@ export default function ScheduleHubScreen() {
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeText}>{exceptionCount}</Text>
           </View>
-        </View>
+        </Pressable>
 
         {exceptionsQuery.isLoading ? (
           <Text style={styles.loadingText}>Loading exceptions...</Text>
@@ -122,7 +127,12 @@ export default function ScheduleHubScreen() {
           <View style={{ gap: spacing.xs }}>
             <Text style={styles.subheading}>Next Blocked Date(s):</Text>
             {nextExceptions.map((item) => (
-              <View key={item.id} style={styles.exceptionRow}>
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                onPress={() => router.push('/doctor/more/schedule/exceptions')}
+                style={styles.exceptionRow}
+              >
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.exceptionDate}>{item.date}</Text>
                   <Text style={styles.exceptionDetails}>
@@ -137,7 +147,7 @@ export default function ScheduleHubScreen() {
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusBadgeText}>BLOCKED</Text>
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
         )}
@@ -150,15 +160,13 @@ export default function ScheduleHubScreen() {
               onPress={() => router.push('/doctor/more/schedule/exceptions/new')}
             />
           </View>
-          {exceptionCount > 0 && (
-            <View style={{ flex: 1 }}>
-              <AppButton
-                label="View All Exceptions"
-                tone="secondary"
-                onPress={() => router.push('/doctor/more/schedule/exceptions')}
-              />
-            </View>
-          )}
+          <View style={{ flex: 1 }}>
+            <AppButton
+              label="View All Exceptions"
+              tone="secondary"
+              onPress={() => router.push('/doctor/more/schedule/exceptions')}
+            />
+          </View>
         </View>
       </View>
     </AppScreen>
@@ -200,12 +208,18 @@ const styles = StyleSheet.create({
   cardSubtitle: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   summaryBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.xs,
     paddingVertical: spacing.xs,
   },
   summaryLabel: { color: colors.muted, fontWeight: '600', fontSize: 14 },
-  summaryValue: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  summaryValue: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 14,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
   noteText: { color: colors.muted, fontSize: 12, fontStyle: 'italic' },
   countBadge: {
     backgroundColor: colors.softPrimary,

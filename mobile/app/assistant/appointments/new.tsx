@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -105,7 +107,7 @@ export default function NewAppointmentScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>New Appointment</Text>
       <Text style={styles.subtitle}>
@@ -230,7 +232,7 @@ export default function NewAppointmentScreen() {
             <Text style={styles.subtitle}>Use only when intentionally adding an extra or double-booked patient.</Text>
           </Pressable>
           {overrideEnabled ? (
-            <TextInput
+            <KeyboardSafeTextInput
               value={overrideReason}
               onChangeText={setOverrideReason}
               placeholder="Required override reason"
@@ -270,7 +272,7 @@ export default function NewAppointmentScreen() {
           Select a session and appointment time to continue.
         </Text>
       ) : null}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

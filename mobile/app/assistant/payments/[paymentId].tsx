@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
@@ -64,7 +66,7 @@ export default function PaymentDetailsScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>{item.patient_name}</Text>
       <Text style={styles.status}>{item.status}</Text>
@@ -95,14 +97,14 @@ export default function PaymentDetailsScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Controlled financial correction</Text>
           <Text style={styles.warning}>The original payment and receipt stay in history.</Text>
-          <TextInput value={voidReason} onChangeText={setVoidReason} placeholder="Reason for void" style={styles.input} />
+          <KeyboardSafeTextInput value={voidReason} onChangeText={setVoidReason} placeholder="Reason for void" style={styles.input} />
           <AppButton label={replace ? 'Create replacement payment: Yes' : 'Create replacement payment: No'} tone="secondary" onPress={() => setReplace((value) => !value)} />
           <AppButton label="Confirm Void" tone="danger" loading={voidState.isLoading} disabled={voidReason.trim().length < 2} onPress={() => void doVoid()} />
         </View>
       ) : null}
       {confirmState.error ? <Text style={styles.error}>{apiError(confirmState.error)?.message ?? 'Unable to confirm payment.'}</Text> : null}
       {voidState.error ? <Text style={styles.error}>{apiError(voidState.error)?.message ?? 'Unable to void payment.'}</Text> : null}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 

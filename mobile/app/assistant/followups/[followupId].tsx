@@ -1,5 +1,7 @@
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useCloseFollowUpMutation, useGetFollowUpQuery, useListRemindersQuery } from '@/api/api';
@@ -41,7 +43,7 @@ export default function FollowUpDetailsScreen() {
   }
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'OVERDUE' : item.status}</Text>
@@ -86,13 +88,13 @@ export default function FollowUpDetailsScreen() {
           {['PATIENT_DECLINED', 'NO_LONGER_REQUIRED', 'CONTACTED', 'OTHER'].map((value) => (
             <AppButton key={value} label={value.replaceAll('_', ' ')} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} />
           ))}
-          {reason === 'OTHER' ? <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Reason" /> : null}
+          {reason === 'OTHER' ? <KeyboardSafeTextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Reason" /> : null}
           {closeState.error ? <Text style={styles.error}>{apiError(closeState.error)?.message ?? 'Unable to close follow-up.'}</Text> : null}
           <AppButton label="Confirm Close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
         </View>
       ) : null}
       <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 
