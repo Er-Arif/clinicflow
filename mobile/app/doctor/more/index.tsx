@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 
 import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery, useListDoctorsQuery } from '@/api/api';
@@ -7,17 +7,6 @@ import { clearSessionTokens } from '@/auth/session';
 import { AppScreen } from '@/components/AppScreen';
 import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
-
-function getGreetingPrefix(): string {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) {
-    return 'Good morning';
-  }
-  if (hour >= 12 && hour < 17) {
-    return 'Good afternoon';
-  }
-  return 'Good evening';
-}
 
 export default function DoctorMoreScreen() {
   const router = useRouter();
@@ -28,7 +17,6 @@ export default function DoctorMoreScreen() {
   const doctors = useListDoctorsQuery();
   const owner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
 
-  const [greetingPrefix, setGreetingPrefix] = useState(getGreetingPrefix);
 
   // CF-UAT-029: Collapsible accordion categories start COLLAPSED by default.
   // Reset to collapsed when leaving More root on navigation blur.
@@ -39,12 +27,6 @@ export default function DoctorMoreScreen() {
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
   useEffect(() => {
-    const unsubFocus = navigation.addListener('focus', () => {
-      setGreetingPrefix(getGreetingPrefix());
-    });
-    const unsubParentFocus = navigation.getParent()?.addListener('focus', () => {
-      setGreetingPrefix(getGreetingPrefix());
-    });
     const unsubBlur = navigation.addListener('blur', () => {
       setClinicExpanded(false);
       setCommunicationExpanded(false);
@@ -53,8 +35,6 @@ export default function DoctorMoreScreen() {
       setAboutExpanded(false);
     });
     return () => {
-      unsubFocus();
-      unsubParentFocus?.();
       unsubBlur();
     };
   }, [navigation]);
@@ -78,9 +58,10 @@ export default function DoctorMoreScreen() {
 
   return (
     <AppScreen>
-      <ScrollView contentContainerStyle={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.md }}>
         <View style={styles.header}>
-          <Text style={styles.title}>{greetingPrefix}, {doctorDisplayName}</Text>
+          <Text style={styles.title}>Settings</Text>
+          <Text style={styles.subtitle}>{doctorDisplayName}</Text>
         </View>
 
         {/* 1. Clinic & Practice */}
@@ -156,7 +137,7 @@ export default function DoctorMoreScreen() {
             ) : null}
           </View>
         </AccordionSection>
-      </ScrollView>
+      </View>
     </AppScreen>
   );
 }
@@ -174,7 +155,7 @@ function AccordionSection({
 }) {
   return (
     <View style={styles.sectionContainer}>
-      <Pressable style={styles.sectionHeader} onPress={onToggle}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded }} style={styles.sectionHeader} onPress={onToggle}>
         <Text style={styles.sectionTitle}>{title}</Text>
         <Text style={styles.accordionIndicator}>{expanded ? '▲' : '▼'}</Text>
       </Pressable>
@@ -185,7 +166,7 @@ function AccordionSection({
 
 function MenuItem({ label, onPress, textStyle }: { label: string; onPress: () => void; textStyle?: object }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.card} onPress={onPress}>
       <Text style={[styles.text, textStyle]}>{label}</Text>
     </Pressable>
   );
@@ -193,7 +174,7 @@ function MenuItem({ label, onPress, textStyle }: { label: string; onPress: () =>
 
 const styles = StyleSheet.create({
   header: { marginBottom: spacing.xs },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
+  title: { fontSize: 24, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
   sectionContainer: {
     backgroundColor: colors.surface,

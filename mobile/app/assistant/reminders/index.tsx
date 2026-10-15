@@ -1,3 +1,4 @@
+import { formatClinicDate } from '@/utils/dates';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -46,7 +47,7 @@ export default function RemindersScreen() {
       {items.map((item) => (
         <View key={item.reminder_id} style={styles.card}>
           <Text style={styles.patient}>{item.patient_name}</Text>
-          <Text style={styles.subtitle}>{item.reminder_type.replaceAll('_', ' ')} · Due {item.due_on} · {item.language}</Text>
+          <Text style={styles.subtitle}>{item.reminder_type.replaceAll('_', ' ')} · Due {formatClinicDate(item.due_on)} · {item.language}</Text>
           {!item.sendable ? <Text style={styles.warning}>Temporarily suppressed: {item.suppression_reason?.replaceAll('_', ' ')}</Text> : null}
           <AppButton
             label="Send WhatsApp"

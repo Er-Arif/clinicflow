@@ -117,12 +117,29 @@ class ReportingService:
             status="BOOKED",
             limit=100,
             future_only=(target == self.clock.clinic_date()),
+            timed_only=True,
         )
+        # Summary counts must not inherit the display lists' 100-row limit.
+        upcoming_conditions = [
+            Appointment.clinic_id == self.context.clinic_id,
+            SessionOccurrence.occurrence_date == target,
+            Appointment.status == "BOOKED",
+            Appointment.appointment_time.is_not(None),
+        ]
+        if target == self.clock.clinic_date():
+            upcoming_conditions.append(
+                Appointment.appointment_time >= self.clock.clinic_now().time().replace(tzinfo=None)
+            )
+        upcoming_count = self.db.scalar(
+            select(func.count(Appointment.appointment_id))
+            .join(SessionOccurrence, SessionOccurrence.session_occurrence_id == Appointment.session_occurrence_id)
+            .where(*upcoming_conditions)
+        ) or 0
         return DoctorTodayResponse(
             date=target,
             total_appointments=sum(counts.values()),
-            checked_in_count=len(checked_in),
-            upcoming_count=len(upcoming),
+            checked_in_count=counts.get("CHECKED_IN", 0),
+            upcoming_count=upcoming_count,
             checked_in=checked_in,
             upcoming=upcoming,
         )
@@ -578,6 +595,7 @@ class ReportingService:
         status: str,
         limit: int,
         future_only: bool = False,
+        timed_only: bool = False,
     ) -> list[OperationalAppointmentItem]:
         query = (
             select(
@@ -604,6 +622,8 @@ class ReportingService:
                 Appointment.status == status,
             )
         )
+        if timed_only:
+            query = query.where(Appointment.appointment_time.is_not(None))
         if future_only and target_date == self.clock.clinic_date():
             current_time = self.clock.clinic_now().time().replace(tzinfo=None)
             query = query.where(

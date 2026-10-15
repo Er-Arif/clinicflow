@@ -239,7 +239,7 @@ for (const [mutation, arg, followupStatus, reminderStatus] of mutations) {
     await h.dispatch('listReminders', { status: 'DUE', followupId: 'f1' });
     if (['cancelAppointment', 'rescheduleAppointment'].includes(mutation)) {
       assert.match(h.render('detail').markup, /BOOKED/);
-      assert.match(h.render('detail').markup, /2026-10-20/);
+      assert.match(h.render('detail').markup, /20 Oct 2026/);
       assert.doesNotMatch(h.render('detail').markup, /Send WhatsApp Reminder/);
     }
     h.server.mutate = () => {
@@ -263,7 +263,7 @@ for (const [mutation, arg, followupStatus, reminderStatus] of mutations) {
         assert.match(detail, /Send WhatsApp Reminder/);
         assert.equal(h.state('listReminders', { status: 'DUE', followupId: 'f1' }).data.items[0].status, 'DUE');
       }
-      if (mutation === 'rescheduleAppointment') assert.match(detail, /2026-10-22/);
+      if (mutation === 'rescheduleAppointment') assert.match(detail, /22 Oct 2026/);
     }
     await h.dispatch('reminderWorklist', reminderArg, { direction: 'forward', subscribe: false });
     assert.equal(h.state('reminderWorklist', reminderArg).data.pages.length, 2);
@@ -324,6 +324,6 @@ for (const mutation of ['cancelAppointment', 'rescheduleAppointment']) {
     await h.settle();
     assert.ok(h.state('getFollowUp', 'f1').isUninitialized);
     await h.dispatch('getFollowUp', 'f1');
-    assert.match(h.render('detail').markup, mutation === 'cancelAppointment' ? /OPEN/ : /2026-10-22/);
+    assert.match(h.render('detail').markup, mutation === 'cancelAppointment' ? /OPEN/ : /22 Oct 2026/);
   });
 }

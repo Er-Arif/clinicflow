@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -26,12 +28,12 @@ export default function ScheduleHubScreen() {
 
   const scheduleQuery = useGetScheduleQuery(
     { doctorId, effectiveOn: today },
-    { skip: !doctorId }
+    { skip: !doctorId || !today }
   );
 
   const exceptionsQuery = useListScheduleExceptionsQuery(
     { doctorId, fromDate: today },
-    { skip: !doctorId }
+    { skip: !doctorId || !today }
   );
 
   const activeDayIndices = (scheduleQuery.data?.days ?? [])
@@ -45,6 +47,8 @@ export default function ScheduleHubScreen() {
   return (
     <AppScreen>
       <BackButton />
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={doctors} label="doctors" />
       <View style={styles.header}>
         <Text style={styles.title}>Schedule & Sessions</Text>
         <Text style={styles.subtitle}>
@@ -78,10 +82,11 @@ export default function ScheduleHubScreen() {
           Recurring weekly operating schedule across weekdays.
         </Text>
 
+        <QueryState query={scheduleQuery} label="weekly hours" />
         <View style={styles.summaryBox}>
           <Text style={styles.summaryLabel}>Working Days:</Text>
           <Text style={styles.summaryValue}>
-            {formatWorkingDays(activeDayIndices)}
+            {scheduleQuery.data ? formatWorkingDays(activeDayIndices) : 'Unavailable'}
           </Text>
         </View>
 
@@ -110,13 +115,14 @@ export default function ScheduleHubScreen() {
             </Text>
           </View>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{exceptionCount}</Text>
+            <Text style={styles.countBadgeText}>{exceptionsQuery.data ? exceptionCount : '—'}</Text>
           </View>
         </Pressable>
 
+        <QueryState query={exceptionsQuery} label="exceptions" />
         {exceptionsQuery.isLoading ? (
           <Text style={styles.loadingText}>Loading exceptions...</Text>
-        ) : exceptionCount === 0 ? (
+        ) : !exceptionsQuery.data || (exceptionsQuery.isError && exceptionCount === 0) ? null : exceptionCount === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No upcoming blocked dates</Text>
             <Text style={styles.emptyStateSubtext}>
@@ -134,7 +140,7 @@ export default function ScheduleHubScreen() {
                 style={styles.exceptionRow}
               >
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.exceptionDate}>{item.date}</Text>
+                  <Text style={styles.exceptionDate}>{formatClinicDate(item.date)}</Text>
                   <Text style={styles.exceptionDetails}>
                     {item.scope === 'FULL_DAY' ? 'Full Day' : item.session_name ?? 'Session'} • {item.reason}
                   </Text>

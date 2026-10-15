@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,7 +25,7 @@ export default function ExceptionsHubScreen() {
 
   const exceptionsQuery = useListScheduleExceptionsQuery(
     { doctorId, fromDate: today },
-    { skip: !doctorId }
+    { skip: !doctorId || !today }
   );
 
   const [unblockMutation, unblockState] = useUnblockScheduleExceptionsMutation();
@@ -53,6 +55,9 @@ export default function ExceptionsHubScreen() {
   return (
     <AppScreen>
       <BackButton />
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={doctors} label="doctors" />
+      <QueryState query={exceptionsQuery} label="exceptions" />
       <View style={styles.header}>
         <Text style={styles.title}>Exceptions & Time Off</Text>
         <Text style={styles.subtitle}>
@@ -76,7 +81,7 @@ export default function ExceptionsHubScreen() {
 
       {exceptionsQuery.isLoading ? (
         <Text style={styles.loadingText}>Loading exceptions...</Text>
-      ) : exceptions.length === 0 ? (
+      ) : !exceptionsQuery.data || (exceptionsQuery.isError && exceptions.length === 0) ? null : exceptions.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>No Upcoming Exceptions</Text>
           <Text style={styles.emptySubtitle}>
@@ -90,7 +95,7 @@ export default function ExceptionsHubScreen() {
             return (
               <View key={item.id} style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.dateText}>{item.date}</Text>
+                  <Text style={styles.dateText}>{formatClinicDate(item.date)}</Text>
                   <View style={styles.statusBadge}>
                     <Text style={styles.statusBadgeText}>BLOCKED</Text>
                   </View>

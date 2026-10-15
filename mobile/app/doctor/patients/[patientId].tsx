@@ -1,3 +1,4 @@
+import { QueryState } from '@/components/QueryState';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -28,6 +29,7 @@ export default function DoctorPatientSummaryScreen() {
   return (
     <AppScreen refreshing={summary.isFetching} onRefresh={() => void summary.refetch()}>
       <BackButton />
+      <QueryState query={summary} label="patient history" />
       <Text style={styles.title}>{data.patient.full_name}</Text>
       <Text style={styles.subtitle}>{data.patient.patient_code} · Age {data.patient.age ?? '—'} · {data.patient.gender.replaceAll('_', ' ')}</Text>
       <Text style={styles.subtitle}>{formatPhone(data.patient.mobile_number)}</Text>
@@ -55,7 +57,8 @@ export default function DoctorPatientSummaryScreen() {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Visit History</Text>
+        <Text style={styles.sectionTitle}>Recent Completed Visits</Text>
+        <Text style={styles.subtitle}>Showing {data.visit_history.length} of {data.total_completed_visits} completed visits. Operational history only.</Text>
         {data.visit_history.map((visit) => (
           <View key={visit.visit_id} style={styles.visitCard}>
             <View style={styles.rowTop}>

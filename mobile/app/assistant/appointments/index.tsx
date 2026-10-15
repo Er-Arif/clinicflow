@@ -1,5 +1,6 @@
+import { QueryState } from '@/components/QueryState';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useListAppointmentsQuery } from '@/api/api';
@@ -12,12 +13,10 @@ export default function AppointmentsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const clinicTime = useClinicTimeQuery();
-  const [date, setDate] = useState('');
+  const [dateInput, setDate] = useState('');
   const [status, setStatus] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (!date && clinicTime.data?.clinic_date) setDate(clinicTime.data.clinic_date);
-  }, [clinicTime.data?.clinic_date, date]);
+  const date = dateInput || clinicTime.data?.clinic_date || '';
 
   useEffect(() => {
     const unsub = navigation.getParent()?.addListener('blur', () => {
@@ -32,7 +31,7 @@ export default function AppointmentsScreen() {
   const appointments = useListAppointmentsQuery({ date, status }, { skip: !date });
 
   return (
-    <AppScreen>
+    <AppScreen refreshing={appointments.isFetching} onRefresh={() => { if (date) void appointments.refetch(); else void clinicTime.refetch(); }}>
       <View>
         <Text style={styles.title}>Appointments</Text>
         <Text style={styles.subtitle}>Bookings for the selected clinic date.</Text>
@@ -40,13 +39,14 @@ export default function AppointmentsScreen() {
       <DatePicker value={date} onChange={setDate} placeholder="YYYY-MM-DD" />
       <View style={styles.chips}>
         {[undefined, 'BOOKED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'].map((value) => (
-          <Pressable key={value ?? 'ALL'} onPress={() => setStatus(value)} style={[styles.chip, status === value && styles.chipActive]}>
-            <Text style={status === value ? styles.chipTextActive : styles.chipText}>{value ?? 'ALL'}</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: status === value }} key={value?.replaceAll('_', ' ') ?? 'ALL'} onPress={() => setStatus(value)} style={[styles.chip, status === value && styles.chipActive]}>
+            <Text style={status === value ? styles.chipTextActive : styles.chipText}>{value?.replaceAll('_', ' ') ?? 'ALL'}</Text>
           </Pressable>
         ))}
       </View>
-      {appointments.isFetching ? <ActivityIndicator /> : null}
-      {appointments.data?.items.map((item) => (
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={appointments} label="appointments" hasData={Boolean(appointments.currentData)} empty={appointments.currentData?.items.length === 0 ? "No appointments for this date and status." : undefined} />
+      {appointments.currentData?.items.map((item) => (
         <Pressable key={item.appointment_id} style={styles.card} onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
@@ -57,7 +57,6 @@ export default function AppointmentsScreen() {
           </View>
         </Pressable>
       ))}
-      {!appointments.isFetching && appointments.data?.items.length === 0 ? <Text style={styles.subtitle}>No appointments found.</Text> : null}
       <AppButton label="New Appointment" onPress={() => router.push('/assistant/patients')} />
     </AppScreen>
   );

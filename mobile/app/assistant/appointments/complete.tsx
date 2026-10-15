@@ -1,3 +1,4 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
@@ -32,7 +33,8 @@ export default function CompleteVisitScreen() {
     return (
       <AppScreen>
         <BackButton />
-        <Text style={styles.title}>Appointment not found</Text>
+        <Text style={styles.title}>Unable to load appointment</Text>
+        <QueryState query={appointment} label="appointment" />
       </AppScreen>
     );
   }
@@ -82,6 +84,7 @@ export default function CompleteVisitScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={appointment} label="appointment" />
       <BackButton />
       <Text style={styles.title}>Complete Visit</Text>
       <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>

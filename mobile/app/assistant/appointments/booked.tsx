@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -24,14 +26,14 @@ export default function AppointmentBookedScreen() {
   }
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment booked</Text></AppScreen>;
+  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment booked</Text><QueryState query={appointment} label="booked appointment" /></AppScreen>;
 
   return (
     <AppScreen>
       <Text style={styles.success}>✓ Appointment Booked</Text>
       <View style={styles.card}>
         <Text style={styles.name}>{appointment.data.patient.full_name}</Text>
-        <Text style={styles.meta}>{appointment.data.session.date} · {appointment.data.appointment_time?.slice(0, 5)}</Text>
+        <Text style={styles.meta}>{formatClinicDate(appointment.data.session.date)} · {appointment.data.appointment_time?.slice(0, 5)}</Text>
         <Text style={styles.meta}>{appointment.data.doctor.display_name}</Text>
         <Text style={styles.meta}>₹{appointment.data.effective_fee}</Text>
       </View>

@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
@@ -27,7 +29,8 @@ export default function FollowUpDetailsScreen() {
     return (
       <AppScreen>
         <BackButton />
-        <Text style={styles.title}>Follow-up not found</Text>
+        <Text style={styles.title}>Unable to load follow-up</Text>
+        <QueryState query={query} label="follow-up" />
       </AppScreen>
     );
   }
@@ -44,15 +47,16 @@ export default function FollowUpDetailsScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={query} label="follow-up" />
       <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'OVERDUE' : item.status}</Text>
       <View style={styles.card}>
-        <Row label="Due" value={item.due_date} />
-        <Row label="Source visit" value={item.source_visit_date} />
+        <Row label="Due" value={formatClinicDate(item.due_date)} />
+        <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
         <Row label="Patient ID" value={item.patient.patient_code} />
         {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
-        {item.linked_appointment ? <Row label="Appointment" value={`${item.linked_appointment.date} ${item.linked_appointment.time?.slice(0, 5) ?? ''}`} /> : null}
+        {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)} ${item.linked_appointment.time?.slice(0, 5) ?? ''}`} /> : null}
         {item.close_reason ? <Row label="Closed" value={item.close_reason.replaceAll('_', ' ')} /> : null}
       </View>
 

@@ -38,7 +38,7 @@ export default function AssistantLayout() {
           name="appointments"
           options={{
             title: 'Appointments',
-            tabBarLabel: 'Appts',
+            tabBarLabel: 'Appointments',
             tabBarIcon: ({ color, size }) => <TabIcon name="appointments" color={color} size={size} />,
           }}
         />

@@ -14,6 +14,8 @@ export function AppButton({ label, onPress, disabled, loading, tone = 'primary' 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
       disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
@@ -25,7 +27,7 @@ export function AppButton({ label, onPress, disabled, loading, tone = 'primary' 
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={tone === 'secondary' ? colors.primary : '#FFFFFF'} />
+        <ActivityIndicator color={tone === 'secondary' ? colors.primary : colors.surface} />
       ) : (
         <Text style={[styles.label, tone === 'secondary' && styles.secondaryLabel]}>{label}</Text>
       )}
@@ -44,7 +46,7 @@ const styles = StyleSheet.create({
   },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
   danger: { backgroundColor: colors.danger },
-  label: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  label: { color: colors.surface, fontWeight: '700', fontSize: 16 },
   secondaryLabel: { color: colors.primary },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.82 },

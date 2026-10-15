@@ -60,7 +60,7 @@ export default function DoctorLayout() {
           options={{
             title: 'Settings',
             tabBarLabel: 'Settings',
-            tabBarIcon: ({ color, size }) => <TabIcon name="more" color={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <TabIcon name="settings" color={color} size={size} />,
           }}
         />
       </Tabs>

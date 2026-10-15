@@ -1,8 +1,9 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useListPaymentsQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
@@ -25,7 +26,7 @@ export default function PaymentsScreen() {
   );
 
   return (
-    <AppScreen>
+    <AppScreen refreshing={payments.isFetching} onRefresh={() => { if (filter !== 'TODAY' || date) void payments.refetch(); else void clinicTime.refetch(); }}>
       <BackButton />
       <Text style={styles.title}>Payments</Text>
       <Text style={styles.subtitle}>Pending collections and confirmed financial history.</Text>
@@ -37,17 +38,16 @@ export default function PaymentsScreen() {
         ))}
       </View>
 
-      {payments.isLoading || (filter === 'TODAY' && clinicTime.isLoading) ? <ActivityIndicator /> : null}
-      {payments.error ? <Text style={styles.error}>{apiError(payments.error)?.message ?? 'Unable to load payments.'}</Text> : null}
-      {payments.data?.items.length === 0 ? <Text style={styles.empty}>No payments found.</Text> : null}
-      {payments.data?.items.map((item) => (
+      {filter === 'TODAY' ? <QueryState query={clinicTime} label="clinic date" /> : null}
+      <QueryState query={payments} label="payments" hasData={Boolean(payments.currentData)} empty={payments.currentData?.items.length === 0 ? 'No payments for this filter.' : undefined} />
+      {payments.currentData?.items.map((item) => (
         <Pressable
           key={item.payment_id}
           onPress={() => router.push({ pathname: '/assistant/payments/[paymentId]', params: { paymentId: item.payment_id } })}
           style={styles.card}
         >
           <View style={styles.row}><Text style={styles.name}>{item.patient_name}</Text><Text style={styles.amount}>₹{item.amount_due}</Text></View>
-          <Text style={styles.meta}>{item.patient_code} · {item.visit_date} · {item.appointment_type.replace('_', ' ')}</Text>
+          <Text style={styles.meta}>{item.patient_code} · {formatClinicDate(item.visit_date)} · {item.appointment_type.replace('_', ' ')}</Text>
           <View style={styles.row}><Text style={[styles.status, item.status === 'PENDING' ? styles.pending : styles.confirmed]}>{item.status}</Text><Text style={styles.meta}>{item.payment_method ?? 'Unpaid'}</Text></View>
         </Pressable>
       ))}

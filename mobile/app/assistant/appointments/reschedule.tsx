@@ -1,3 +1,5 @@
+import { pickerDate, formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
@@ -38,7 +40,7 @@ export default function RescheduleAppointmentScreen() {
   const isOwner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!appointment.data) return <AppScreen><Text>Appointment not found.</Text></AppScreen>;
+  if (!appointment.data) return <AppScreen><Text>Unable to load appointment.</Text><QueryState query={appointment} label="appointment" /></AppScreen>;
 
   async function confirm() {
     try {
@@ -60,12 +62,15 @@ export default function RescheduleAppointmentScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={appointment} label="appointment" />
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={availability} label="availability" />
       <Text style={styles.title}>Reschedule Appointment</Text>
-      <Text style={styles.subtitle}>Original: {appointment.data.session.date} · {appointment.data.appointment_time?.slice(0, 5)}</Text>
+      <Text style={styles.subtitle}>Original: {formatClinicDate(appointment.data.session.date)} · {appointment.data.appointment_time?.slice(0, 5)}</Text>
         <DatePicker
           value={date}
           onChange={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }}
-          minimumDate={clinicTime.data?.clinic_date ? new Date(clinicTime.data.clinic_date) : undefined}
+          minimumDate={clinicTime.data?.clinic_date ? pickerDate(clinicTime.data.clinic_date) : undefined}
         />
       {availability.data?.sessions.map((session) => (
         <View key={session.session_definition_id} style={styles.card}>
@@ -74,9 +79,9 @@ export default function RescheduleAppointmentScreen() {
           </Pressable>
           {sessionDefinitionId === session.session_definition_id ? (
             <View>
-              <AppButton 
-                label={appointmentTime ? `Selected Time: ${appointmentTime.slice(0, 5)}` : "Select Time"} 
-                onPress={() => setSlotModalVisible(true)} 
+              <AppButton
+                label={appointmentTime ? `Selected Time: ${appointmentTime.slice(0, 5)}` : "Select Time"}
+                onPress={() => setSlotModalVisible(true)}
                 tone={appointmentTime ? "primary" : "secondary"}
               />
               <Modal visible={slotModalVisible} transparent={true} animationType="slide">
@@ -87,13 +92,13 @@ export default function RescheduleAppointmentScreen() {
                       {session.slots.map((slot) => {
                         const selectable = slot.normal_booking_allowed || (isOwner && overrideEnabled && session.status !== 'BLOCKED');
                         return (
-                          <Pressable 
-                            key={slot.time} 
-                            disabled={!selectable} 
+                          <Pressable
+                            key={slot.time}
+                            disabled={!selectable}
                             onPress={() => {
                               setAppointmentTime(slot.time);
                               setSlotModalVisible(false);
-                            }} 
+                            }}
                             style={[styles.slot, !selectable && styles.disabled, appointmentTime === slot.time && styles.selected]}
                           >
                             <Text style={appointmentTime === slot.time ? styles.selectedText : styles.slotText}>{slot.time.slice(0, 5)}</Text>

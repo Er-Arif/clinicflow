@@ -1,7 +1,9 @@
+import { pickerDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -108,6 +110,8 @@ export default function NewAppointmentScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={availability} label="availability" />
       <BackButton />
       <Text style={styles.title}>New Appointment</Text>
       <Text style={styles.subtitle}>
@@ -128,13 +132,13 @@ export default function NewAppointmentScreen() {
       <Text style={styles.label}>Doctor</Text>
       <View style={styles.chips}>
         {doctors.data?.map((doctor) => (
-          <Pressable 
-            key={doctor.doctor_id} 
+          <Pressable
+            key={doctor.doctor_id}
             onPress={() => {
               setDoctorId(doctor.doctor_id);
               setSessionDefinitionId('');
               setAppointmentTime('');
-            }} 
+            }}
             style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]}>
             <Text style={doctorId === doctor.doctor_id ? styles.chipTextActive : styles.chipText}>{doctor.display_name}</Text>
           </Pressable>
@@ -149,12 +153,12 @@ export default function NewAppointmentScreen() {
           setSessionDefinitionId('');
           setAppointmentTime('');
         }}
-        minimumDate={clinicTime.data?.clinic_date ? new Date(clinicTime.data.clinic_date) : undefined}
+        minimumDate={clinicTime.data?.clinic_date ? pickerDate(clinicTime.data.clinic_date) : undefined}
       />
 
       <Text style={styles.label}>Session</Text>
-      {availability.isFetching ? <ActivityIndicator /> : null}
-      {!availability.isFetching && availability.data?.sessions.length === 0 ? (
+
+      {!availability.isFetching && !availability.isError && availability.data?.sessions.length === 0 ? (
         <Text style={styles.subtitle}>No appointment sessions are available on this date.{"\n"}Select another date.</Text>
       ) : null}
       {availability.data?.sessions.map((session) => {
@@ -182,9 +186,9 @@ export default function NewAppointmentScreen() {
             </Pressable>
             {selected ? (
               <View>
-                <AppButton 
-                  label={appointmentTime ? `Selected Time: ${shortTime(appointmentTime)}` : "Select Time"} 
-                  onPress={() => setSlotModalVisible(true)} 
+                <AppButton
+                  label={appointmentTime ? `Selected Time: ${shortTime(appointmentTime)}` : "Select Time"}
+                  onPress={() => setSlotModalVisible(true)}
                   tone={appointmentTime ? "primary" : "secondary"}
                 />
                 <Modal visible={slotModalVisible} transparent={true} animationType="slide">

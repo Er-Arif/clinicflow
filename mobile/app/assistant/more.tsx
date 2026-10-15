@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery } from '@/api/api';
@@ -26,7 +26,7 @@ export default function MoreScreen() {
 
   return (
     <AppScreen>
-      <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
+      <View style={{ gap: spacing.lg }}>
         <View>
           <Text style={styles.title}>More</Text>
           <Text style={styles.subtitle}>{me.data?.display_name ?? 'Assistant'}</Text>
@@ -53,21 +53,21 @@ export default function MoreScreen() {
             ) : null}
           </View>
         </View>
-      </ScrollView>
+      </View>
     </AppScreen>
   );
 }
 
 function MenuItem({ label, onPress, textStyle }: { label: string; onPress: () => void; textStyle?: any }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.card} onPress={onPress}>
       <Text style={[styles.text, textStyle]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
+  title: { fontSize: 24, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
   section: { gap: spacing.sm },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 4 },

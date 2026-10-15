@@ -12,6 +12,7 @@ export type TabIconName =
   | 'followups'
   | 'dashboard'
   | 'reports'
+  | 'settings'
   | 'more';
 
 export function TabIcon({ name, color, size = 20 }: { name: TabIconName; color?: ColorValue; size?: number }) {
@@ -66,6 +67,13 @@ export function TabIcon({ name, color, size = 20 }: { name: TabIconName; color?:
           <Line x1="16" y1="13" x2="8" y2="13" />
           <Line x1="16" y1="17" x2="8" y2="17" />
           <Line x1="10" y1="9" x2="8" y2="9" />
+        </Svg>
+      );
+    case 'settings':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="3" />
+          <Path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z" />
         </Svg>
       );
     case 'more':

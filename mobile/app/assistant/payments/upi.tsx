@@ -1,3 +1,4 @@
+import { QueryState } from '@/components/QueryState';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,6 +35,7 @@ export default function UpiPaymentScreen() {
       <AppScreen>
         <BackButton />
         <Text style={styles.error}>{apiError(intent.error)?.message ?? 'Unable to prepare UPI payment.'}</Text>
+        <QueryState query={intent} label="UPI payment details" />
       </AppScreen>
     );
   }

@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
@@ -35,7 +37,8 @@ export default function AppointmentDetailsScreen() {
     return (
       <AppScreen>
         <BackButton />
-        <Text style={styles.title}>Appointment not found</Text>
+        <Text style={styles.title}>Unable to load appointment</Text>
+        <QueryState query={appointment} label="appointment" />
       </AppScreen>
     );
   }
@@ -82,11 +85,12 @@ export default function AppointmentDetailsScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={appointment} label="appointment" />
       <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
       <Text style={styles.status}>{item.status.replace('_', ' ')}</Text>
       <View style={styles.card}>
-        <Row label="Date" value={item.session.date} />
+        <Row label="Date" value={formatClinicDate(item.session.date)} />
         <Row label="Time" value={item.appointment_time?.slice(0, 5) ?? 'Walk-in'} />
         <Row label="Session" value={item.session.name} />
         <Row label="Doctor" value={item.doctor.display_name} />

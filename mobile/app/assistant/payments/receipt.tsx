@@ -1,14 +1,17 @@
+import { formatClinicTimestamp, formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
-import { useGetReceiptQuery } from '@/api/api';
+import { useClinicTimeQuery, useGetReceiptQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function ReceiptScreen() {
+  const clock = useClinicTimeQuery();
   const router = useRouter();
   const params = useLocalSearchParams<{ paymentId: string }>();
   const paymentId = String(params.paymentId ?? '');
@@ -20,6 +23,7 @@ export default function ReceiptScreen() {
       <AppScreen>
         <BackButton />
         <Text style={styles.error}>{apiError(receipt.error)?.message ?? 'Receipt not found.'}</Text>
+        <QueryState query={receipt} label="receipt" />
       </AppScreen>
     );
   }
@@ -29,17 +33,18 @@ export default function ReceiptScreen() {
     <AppScreen>
       <BackButton />
       <Text style={styles.title}>Digital Receipt</Text>
+      <QueryState query={clock} label="clinic time" />
       {item.voided ? <Text style={styles.voided}>VOIDED PAYMENT · retained for history</Text> : null}
       <View style={styles.card}>
         <Text style={styles.clinic}>{item.clinic_name}</Text>
         <Text style={styles.number}>{item.receipt_number}</Text>
         <Row label="Doctor" value={item.doctor_name} />
         <Row label="Patient" value={item.patient_name} />
-        <Row label="Visit date" value={item.visit_date} />
+        <Row label="Visit date" value={formatClinicDate(item.visit_date)} />
         <Row label="Type" value={item.appointment_type.replace('_', ' ')} />
         <Row label="Amount" value={`₹${item.amount}`} />
         <Row label="Method" value={item.payment_method} />
-        <Row label="Issued" value={new Date(item.issued_at).toLocaleString()} />
+        <Row label="Issued" value={formatClinicTimestamp(item.issued_at, clock.data?.timezone)} />
       </View>
       <AppButton label="Done" onPress={() => router.replace('/assistant/payments')} />
     </AppScreen>

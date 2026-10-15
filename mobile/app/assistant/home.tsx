@@ -1,6 +1,7 @@
+import { QueryState } from '@/components/QueryState';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useGetAssistantHomeQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
@@ -17,11 +18,10 @@ export default function AssistantHome() {
   return (
     <AppScreen refreshing={home.isFetching} onRefresh={() => void home.refetch()}>
       <Text style={styles.eyebrow}>ClinicFlow</Text>
-      <Text style={styles.title}>Today</Text>
-      <Text style={styles.subtitle}>{data ? formatClinicDate(data.clinic_date) : 'Loading clinic day…'}</Text>
+      <Text style={styles.title}>Home</Text>
+      <Text style={styles.subtitle}>{data ? formatClinicDate(data.clinic_date) : 'Clinic activity'}</Text>
 
-      {home.isLoading ? <ActivityIndicator /> : null}
-      {home.isError ? <Text style={styles.error}>Unable to load today&apos;s clinic activity.</Text> : null}
+      <QueryState query={home} label="clinic activity" />
 
       {data ? (
         <>
@@ -37,9 +37,17 @@ export default function AssistantHome() {
             <AppButton label="Walk-in" tone="secondary" onPress={() => router.push('/assistant/walk-in')} />
           </View>
 
-          <Section title="Next Appointments" empty="No upcoming booked appointments today.">
+          <View style={styles.attention}>
+            <Text style={styles.sectionTitle}>Attention</Text>
+            <AttentionRow label="Pending payments today" value={data.pending_payments} onPress={() => router.push('/assistant/payments')} />
+            <AttentionRow label="Due reminders" value={data.due_reminders} onPress={() => router.push('/assistant/reminders')} />
+            <AttentionRow label="Overdue follow-ups" value={data.overdue_followups} onPress={() => router.push('/assistant/followups')} />
+          </View>
+
+          <Section title="Next Appointments · up to 5" empty="No upcoming booked appointments today.">
             {data.next_appointments.map((item) => (
               <Pressable
+                accessibilityRole="button"
                 key={item.appointment_id}
                 style={styles.rowCard}
                 onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}
@@ -53,9 +61,10 @@ export default function AssistantHome() {
             ))}
           </Section>
 
-          <Section title="Checked In" empty="No patient is currently checked in.">
+          <Section title={`Checked In · ${data.checked_in} total`} empty="No patient is currently checked in.">
             {data.checked_in_patients.map((item) => (
               <Pressable
+                accessibilityRole="button"
                 key={item.appointment_id}
                 style={styles.rowCard}
                 onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}
@@ -68,13 +77,8 @@ export default function AssistantHome() {
               </Pressable>
             ))}
           </Section>
+          {data.checked_in > data.checked_in_patients.length ? <AppButton label="View all appointments" tone="secondary" onPress={() => router.push('/assistant/appointments')} /> : null}
 
-          <View style={styles.attention}>
-            <Text style={styles.sectionTitle}>Attention</Text>
-            <AttentionRow label="Pending payments today" value={data.pending_payments} onPress={() => router.push('/assistant/payments')} />
-            <AttentionRow label="Due reminders" value={data.due_reminders} onPress={() => router.push('/assistant/reminders')} />
-            <AttentionRow label="Overdue follow-ups" value={data.overdue_followups} onPress={() => router.push('/assistant/followups')} />
-          </View>
 
         </>
       ) : null}
@@ -95,7 +99,7 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
 
 function AttentionRow({ label, value, onPress }: { label: string; value: number; onPress: () => void }) {
   return (
-    <Pressable style={styles.attentionRow} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.attentionRow} onPress={onPress}>
       <Text style={styles.name}>{label}</Text>
       <Text style={value > 0 ? styles.warning : styles.mutedStrong}>{value}</Text>
     </Pressable>
@@ -104,7 +108,7 @@ function AttentionRow({ label, value, onPress }: { label: string; value: number;
 
 const styles = StyleSheet.create({
   eyebrow: { color: colors.primary, fontWeight: '800' },
-  title: { fontSize: 30, fontWeight: '900', color: colors.text },
+  title: { fontSize: 24, fontWeight: '900', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
   error: { color: colors.danger, fontWeight: '700' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
   time: { fontWeight: '900', color: colors.primary },
   active: { fontWeight: '900', color: colors.primary, fontSize: 12 },
   attention: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 48, paddingVertical: 4 },
   warning: { color: colors.warning, fontWeight: '900', fontSize: 18 },
   mutedStrong: { color: colors.muted, fontWeight: '900', fontSize: 18 },
 });

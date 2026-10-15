@@ -1,7 +1,8 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, } from 'react-native';
+import { StyleSheet, Text, } from 'react-native';
 
 import { useGetClinicSettingsQuery, useUpdateClinicSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
@@ -38,8 +39,9 @@ export default function ClinicSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
+      <QueryState query={query} label="clinic settings" />
       <Text style={styles.title}>Clinic Settings</Text>
-      {query.isLoading ? <ActivityIndicator /> : null}
+
       <KeyboardSafeTextInput style={styles.input} placeholder="Clinic name" value={name} onChangeText={setName} />
       <KeyboardSafeTextInput style={[styles.input, styles.multiline]} placeholder="Address" multiline value={address} onChangeText={setAddress} />
       <KeyboardSafeTextInput style={styles.input} placeholder="Contact number" keyboardType="phone-pad" value={contact} onChangeText={setContact} />

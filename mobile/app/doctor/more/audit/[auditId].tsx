@@ -1,12 +1,15 @@
+import { formatClinicTimestamp } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { useGetAuditEventQuery } from '@/api/api';
+import { useClinicTimeQuery, useGetAuditEventQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AuditDetailScreen() {
+  const clock = useClinicTimeQuery();
   const { auditId } = useLocalSearchParams<{ auditId: string }>();
   const event = useGetAuditEventQuery(auditId);
 
@@ -14,11 +17,12 @@ export default function AuditDetailScreen() {
     <AppScreen>
       <BackButton />
       <Text style={styles.title}>Audit Event</Text>
-      {event.isLoading ? <ActivityIndicator /> : null}
+      <QueryState query={clock} label="clinic time" />
+      <QueryState query={event} label="audit event" />
       {event.data ? (
         <>
           <Row label="Action" value={event.data.action_type} />
-          <Row label="When" value={new Date(event.data.occurred_at).toLocaleString()} />
+          <Row label="When" value={formatClinicTimestamp(event.data.occurred_at, clock.data?.timezone)} />
           <Row label="Actor" value={event.data.actor_display_name ?? event.data.actor_type} />
           <Row label="Entity" value={`${event.data.entity_type}${event.data.entity_id ? ` · ${event.data.entity_id}` : ''}`} />
           <Row label="Reason" value={event.data.reason ?? '—'} />

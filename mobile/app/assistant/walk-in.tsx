@@ -1,7 +1,8 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import {
@@ -81,7 +82,7 @@ export default function WalkInScreen() {
   const clinicClock = clinicTime.data?.clinic_now?.slice(11, 16) ?? '';
 
   const activeSession = (availability.data?.sessions && clinicClock)
-    ? (availability.data.sessions.find(session => 
+    ? (availability.data.sessions.find(session =>
         session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5)
       ) ?? null)
     : null;
@@ -122,6 +123,8 @@ export default function WalkInScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={availability} label="availability" />
       <BackButton />
       <Text style={styles.title}>Add Walk-in</Text>
       <Text style={styles.subtitle}>Create the appointment and check the patient in as one transaction.</Text>
@@ -130,14 +133,14 @@ export default function WalkInScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Patient</Text>
           <KeyboardSafeTextInput value={query} onChangeText={setQuery} placeholder="Search mobile, name or patient ID" style={styles.input} />
-          {search.isFetching ? <ActivityIndicator /> : null}
+          <QueryState query={search} label="patients" />
           {search.data?.items.map((item) => (
             <Pressable key={item.patient_id} style={styles.patientRow} onPress={() => setPatient(item)}>
               <Text style={styles.patientName}>{item.full_name}</Text>
               <Text style={styles.subtitle}>{item.patient_code} · {item.mobile_number}</Text>
             </Pressable>
           ))}
-          {query.trim().length >= 2 && !search.isFetching && search.data?.items.length === 0 ? (
+          {query.trim().length >= 2 && !search.isFetching && !search.isError && search.data?.items.length === 0 ? (
             <AppButton label="Register New Patient" tone="secondary" onPress={() => router.push('/assistant/patients/new')} />
           ) : null}
         </View>
@@ -172,8 +175,8 @@ export default function WalkInScreen() {
       </View>
 
       <Text style={styles.label}>Today&apos;s Session</Text>
-      {availability.isFetching ? <ActivityIndicator /> : null}
-      {!availability.isFetching && !activeSession ? (
+
+      {availability.isSuccess && !availability.isFetching && !availability.isError && !activeSession ? (
         <Text style={styles.subtitle}>
           No active clinic session right now.{"\n\n"}Walk-ins can only be added during an active clinic session.
         </Text>

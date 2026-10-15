@@ -1,3 +1,6 @@
+import { formatClinicDate } from '@/utils/dates';
+import { DatePicker } from '@/components/DatePicker';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
@@ -62,14 +65,17 @@ export default function BookFollowUpScreen() {
   }
 
   if (followup.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!followup.data) return <AppScreen><Text style={styles.title}>Follow-up not found</Text></AppScreen>;
+  if (!followup.data) return <AppScreen><Text style={styles.title}>Unable to load follow-up</Text><QueryState query={followup} label="follow-up" /></AppScreen>;
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={followup} label="follow-up" />
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={availability} label="availability" />
       <Text style={styles.title}>Book Follow-up</Text>
-      <Text style={styles.subtitle}>{followup.data.patient.full_name} · Due {followup.data.due_date}</Text>
-      <KeyboardSafeTextInput value={date} onChangeText={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} placeholder="YYYY-MM-DD" style={styles.input} />
-      {availability.isFetching ? <ActivityIndicator /> : null}
+      <Text style={styles.subtitle}>{followup.data.patient.full_name} · Due {formatClinicDate(followup.data.due_date)}</Text>
+      <DatePicker value={date} onChange={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} accessibilityLabel="Follow-up appointment date" />
+
       {availability.data?.sessions.map((session) => (
         <View key={session.session_definition_id} style={styles.card}>
           <Text style={styles.session}>{session.name}</Text>

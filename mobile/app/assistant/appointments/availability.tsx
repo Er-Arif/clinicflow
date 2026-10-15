@@ -1,12 +1,11 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { apiError } from '@/api/errors';
 import { useClinicTimeQuery, useGetAvailabilityQuery, useListDoctorsQuery } from '@/api/api';
-import { AppButton } from '@/components/AppButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AvailabilityScreen() {
@@ -26,6 +25,8 @@ export default function AvailabilityScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={clinicTime} label="clinic date" />
+      <QueryState query={availability} label="availability" />
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Availability</Text>
@@ -58,15 +59,8 @@ export default function AvailabilityScreen() {
         style={styles.input}
       />
 
-      {availability.isFetching ? <ActivityIndicator /> : null}
-      {availability.error ? (
-        <View style={styles.card}>
-          <Text style={styles.error}>{apiError(availability.error)?.message ?? 'Unable to load availability.'}</Text>
-          <AppButton label="Retry" tone="secondary" onPress={() => void availability.refetch()} />
-        </View>
-      ) : null}
 
-      {!availability.isFetching && availability.data?.sessions.length === 0 ? (
+      {!availability.isFetching && !availability.isError && availability.data?.sessions.length === 0 ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>No clinic session configured</Text>
           <Text style={styles.subtitle}>There is no active session for this doctor on the selected date.</Text>

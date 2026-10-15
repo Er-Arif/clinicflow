@@ -1,3 +1,4 @@
+import { formatClinicDate } from '@/utils/dates';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -57,13 +58,13 @@ export default function PatientProfileScreen() {
         <InfoRow label="Gender" value={patient.gender.replaceAll('_', ' ')} />
         <InfoRow
           label="Age source"
-          value={patient.date_of_birth ? `DOB ${patient.date_of_birth}` : `Approx. age ${patient.approximate_age_years}`}
+          value={patient.date_of_birth ? `DOB ${formatClinicDate(patient.date_of_birth)}` : `Approx. age ${patient.approximate_age_years}`}
         />
       </InfoCard>
 
       <InfoCard title="Visit Summary">
         <InfoRow label="Completed visits" value={String(patient.previous_completed_visits)} />
-        <InfoRow label="Last visit" value={patient.last_visit_date ?? 'No completed visit yet'} />
+        <InfoRow label="Last visit" value={patient.last_visit_date ? formatClinicDate(patient.last_visit_date) : 'No completed visit yet'} />
       </InfoCard>
 
       <View style={styles.actions}>
@@ -114,5 +115,4 @@ const styles = StyleSheet.create({
   label: { color: colors.muted },
   value: { color: colors.text, fontWeight: '600', textAlign: 'right', flex: 1 },
   actions: { gap: spacing.sm },
-  comingSoon: { color: colors.muted, textAlign: 'center', fontSize: 13 },
 });

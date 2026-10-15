@@ -1,8 +1,9 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { useSearchPatientsQuery } from '@/api/api';
@@ -22,10 +23,12 @@ export default function PatientSearchScreen() {
 
   const normalizedQuery = query.trim();
   const shouldSearch = normalizedQuery.length >= 2;
-  const { data, isFetching, isError, refetch } = useSearchPatientsQuery(
+  const patients = useSearchPatientsQuery(
     { q: normalizedQuery },
     { skip: !shouldSearch },
   );
+
+  const data = patients.currentData;
 
   const mobilePrefill = useMemo(() => query.replace(/\D/g, ''), [query]);
 
@@ -45,15 +48,9 @@ export default function PatientSearchScreen() {
         autoCapitalize="words"
       />
 
+      {shouldSearch ? <QueryState query={patients} label="patients" hasData={Boolean(data)} /> : null}
       {!shouldSearch ? (
         <Text style={styles.helper}>Enter at least 2 characters to search.</Text>
-      ) : isFetching ? (
-        <ActivityIndicator />
-      ) : isError ? (
-        <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>Unable to load patients</Text>
-          <AppButton label="Retry" tone="secondary" onPress={() => void refetch()} />
-        </View>
       ) : data?.items.length ? (
         <View style={styles.list}>
           {data.items.map((patient) => (
@@ -73,12 +70,12 @@ export default function PatientSearchScreen() {
             </Pressable>
           ))}
         </View>
-      ) : (
+      ) : patients.isSuccess && !patients.isFetching && !patients.isError ? (
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>No patient found</Text>
           <Text style={styles.helper}>Register a new patient if this person is not already in ClinicFlow.</Text>
         </View>
-      )}
+      ) : null}
 
       <AppButton
         label="Register New Patient"

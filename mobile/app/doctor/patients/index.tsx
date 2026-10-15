@@ -1,8 +1,10 @@
+import { QueryState } from '@/components/QueryState';
+import { formatClinicDate } from '@/utils/dates';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, } from 'react-native';
+import { Pressable, StyleSheet, Text, } from 'react-native';
 
 import { useSearchPatientsQuery } from '@/api/api';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -32,15 +34,15 @@ export default function DoctorPatientSearchScreen() {
         style={styles.input}
         autoCapitalize="words"
       />
-      {patients.isFetching ? <ActivityIndicator /> : null}
-      {patients.data?.items.map((patient) => (
+      {query.trim().length < 2 ? <Text style={styles.subtitle}>Enter at least 2 characters to search.</Text> :
+        <QueryState query={patients} label="patients" hasData={Boolean(patients.currentData)} empty={patients.currentData?.items.length === 0 ? 'No patients match this search.' : undefined} />}
+      {patients.currentData?.items.map((patient) => (
         <Pressable key={patient.patient_id} style={styles.card} onPress={() => router.push(`/doctor/patients/${patient.patient_id}`)}>
           <Text style={styles.name}>{patient.full_name}</Text>
           <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number}</Text>
-          <Text style={styles.meta}>{patient.previous_completed_visits} completed visit(s) · Last {patient.last_visit_date ?? '—'}</Text>
+          <Text style={styles.meta}>{patient.previous_completed_visits} completed visit(s) · Last {patient.last_visit_date ? formatClinicDate(patient.last_visit_date) : '—'}</Text>
         </Pressable>
       ))}
-      {query.trim().length >= 2 && !patients.isFetching && patients.data?.items.length === 0 ? <Text style={styles.subtitle}>No patient found.</Text> : null}
     </KeyboardSafeFormScreen>
   );
 }

@@ -23,5 +23,22 @@ export function formatClinicDate(isoDate: string): string {
 }
 
 export function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+// Native date pickers represent calendar fields in device-local Date objects.
+// Construct from fields, never parse an ISO date as a UTC instant.
+export function pickerDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+export function formatClinicTimestamp(value: string, timezone?: string): string {
+  if (!timezone) return 'Clinic time unavailable';
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: timezone, day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(new Date(value));
 }

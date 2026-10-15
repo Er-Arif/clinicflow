@@ -1,5 +1,6 @@
+import { QueryState } from '@/components/QueryState';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useListUsersQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
@@ -16,8 +17,8 @@ export default function UsersScreen() {
       <Text style={styles.title}>Users</Text>
       <Text style={styles.subtitle}>Individual accounts with server-defined ClinicFlow roles.</Text>
       <AppButton label="Add User" onPress={() => router.push('/doctor/more/users/new')} />
-      {users.isLoading ? <ActivityIndicator /> : null}
-      {users.data?.items.map((user) => (
+      <QueryState query={users} label="users" hasData={Boolean(users.currentData)} empty={users.currentData?.items.length === 0 ? 'No user accounts found.' : undefined} />
+      {users.currentData?.items.map((user) => (
         <Pressable key={user.user_id} style={styles.card} onPress={() => router.push(`/doctor/more/users/${user.user_id}`)}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
@@ -30,7 +31,6 @@ export default function UsersScreen() {
           </View>
         </Pressable>
       ))}
-      {!users.isLoading && users.data?.items.length === 0 ? <Text style={styles.subtitle}>No user accounts found.</Text> : null}
     </AppScreen>
   );
 }

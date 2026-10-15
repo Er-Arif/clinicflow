@@ -1,3 +1,5 @@
+import { formatClinicDate } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
@@ -37,6 +39,7 @@ export default function PaymentDetailsScreen() {
       <AppScreen>
         <BackButton />
         <Text style={styles.title}>Payment not found</Text>
+        <QueryState query={payment} label="payment" />
       </AppScreen>
     );
   }
@@ -67,12 +70,13 @@ export default function PaymentDetailsScreen() {
 
   return (
     <KeyboardSafeFormScreen>
+      <QueryState query={payment} label="payment" />
       <BackButton />
       <Text style={styles.title}>{item.patient_name}</Text>
       <Text style={styles.status}>{item.status}</Text>
       <View style={styles.card}>
         <Row label="Patient ID" value={item.patient_code} />
-        <Row label="Visit date" value={item.visit_date} />
+        <Row label="Visit date" value={formatClinicDate(item.visit_date)} />
         <Row label="Type" value={item.appointment_type.replace('_', ' ')} />
         <Row label="Amount due" value={`₹${item.amount_due}`} />
         {item.amount_paid != null ? <Row label="Amount paid" value={`₹${item.amount_paid}`} /> : null}

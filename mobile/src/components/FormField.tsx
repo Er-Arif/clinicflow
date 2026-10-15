@@ -23,6 +23,7 @@ export function FormField({ label, error, inputRef, ...props }: Props) {
       <KeyboardSafeTextInput
         ref={inputRef}
         {...props}
+        accessibilityLabel={props.accessibilityLabel ?? label}
         style={[
           styles.input,
           props.multiline ? styles.multilineInput : null,
@@ -30,7 +31,7 @@ export function FormField({ label, error, inputRef, ...props }: Props) {
           props.style,
         ]}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     </View>
   );
 }

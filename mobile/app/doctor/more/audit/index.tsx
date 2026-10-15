@@ -1,8 +1,10 @@
+import { formatClinicTimestamp } from '@/utils/dates';
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useClinicTimeQuery, useListAuditEventsQuery, useListUsersQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
@@ -62,20 +64,19 @@ export default function AuditHistoryScreen() {
       </View>
       <AppButton label="Apply Filters" onPress={apply} />
 
-      <Text style={styles.heading}>{events.data ? `${events.data.total} events` : 'Events'}</Text>
-      {events.isLoading ? <ActivityIndicator /> : null}
-      {events.data?.items.map((event) => (
+      <Text style={styles.heading}>{events.currentData ? `${events.currentData.total} events` : 'Events'}</Text>
+      <QueryState query={events} label="audit events" hasData={Boolean(events.currentData)} empty={events.currentData?.items.length === 0 ? 'No audit events match these filters.' : undefined} />
+      {events.currentData?.items.map((event) => (
         <Pressable key={event.audit_id} style={styles.card} onPress={() => router.push(`/doctor/more/audit/${event.audit_id}`)}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.action}>{event.action_type}</Text>
               <Text style={styles.subtitle}>{event.entity_type}{event.actor_display_name ? ` · ${event.actor_display_name}` : ` · ${event.actor_type}`}</Text>
             </View>
-            <Text style={styles.time}>{new Date(event.occurred_at).toLocaleString()}</Text>
+            <Text style={styles.time}>{formatClinicTimestamp(event.occurred_at, clock.data?.timezone)}</Text>
           </View>
         </Pressable>
       ))}
-      {!events.isLoading && events.data?.items.length === 0 ? <Text style={styles.subtitle}>No audit events match these filters.</Text> : null}
     </KeyboardSafeFormScreen>
   );
 }

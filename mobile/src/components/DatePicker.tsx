@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, radius } from '@/theme/tokens';
+import { formatClinicDate, isIsoDate, pickerDate } from '@/utils/dates';
 
 interface DatePickerProps {
   value: string;
@@ -11,22 +12,23 @@ interface DatePickerProps {
   allowClear?: boolean;
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }
 
-export function DatePicker({ value, onChange, minimumDate, maximumDate, allowClear, placeholder = 'YYYY-MM-DD', style }: DatePickerProps) {
+export function DatePicker({ value, onChange, minimumDate, maximumDate, allowClear, placeholder = 'Choose date', style, accessibilityLabel = 'Choose date' }: DatePickerProps) {
   const [show, setShow] = useState(false);
 
-  const displayDate = value ? value : placeholder;
-  const dateObj = value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value) : new Date();
+  const displayDate = isIsoDate(value) ? formatClinicDate(value) : placeholder;
+  const dateObj = isIsoDate(value) ? pickerDate(value) : minimumDate ?? new Date();
 
   return (
     <View style={style}>
       <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
-        <Pressable style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => setShow(true)}>
+        <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityValue={{ text: displayDate }} style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => setShow(true)}>
           <Text style={[styles.text, !value && { color: colors.muted }]}>{displayDate}</Text>
         </Pressable>
         {allowClear && value ? (
-          <Pressable style={{ paddingHorizontal: 14, paddingVertical: 10 }} onPress={() => onChange('')}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Clear ${accessibilityLabel.toLowerCase()}`} style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => onChange('')}>
             <Text style={{ color: colors.danger, fontWeight: 'bold' }}>Clear</Text>
           </Pressable>
         ) : null}

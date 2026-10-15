@@ -1,7 +1,8 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useListMessageTemplatesQuery, useUpdateMessageTemplateMutation } from '@/api/api';
 import { apiError } from '@/api/errors';
@@ -37,6 +38,7 @@ export default function MessageTemplatesScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
+      <QueryState query={query} label="message templates" />
       <Text style={styles.title}>Message Templates</Text>
       <Text style={styles.subtitle}>Operational messages only. Do not include diagnosis, medicines, or sensitive clinical information.</Text>
       <View style={styles.helperCard}>
@@ -45,7 +47,7 @@ export default function MessageTemplatesScreen() {
           {'{patient_name}'}, {'{doctor_name}'}, {'{clinic_name}'}, {'{clinic_contact_number}'}, {'{appointment_date}'}, {'{appointment_time}'}, {'{followup_due_date}'}
         </Text>
       </View>
-      {query.isFetching ? <ActivityIndicator /> : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {query.data?.map((item) => (
         <View key={item.template_id} style={styles.card}>

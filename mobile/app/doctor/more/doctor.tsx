@@ -1,7 +1,8 @@
+import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, } from 'react-native';
+import { StyleSheet, Text, } from 'react-native';
 
 import { useGetDoctorSettingsQuery, useListDoctorsQuery, useUpdateDoctorSettingsMutation } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
@@ -38,9 +39,10 @@ export default function DoctorSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
+      <QueryState query={doctors} label="doctors" />
+      <QueryState query={settings} label="doctor settings" />
       <Text style={styles.title}>Doctor Settings</Text>
-      {doctors.isLoading || settings.isLoading ? <ActivityIndicator /> : null}
-      {!doctorId && !doctors.isLoading ? <Text style={styles.error}>No active doctor is configured.</Text> : null}
+      {!doctorId && doctors.isSuccess ? <Text style={styles.error}>No active doctor is configured.</Text> : null}
       <KeyboardSafeTextInput style={styles.input} placeholder="Doctor name" value={name} onChangeText={setName} />
       <KeyboardSafeTextInput style={[styles.input, styles.multiline]} placeholder="Professional display details" multiline value={details} onChangeText={setDetails} />
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
