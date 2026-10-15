@@ -1,5 +1,7 @@
 # ClinicFlow V1 — Stage 6 M12 Release Candidate Preparation
 
+> Historical milestone snapshot. Current implementation status, suite counts and production gates are maintained in [V1 production readiness](../release/v1-production-readiness.md); the original evidence below is retained for traceability.
+
 ## Status
 
 **Release-candidate preparation implemented. External UAT certification is not yet complete.**

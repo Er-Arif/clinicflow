@@ -1,5 +1,7 @@
 # ClinicFlow V1 — Stage 6 M11 Security / Concurrency / Recovery Hardening
 
+> Historical milestone snapshot. Current implementation status, suite counts and production gates are maintained in [V1 production readiness](../release/v1-production-readiness.md); the original evidence below is retained for traceability.
+
 ## Scope
 
 M11 adds no clinic features. It hardens the existing M0–M10 workflows against concurrency races, retries, invalid sessions, malformed requests, production misconfiguration, audit tampering, and recovery failures.

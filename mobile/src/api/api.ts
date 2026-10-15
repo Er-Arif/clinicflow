@@ -8,6 +8,7 @@ import {
 } from '@reduxjs/toolkit/query/react';
 
 import { newRequestId } from '@/api/requestId';
+import { getApiUrl } from '@/api/config';
 import { WORKLIST_PAGE_SIZE, worklistOptions } from '@/api/worklists';
 import { notifySessionExpired } from '@/auth/sessionEvents';
 import {
@@ -77,7 +78,7 @@ import {
   ScheduleApply,
 } from '@/features/scheduling/types';
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8000';
+const apiUrl = getApiUrl();
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: apiUrl,

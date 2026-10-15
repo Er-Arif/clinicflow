@@ -5,13 +5,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
-COPY pyproject.toml /app/pyproject.toml
-RUN uv pip install --system .
+COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /bin/uv
+COPY pyproject.toml uv.lock /app/
+RUN uv sync --frozen --no-dev --no-install-project
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY app /app/app
 COPY alembic /app/alembic
 COPY alembic.ini /app/alembic.ini
 COPY scripts /app/scripts
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN useradd --system --uid 10001 clinicflow
+USER clinicflow
+CMD ["python", "-m", "scripts.serve"]

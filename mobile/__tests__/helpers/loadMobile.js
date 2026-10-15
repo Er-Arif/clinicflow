@@ -24,6 +24,7 @@ function mobileRuntime(overrides = {}) {
   native.Platform = { OS: 'android' };
   native.Keyboard = { dismiss() {}, metrics: () => undefined };
   const mocks = {
+    '@/api/config': { getApiUrl: () => 'https://api.test.invalid' },
     'react-native': native,
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@react-native-community/datetimepicker': host('DateTimePicker'),

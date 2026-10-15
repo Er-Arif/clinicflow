@@ -48,6 +48,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
+            headers={"Retry-After": str(exc.details["retry_after_seconds"])}
+            if exc.code == "AUTH_RATE_LIMITED" else None,
             content=_body(
                 code=exc.code,
                 message=exc.message,

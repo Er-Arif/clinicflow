@@ -2,7 +2,7 @@
 
 ClinicFlow V1 is an Android-first clinic practice-management application for appointments, payments and follow-ups.
 
-This repository begins Stage 6 implementation against the frozen Stage 1–5 baselines.
+The V1 workflows and scheduling redesign are implemented. Current release gates and verification evidence are tracked in [V1 production readiness](docs/release/v1-production-readiness.md).
 
 ## Stack
 
@@ -23,7 +23,7 @@ clinicflow/
 └── .github/
 ```
 
-## Stage 6 foundation quick start
+## Local development quick start
 
 1. Copy `backend/.env.example` to `backend/.env`.
 2. Start PostgreSQL and backend:
@@ -32,7 +32,7 @@ clinicflow/
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-3. Run the first migration and bootstrap the Owner/Doctor account:
+3. Apply the migration chain and bootstrap the Owner/Doctor account:
 
 ```bash
 docker compose -f infra/docker-compose.yml run --rm backend alembic upgrade head
@@ -52,13 +52,13 @@ GET http://localhost:8000/health/ready
 
 - PostgreSQL is the source of truth.
 - Business dates come from the backend clinic clock, not device time.
-- Every state-changing operation will be server-authorized.
+- State-changing operations are server-authorized.
 - Audit and idempotency are cross-cutting foundations, not retrofit features.
 - No clinical/EMR fields belong in V1.
 
 ## Implemented checkpoint
 
-M0/M1 foundation includes health checks, request IDs, backend clinic clock, PostgreSQL/Alembic, append-only audit foundation, idempotency foundation, Clinic/User/Doctor/RBAC schema, Argon2id passwords, access + rotating refresh sessions, `/api/v1/auth/*`, secure mobile refresh-token storage, single-flight refresh handling, login/session restore routes, and role-based landing placeholders.
+M0/M1 foundation includes health checks, request IDs, backend clinic clock, PostgreSQL/Alembic, append-only audit foundation, idempotency foundation, Clinic/User/Doctor/RBAC schema, Argon2id passwords, access + rotating refresh sessions, `/api/v1/auth/*`, secure mobile refresh-token storage, single-flight refresh handling, login/session restore routes, and role-based navigation.
 
 M2 Patient Management adds governed patient codes, E.164 Indian mobile normalization, shared-family-number duplicate warnings, DOB/approximate-age rules, optimistic edits, patient audit events, `/api/v1/patients`, and the Patient Search / New Patient / Patient Profile / Edit Patient Android screens.
 
@@ -82,8 +82,8 @@ M10 Settings / Users / Audit completes the Owner administration surface with opt
 
 M11 Security / Concurrency / Recovery hardening adds stable mobile retry keys, request/session failure recovery, uniform safe API errors, security headers, production secret validation, structured request logs, audit UUID/redaction fixes, PostgreSQL concurrency/integrity tests wired into CI, a non-public production PostgreSQL topology, explicit migration deployment, rotating backups, restore verification, and production/release runbooks.
 
-M12 Release Candidate preparation adds backend/mobile build visibility, an About screen, a deployed read-only smoke test, a disposable-PostgreSQL local RC verifier, APK release-manifest/checksum generation, and the complete UAT evidence plan/checklist. M12 is **not yet certified complete**: dependency lockfiles must be generated online and committed, real PostgreSQL concurrency tests must run, and staging/physical-device/WhatsApp/UPI/backup/signed-APK UAT evidence must be recorded.
+M12 Release Candidate preparation adds backend/mobile build visibility, an About screen, a deployed read-only smoke test, a disposable-PostgreSQL local RC verifier, APK release-manifest/checksum generation, and the complete UAT evidence plan/checklist. M12 is **not yet certified complete**: committed uv/npm lockfiles and PostgreSQL regression runs are present; staging, physical-device, WhatsApp/UPI, production restore and user-signed artifact evidence remain rollout gates.
 
 See `docs/implementation/stage6-m7-followups.md`, `docs/implementation/stage6-m8-messaging.md`, `docs/implementation/stage6-m9-reporting.md`, `docs/implementation/stage6-m10-admin.md`, `docs/implementation/stage6-m11-hardening.md`, and `docs/implementation/stage6-m12-rc-preparation.md`.
 
-Next gate: execute the M12 RC/UAT evidence plan on an online Docker/PostgreSQL + Android-device environment. No new V1 feature milestone should begin before that gate.
+Next gate: review the production-hardening changes and execute the current release-readiness checklist against staging and physical Android. Historical milestone reports retain their original validation counts; they do not describe the current suite.

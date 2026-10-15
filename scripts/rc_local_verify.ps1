@@ -46,11 +46,11 @@ try {
 
         & uv sync --frozen --dev
         if ($LASTEXITCODE -ne 0) { throw "uv sync failed." }
-        & uv run alembic upgrade head
+        & uv run --frozen alembic upgrade head
         if ($LASTEXITCODE -ne 0) { throw "Alembic migration failed." }
-        & uv run ruff check .
+        & uv run --frozen ruff check .
         if ($LASTEXITCODE -ne 0) { throw "Ruff failed." }
-        & uv run pytest
+        & uv run --frozen pytest
         if ($LASTEXITCODE -ne 0) { throw "Backend tests failed." }
     }
     finally {

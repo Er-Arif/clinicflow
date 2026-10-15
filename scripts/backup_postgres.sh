@@ -1,25 +1,35 @@
 #!/bin/sh
 set -eu
+umask 077
+command -v python3 >/dev/null 2>&1 || { echo "Python 3 is required for backup integrity." >&2; exit 1; }
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 COMPOSE_FILE=${COMPOSE_FILE:-"$ROOT_DIR/infra/docker-compose.production.yml"}
 ENV_FILE=${ENV_FILE:-"$ROOT_DIR/infra/.env.production"}
 BACKUP_ROOT=${BACKUP_ROOT:-"$ROOT_DIR/backups"}
 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Production env file not found: $ENV_FILE" >&2
-  exit 1
+BACKUP_MODE=${BACKUP_MODE:-compose}
+case "$BACKUP_MODE" in compose|direct) ;; *) echo "Invalid BACKUP_MODE" >&2; exit 2;; esac
+if [ "$BACKUP_MODE" = compose ]; then
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Production env file not found: $ENV_FILE" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC1090
+  set -a
+  . "$ENV_FILE"
+  set +a
+
+  : "${POSTGRES_DB:?POSTGRES_DB is required}"
+  : "${POSTGRES_USER:?POSTGRES_USER is required}"
+else
+  : "${PGDATABASE:?PGDATABASE is required}"
+  : "${PGHOST:?PGHOST is required}"
+  : "${PGUSER:?PGUSER is required}"
 fi
 
-# shellcheck disable=SC1090
-set -a
-. "$ENV_FILE"
-set +a
-
-: "${POSTGRES_DB:?POSTGRES_DB is required}"
-: "${POSTGRES_USER:?POSTGRES_USER is required}"
-
-STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)-$$
 DAY=$(date -u +%d)
 WEEKDAY=$(date -u +%u)
 DAILY_DIR="$BACKUP_ROOT/daily"
@@ -32,13 +42,18 @@ FILE="$DAILY_DIR/clinicflow-$STAMP.dump"
 TMP="$FILE.tmp"
 trap 'rm -f "$TMP"' EXIT INT TERM
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
-  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges > "$TMP"
+if [ "$BACKUP_MODE" = compose ]; then
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+    pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges > "$TMP"
+else
+  pg_dump --format=custom --no-owner --no-privileges > "$TMP"
+fi
 
 [ -s "$TMP" ] || { echo "Backup is empty" >&2; exit 1; }
 mv "$TMP" "$FILE"
 chmod 600 "$FILE"
-sha256sum "$FILE" > "$FILE.sha256"
+python3 "$ROOT_DIR/scripts/backup_integrity.py" write "$FILE"
+python3 "$ROOT_DIR/scripts/backup_integrity.py" verify "$FILE"
 chmod 600 "$FILE.sha256"
 trap - EXIT INT TERM
 

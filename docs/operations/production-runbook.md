@@ -2,7 +2,31 @@
 
 ## Production boundary
 
-Production uses Caddy → FastAPI → PostgreSQL. PostgreSQL has no host/public port in the production Compose file. Caddy is the only public service and terminates HTTPS. FastAPI and PostgreSQL communicate on an internal Docker network.
+Production is internet-first: Android uses HTTPS to reach FastAPI and PostgreSQL remains private. Railway is the initial cloud target; the Caddy/Compose topology is an alternative self-hosted deployment. PostgreSQL has no public host port in the production Compose file.
+
+Current implementation and validation evidence: [V1 production readiness](../release/v1-production-readiness.md). Earlier milestone counts are historical evidence, not the current release gate.
+
+## Railway deployment
+
+- Set service root to `backend` and use its Dockerfile. Build with the committed `uv.lock`; do not regenerate it on deployment.
+- Start command: `python -m scripts.serve`. It binds `0.0.0.0:$PORT` (8000 when unset), disables raw Uvicorn access logs, and forces one worker. Use exactly **one replica** while auth budgets are process-local.
+- Set `CLINICFLOW_ENVIRONMENT=production`, a random access secret of at least 32 characters, and a non-placeholder `CLINICFLOW_DATABASE_URL` using `postgresql+psycopg://`. URL-encode the password. Use Railway private networking; when the chosen database endpoint requires TLS, specify `?sslmode=require` or preferably `verify-full` with the provider CA. Never expose PostgreSQL merely to make the app reachable.
+- Set `CLINICFLOW_ALLOWED_HOSTS` to a JSON array containing the public API hostname and `healthcheck.railway.app` (plus any explicitly used private health host). Set `CLINICFLOW_CORS_ORIGINS=[]` for the native-only client; if a browser client is deployed, list only its exact HTTPS origins. CORS credentials are disabled: authentication uses Bearer headers and refresh-token request bodies, not cookies. Cookie SameSite/CSRF settings do not apply to this architecture.
+- Set `CLINICFLOW_TRUSTED_PROXY_IPS` to the actual ingress peer IPs/CIDRs, verified in the deployment network. Empty means no forwarded-header trust; `*` and all-address CIDRs are rejected. Do not guess a Railway-wide network or trust arbitrary client XFF. Before opening access, test two client IPs and spoofed XFF through the real ingress. If Railway cannot provide a stable narrow trust boundary, retain conservative shared-IP throttling and resolve ingress configuration before clinic rollout.
+- Run `alembic upgrade head` as the separately configured pre-deploy command, serialized by the deployment operator. Do not launch overlapping deployments or place migrations in per-worker startup. This pass adds no migration.
+- Healthcheck path: `/health/ready`. `/health/live` checks the process; readiness executes `SELECT 1` and returns a safe 503 on database failure. It does not certify schema compatibility or domain data. Run migration and smoke checks separately.
+- Configure restart-on-failure and alerts for failed deploys, sustained 5xx/503, restart loops and backup failures. Railway deploy healthchecks are not a continuous uptime monitor; arrange an external probe before clinic rollout. No monitoring vendor is installed by this pass.
+- Database pool defaults per worker: 5 connections + 5 overflow, 10-second pool wait, 1800-second recycle, 5-second connect timeout, `pool_pre_ping=True`. Environment knobs are `CLINICFLOW_DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`, `DB_CONNECT_TIMEOUT` (all with the `CLINICFLOW_` prefix). Budget database connections for migrations/backup too. No aggressive statement timeout is imposed on financial/scheduling transactions.
+
+Reference: [Railway healthchecks](https://docs.railway.com/deployments/healthchecks), [pre-deploy commands](https://docs.railway.com/deployments/pre-deploy-command), [Uvicorn proxy trust](https://uvicorn.dev/settings/).
+
+## Login protection and operational limits
+
+Login IP budgets: 20 attempts/minute and 100/15 minutes. Identity budgets: 5 attempts/minute and 20/15 minutes, normalized with PostgreSQL `lower()` to match CITEXT, then hashed in memory. Checks reserve capacity atomically before password verification; failed transactions do not erase attempts. Successful login clears the identity budget but retains the IP budget. Refresh and password-change attempts share the IP budget. Unknown, ambiguous, disabled and incorrect-password logins all return `INVALID_CREDENTIALS`; blocked requests return 429 with `Retry-After` and a request ID.
+
+Budgets expire automatically, store at most 10,000 keys and fail closed at saturation. They reset on restart and are not shared across replicas; deployment overlap also temporarily divides enforcement. This is an accepted single-instance V1 constraint, not distributed protection. Before scaling, review shared atomic storage/edge protection as a separate change. Distributed denial-of-service protection remains an ingress responsibility. Logs contain throttling event/request ID, never login identifiers, passwords or tokens.
+
+Application logs are JSON with request IDs, route templates, status and duration; startup/shutdown and unexpected-error events are recorded. Raw query strings, arbitrary paths, SQL parameters and exception messages are excluded. Restrict log access and retention; business audit data remains in PostgreSQL, unchanged.
 
 ## Host baseline
 

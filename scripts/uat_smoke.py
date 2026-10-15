@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from getpass import getpass
 import json
 import os
+from getpass import getpass
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen

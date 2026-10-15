@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
+from app.db.read_references import ReadReferences
 from app.modules.appointments.models import Appointment
 from app.modules.audit.service import AuditService
 from app.modules.clinic.models import Clinic, Doctor
@@ -253,8 +254,13 @@ class ReminderService:
             .offset(offset)
         ).all()
         total = int(self.db.scalar(select(func.count(Reminder.reminder_id)).where(*conditions)) or 0)
+        refs = ReadReferences(self.db, self.context.clinic_id)
+        refs.load(Patient, [row.patient_id for row in rows])
+        appointments = refs.load(Appointment, [row.appointment_id for row in rows])
+        refs.load(SessionOccurrence, [row.session_occurrence_id for row in appointments])
+        refs.load(FollowUpRecommendation, [row.followup_id for row in rows])
         return ReminderListResponse(
-            items=[self._response(row) for row in rows], total=total, limit=limit, offset=offset
+            items=[self._response(row, refs) for row in rows], total=total, limit=limit, offset=offset
         )
 
     def prepare(self, reminder_id: UUID, language: str | None = None) -> PreparedMessageResponse:
@@ -450,18 +456,19 @@ class ReminderService:
             )
         return values
 
-    def _sendability(self, reminder: Reminder) -> tuple[bool, str | None]:
+    def _sendability(self, reminder: Reminder, refs: ReadReferences | None = None) -> tuple[bool, str | None]:
+        source = refs if refs is not None else self.db
         if reminder.reminder_type == "APPOINTMENT_REMINDER" and reminder.appointment_id:
-            appointment = self.db.get(Appointment, reminder.appointment_id)
+            appointment = source.get(Appointment, reminder.appointment_id)
             if appointment is None:
                 return False, "APPOINTMENT_NOT_FOUND"
-            occurrence = self.db.get(SessionOccurrence, appointment.session_occurrence_id)
+            occurrence = source.get(SessionOccurrence, appointment.session_occurrence_id)
             if occurrence and occurrence.status == "BLOCKED" and appointment.status in {"BOOKED", "CHECKED_IN"}:
                 return False, "SESSION_BLOCKED"
             if appointment.status != "BOOKED":
                 return False, "APPOINTMENT_NOT_BOOKED"
         if reminder.followup_id:
-            followup = self.db.get(FollowUpRecommendation, reminder.followup_id)
+            followup = source.get(FollowUpRecommendation, reminder.followup_id)
             if followup is None or followup.status != "OPEN":
                 return False, "FOLLOWUP_NOT_OPEN"
         return True, None
@@ -504,11 +511,12 @@ class ReminderService:
             new_values={"status": "SKIPPED", "reminder_type": reminder.reminder_type},
         )
 
-    def _response(self, reminder: Reminder) -> ReminderResponse:
-        patient = self.db.get(Patient, reminder.patient_id)
+    def _response(self, reminder: Reminder, refs: ReadReferences | None = None) -> ReminderResponse:
+        source = refs if refs is not None else self.db
+        patient = source.get(Patient, reminder.patient_id)
         if patient is None:
             raise RuntimeError("Reminder patient integrity failure")
-        sendable, reason = self._sendability(reminder) if reminder.status == "DUE" else (False, None)
+        sendable, reason = self._sendability(reminder, refs) if reminder.status == "DUE" else (False, None)
         return ReminderResponse(
             reminder_id=reminder.reminder_id,
             patient_id=reminder.patient_id,

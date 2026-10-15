@@ -2,13 +2,29 @@ import logging
 from time import perf_counter
 from uuid import UUID, uuid4
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.core.config import Settings
 from app.core.context import request_id_var
 
 request_logger = logging.getLogger("clinicflow.request")
+
+
+def configure_http_boundary(app: FastAPI, config: Settings) -> None:
+    if config.environment in {"staging", "production"}:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts)
+    if config.cors_origins:
+        app.add_middleware(
+            CORSMiddleware, allow_origins=config.cors_origins, allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
+            expose_headers=["X-Request-ID", "Retry-After"],
+        )
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -57,7 +73,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             extra={
                 "request_id": getattr(request.state, "request_id", None),
                 "method": request.method,
-                "path": request.url.path,
+                # Route templates exclude patient identifiers and arbitrary URL text.
+                "path": getattr(request.scope.get("route"), "path", "unmatched"),
                 "status_code": response.status_code,
                 "duration_ms": duration_ms,
             },

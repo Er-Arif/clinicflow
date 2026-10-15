@@ -33,9 +33,9 @@ docker compose -f "$COMPOSE" exec -T postgres createdb -U clinicflow "$TEST_DB"
 (
   cd "$ROOT_DIR/backend"
   uv sync --frozen --dev
-  CLINICFLOW_DATABASE_URL="$DB_URL" uv run alembic upgrade head
-  CLINICFLOW_DATABASE_URL="$DB_URL" CLINICFLOW_RUN_INTEGRATION=1 uv run ruff check .
-  CLINICFLOW_DATABASE_URL="$DB_URL" CLINICFLOW_RUN_INTEGRATION=1 uv run pytest
+  CLINICFLOW_DATABASE_URL="$DB_URL" uv run --frozen alembic upgrade head
+  CLINICFLOW_DATABASE_URL="$DB_URL" CLINICFLOW_RUN_INTEGRATION=1 uv run --frozen ruff check .
+  CLINICFLOW_DATABASE_URL="$DB_URL" CLINICFLOW_RUN_INTEGRATION=1 uv run --frozen pytest
 )
 
 (

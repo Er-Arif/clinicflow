@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.auth_throttle import auth_client_ip, auth_throttle, throttle_auth_ip
 from app.core.clock import Clock, get_clock
 from app.db.session import get_db
 from app.modules.identity.dependencies import get_auth_context
@@ -19,14 +21,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=TokenPairResponse)
 def login(
     request: LoginRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> TokenPairResponse:
+    auth_throttle.check(auth_client_ip(http_request))
     with db.begin():
-        return AuthService(db, clock).login(request)
+        # CITEXT compares using PostgreSQL lower(), whose Unicode behavior differs
+        # from Python. Normalize in the same database before assigning a budget.
+        identity = db.scalar(select(func.lower(request.login_identifier.strip())))
+        auth_throttle.check(None, identity)
+        response = AuthService(db, clock).login(request)
+    auth_throttle.success(identity)
+    return response
 
 
-@router.post("/refresh", response_model=TokenPairResponse)
+@router.post("/refresh", response_model=TokenPairResponse, dependencies=[Depends(throttle_auth_ip)])
 def refresh(
     request: RefreshRequest,
     db: Session = Depends(get_db),
@@ -59,7 +69,7 @@ def me(context: AuthContext = Depends(get_auth_context)) -> UserContextResponse:
     )
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(throttle_auth_ip)])
 def change_password(
     request: ChangePasswordRequest,
     context: AuthContext = Depends(get_auth_context),

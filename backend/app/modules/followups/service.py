@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
+from app.db.read_references import ReadReferences
 from app.modules.appointments.models import Appointment
 from app.modules.appointments.service import AppointmentService
 from app.modules.audit.service import AuditService
@@ -95,8 +96,14 @@ class FollowUpService:
             self.db.scalar(select(func.count(FollowUpRecommendation.followup_id)).where(*conditions))
             or 0
         )
+        refs = ReadReferences(self.db, self.context.clinic_id)
+        refs.load(Patient, [row.patient_id for row in rows])
+        visits = refs.load(Visit, [row.source_visit_id for row in rows])
+        appointments = refs.load(Appointment, [visit.appointment_id for visit in visits]
+                                 + [row.linked_appointment_id for row in rows])
+        refs.load(SessionOccurrence, [row.session_occurrence_id for row in appointments])
         return FollowUpListResponse(
-            items=[self._response(row) for row in rows], total=total, limit=limit, offset=offset
+            items=[self._response(row, refs) for row in rows], total=total, limit=limit, offset=offset
         )
 
     def get(self, followup_id: UUID) -> FollowUpResponse:
@@ -296,24 +303,25 @@ class FollowUpService:
             raise AppError("FOLLOWUP_NOT_FOUND", "Follow-up not found.", 404)
         return item
 
-    def _response(self, item: FollowUpRecommendation) -> FollowUpResponse:
-        patient = self.db.get(Patient, item.patient_id)
-        source_visit = self.db.get(Visit, item.source_visit_id)
+    def _response(self, item: FollowUpRecommendation, refs: ReadReferences | None = None) -> FollowUpResponse:
+        source = refs if refs is not None else self.db
+        patient = source.get(Patient, item.patient_id)
+        source_visit = source.get(Visit, item.source_visit_id)
         if patient is None or source_visit is None:
             raise RuntimeError("Follow-up reference integrity failure")
-        source_appt = self.db.get(Appointment, source_visit.appointment_id)
+        source_appt = source.get(Appointment, source_visit.appointment_id)
         if source_appt is None:
             raise RuntimeError("Follow-up source appointment integrity failure")
-        source_occurrence = self.db.get(SessionOccurrence, source_appt.session_occurrence_id)
+        source_occurrence = source.get(SessionOccurrence, source_appt.session_occurrence_id)
         if source_occurrence is None:
             raise RuntimeError("Follow-up source occurrence integrity failure")
 
         linked: FollowUpLinkedAppointmentSummary | None = None
         if item.linked_appointment_id:
-            linked_appt = self.db.get(Appointment, item.linked_appointment_id)
+            linked_appt = source.get(Appointment, item.linked_appointment_id)
             if linked_appt is None:
                 raise RuntimeError("Follow-up linked appointment integrity failure")
-            linked_occurrence = self.db.get(SessionOccurrence, linked_appt.session_occurrence_id)
+            linked_occurrence = source.get(SessionOccurrence, linked_appt.session_occurrence_id)
             if linked_occurrence is None:
                 raise RuntimeError("Follow-up linked occurrence integrity failure")
             linked = FollowUpLinkedAppointmentSummary(

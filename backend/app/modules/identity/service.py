@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import lru_cache
 from uuid import UUID
 
 from sqlalchemy import select
@@ -40,6 +41,12 @@ class AuthContext:
     must_change_password: bool
 
 
+@lru_cache(maxsize=1)
+def _dummy_password_hash() -> str:
+    # Unknown/ambiguous identities still pay the normal password-verification cost.
+    return PasswordService.hash("not-an-account-password")
+
+
 def _request_id() -> UUID:
     value = request_id_var.get()
     if value is None:
@@ -64,16 +71,11 @@ class AuthService:
         users = self.db.scalars(
             select(User).where(User.login_identifier == request.login_identifier.strip())
         ).all()
-        if len(users) != 1:
-            self._invalid_credentials()
-        user = users[0]
-        if not user.active:
-            raise AppError(
-                code="ACCOUNT_DISABLED",
-                message="This account has been disabled. Contact the clinic administrator.",
-                status_code=403,
-            )
-        if not PasswordService.verify(user.password_hash, request.password):
+        user = users[0] if len(users) == 1 else None
+        valid = PasswordService.verify(
+            user.password_hash if user is not None else _dummy_password_hash(), request.password
+        )
+        if user is None or not valid or not user.active:
             self._invalid_credentials()
 
         raw_refresh = self.tokens.new_refresh_token()

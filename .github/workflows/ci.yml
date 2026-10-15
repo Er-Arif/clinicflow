@@ -35,10 +35,10 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.13'
-      - run: uv sync --dev
-      - run: uv run ruff check .
-      - run: uv run alembic upgrade head
-      - run: uv run pytest
+      - run: uv sync --frozen --dev
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen alembic upgrade head
+      - run: uv run --frozen pytest
 
   mobile:
     runs-on: ubuntu-latest
@@ -50,6 +50,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test

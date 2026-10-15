@@ -81,6 +81,41 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def releaseStore = System.getenv('CLINICFLOW_ANDROID_KEYSTORE')
+def releaseStorePassword = System.getenv('CLINICFLOW_ANDROID_STORE_PASSWORD')
+def releaseKeyAlias = System.getenv('CLINICFLOW_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('CLINICFLOW_ANDROID_KEY_PASSWORD')
+
+tasks.register('validateProductionRelease') {
+    doLast {
+        if (!releaseStore || !releaseStorePassword || !releaseKeyAlias || !releaseKeyPassword) {
+            throw new GradleException('Production release requires the four CLINICFLOW_ANDROID signing environment variables.')
+        }
+        if (!file(releaseStore).isFile() || file(releaseStore).name == 'debug.keystore' || releaseKeyAlias == 'androiddebugkey') {
+            throw new GradleException('Production release requires a user-owned non-debug keystore and alias.')
+        }
+        def keys = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType())
+        file(releaseStore).withInputStream { keys.load(it, releaseStorePassword.toCharArray()) }
+        def certificate = keys.getCertificate(releaseKeyAlias)
+        if (!keys.isKeyEntry(releaseKeyAlias) || !certificate || !keys.getKey(releaseKeyAlias, releaseKeyPassword.toCharArray())) {
+            throw new GradleException('Production signing alias must contain a private key and certificate.')
+        }
+        if (certificate.subjectX500Principal.name.toLowerCase().contains('cn=android debug')) {
+            throw new GradleException('The Android debug signing certificate cannot sign production releases.')
+        }
+        def api = System.getenv('EXPO_PUBLIC_API_URL')
+        def uri = api ? new URI(api) : null
+        if (!uri || uri.scheme != 'https' || !uri.host || uri.userInfo || uri.query || uri.fragment || (uri.path && uri.path != '/')) {
+            throw new GradleException('Production release requires EXPO_PUBLIC_API_URL as an explicit HTTPS origin.')
+        }
+    }
+}
+tasks.configureEach { task ->
+    if (task.name == 'preReleaseBuild' || task.name == 'createBundleReleaseJsAndAssets') {
+        task.dependsOn('validateProductionRelease')
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -108,6 +143,12 @@ android {
         }
     }
     signingConfigs {
+        release {
+            if (releaseStore) storeFile file(releaseStore)
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -120,9 +161,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

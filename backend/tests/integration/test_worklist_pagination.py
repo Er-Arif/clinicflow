@@ -5,8 +5,10 @@ from datetime import time
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import event, select, update
 
+from app.modules.appointments.models import Appointment
+from app.modules.appointments.service import AppointmentService
 from app.modules.followups.models import FollowUpRecommendation
 from app.modules.followups.schemas import (
     FollowUpCloseRequest,
@@ -92,3 +94,40 @@ def test_all_matching_rows_reachable_once_in_deterministic_order(worklists, kind
         actual = [getattr(row, field) for row in first.items + second.items]
         assert actual == expected and len(set(actual)) == 55
         assert [getattr(row, field) for row in service.list(**filters).items] == actual[:50]
+
+
+@pytest.mark.parametrize("kind", ["appointments", "followups", "reminders"])
+def test_list_queries_are_bounded_and_match_individual_responses(worklists, kind):
+    s = worklists
+    counts = []
+    for limit in (1, 50):
+        statements = []
+        def record(_conn, _cursor, statement, _params, _context, _many, statements=statements):
+            statements.append(statement)
+        with s.factory() as db:
+            if kind == "appointments":
+                service = AppointmentService(db, s.clock, s.context)
+                kwargs = dict(target_date=None, patient_id=None, doctor_id=None, status=None)
+                model, field = Appointment, "appointment_id"
+            elif kind == "followups":
+                service = FollowUpService(db, s.clock, s.context)
+                kwargs = {}
+                model, field = FollowUpRecommendation, "followup_id"
+            else:
+                service = ReminderService(db, s.clock, s.context)
+                kwargs = {}
+                model, field = Reminder, "reminder_id"
+            engine = db.get_bind()
+            event.listen(engine, "before_cursor_execute", record)
+            try:
+                response = service.list(**kwargs, limit=limit, offset=0)
+            finally:
+                event.remove(engine, "before_cursor_execute", record)
+            counts.append(len(statements))
+            assert len(response.items) == limit
+            # Compare the optimized list with the unchanged detail/command serializer.
+            for item in response.items:
+                original = service._response(db.get(model, getattr(item, field)))
+                assert original.model_dump() == item.model_dump()
+    assert counts[0] == counts[1]
+    assert counts[1] <= 8

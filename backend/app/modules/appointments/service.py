@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
+from app.db.read_references import ReadReferences
 from app.modules.appointments.models import Appointment, AppointmentFeeAdjustment
 from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
@@ -112,8 +113,30 @@ class AppointmentService:
             ).limit(limit).offset(offset)
         ).all()
         total = int(self.db.scalar(count_query) or 0)
+        refs = ReadReferences(self.db, self.context.clinic_id)
+        refs.load(Patient, [row.patient_id for row in items])
+        refs.load(Doctor, [row.doctor_id for row in items])
+        refs.load(SessionOccurrence, [row.session_occurrence_id for row in items])
+        ids = [row.appointment_id for row in items]
+        visits = {row.appointment_id: row for row in self.db.scalars(select(Visit).where(
+            Visit.clinic_id == self.context.clinic_id, Visit.appointment_id.in_(ids),
+        ))} if ids else {}
+        payments = {}
+        if visits:
+            for row in self.db.scalars(select(Payment).where(
+                Payment.clinic_id == self.context.clinic_id,
+                Payment.visit_id.in_([visit.visit_id for visit in visits.values()]),
+            ).order_by(Payment.created_at.desc())):
+                payments.setdefault(row.visit_id, row)
+        followups = {row.linked_appointment_id: row for row in self.db.scalars(
+            select(FollowUpRecommendation).where(
+                FollowUpRecommendation.clinic_id == self.context.clinic_id,
+                FollowUpRecommendation.linked_appointment_id.in_(ids),
+            )
+        )} if ids else {}
         return AppointmentListResponse(
-            items=[self._response(item) for item in items], total=total, limit=limit, offset=offset
+            items=[self._response(item, related=(refs, visits, payments, followups)) for item in items],
+            total=total, limit=limit, offset=offset
         )
 
     def get(self, appointment_id: UUID) -> AppointmentResponse:
@@ -860,13 +883,14 @@ class AppointmentService:
     def _booking_source(self) -> str:
         return "ADMIN" if "OWNER_ADMIN" in self.context.roles else "ASSISTANT"
 
-    def _response(self, appointment: Appointment) -> AppointmentResponse:
-        patient = self.db.get(Patient, appointment.patient_id)
-        doctor = self.db.get(Doctor, appointment.doctor_id)
-        occurrence = self.db.get(SessionOccurrence, appointment.session_occurrence_id)
+    def _response(self, appointment: Appointment, *, related: tuple | None = None) -> AppointmentResponse:
+        source = related[0] if related is not None else self.db
+        patient = source.get(Patient, appointment.patient_id)
+        doctor = source.get(Doctor, appointment.doctor_id)
+        occurrence = source.get(SessionOccurrence, appointment.session_occurrence_id)
         if patient is None or doctor is None or occurrence is None:  # pragma: no cover - FK invariant
             raise RuntimeError("Appointment reference integrity failure")
-        visit = self.db.scalar(
+        visit = related[1].get(appointment.appointment_id) if related is not None else self.db.scalar(
             select(Visit).where(
                 Visit.appointment_id == appointment.appointment_id,
                 Visit.clinic_id == self.context.clinic_id,
@@ -874,7 +898,7 @@ class AppointmentService:
         )
         payment = None
         if visit is not None:
-            payment = self.db.scalar(
+            payment = related[2].get(visit.visit_id) if related is not None else self.db.scalar(
                 select(Payment)
                 .where(
                     Payment.visit_id == visit.visit_id,
@@ -882,7 +906,7 @@ class AppointmentService:
                 )
                 .order_by(Payment.created_at.desc())
             )
-        linked_followup = self.db.scalar(
+        linked_followup = related[3].get(appointment.appointment_id) if related is not None else self.db.scalar(
             select(FollowUpRecommendation).where(
                 FollowUpRecommendation.clinic_id == self.context.clinic_id,
                 FollowUpRecommendation.linked_appointment_id == appointment.appointment_id,
