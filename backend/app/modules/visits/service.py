@@ -22,6 +22,7 @@ from app.modules.identity.service import AuthContext
 from app.modules.messaging.service import ReminderService
 from app.modules.payments.models import Payment
 from app.modules.payments.schemas import PaymentSummary
+from app.modules.scheduling.concurrency import acquire_doctor_date_locks
 from app.modules.scheduling.models import SessionOccurrence
 from app.modules.scheduling.service import SchedulingService
 from app.modules.visits.models import Visit
@@ -144,16 +145,17 @@ class VisitService:
             return replay
 
         appointment_service = AppointmentService(self.db, self.clock, self.context)
-        patient = appointment_service._lock_patient(request.patient_id)
         doctor = appointment_service._doctor(request.doctor_id)
         today = self.clock.clinic_date()
+        acquire_doctor_date_locks(self.db, doctor.doctor_id, [today])
+        patient = appointment_service._lock_patient(request.patient_id)
         appointment_service._validate_no_duplicate_appointment(
             patient_id=patient.patient_id,
             doctor_id=doctor.doctor_id,
             appointment_date=today,
         )
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
-            request.session_definition_id, today
+            request.session_definition_id, today, doctor_id=doctor.doctor_id
         )
         occurrence = appointment_service._lock_occurrence(occurrence.session_occurrence_id)
         appointment_service._validate_occurrence_doctor(occurrence, doctor.doctor_id)

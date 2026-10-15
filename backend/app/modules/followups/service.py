@@ -27,6 +27,7 @@ from app.modules.idempotency.service import IdempotencyService
 from app.modules.identity.service import AuthContext
 from app.modules.messaging.service import ReminderService
 from app.modules.patients.models import Patient
+from app.modules.scheduling.concurrency import acquire_doctor_date_locks
 from app.modules.scheduling.models import SessionOccurrence
 from app.modules.scheduling.service import SchedulingService
 from app.modules.visits.models import Visit
@@ -111,9 +112,8 @@ class FollowUpService:
         if record.response_body is not None:
             return FollowUpBookResponse.model_validate(record.response_body)
 
-        followup = self._locked_followup(followup_id)
-        if followup.status != "OPEN":
-            raise AppError("FOLLOWUP_INVALID_STATE", "Only an open follow-up can be booked.", 409)
+        # Discover immutable ownership without holding FollowUp while waiting for date/Patient.
+        followup = self._followup(followup_id)
         if request.appointment_date < self.clock.clinic_date():
             raise AppError("APPOINTMENT_DATE_PAST", "Select today or a future date.", 422)
 
@@ -127,14 +127,18 @@ class FollowUpService:
             raise RuntimeError("Follow-up source visit integrity failure")
 
         appt_service = AppointmentService(self.db, self.clock, self.context)
+        acquire_doctor_date_locks(self.db, source_visit.doctor_id, [request.appointment_date])
         appt_service._lock_patient(followup.patient_id)
+        followup = self._locked_followup(followup_id)
+        if followup.status != "OPEN":
+            raise AppError("FOLLOWUP_INVALID_STATE", "Only an open follow-up can be booked.", 409)
         appt_service._validate_no_duplicate_appointment(
             patient_id=followup.patient_id,
             doctor_id=source_visit.doctor_id,
             appointment_date=request.appointment_date,
         )
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
-            request.session_definition_id, request.appointment_date
+            request.session_definition_id, request.appointment_date, doctor_id=source_visit.doctor_id
         )
         occurrence = appt_service._lock_occurrence(occurrence.session_occurrence_id)
         appt_service._validate_occurrence_doctor(occurrence, source_visit.doctor_id)
@@ -281,6 +285,7 @@ class FollowUpService:
                 FollowUpRecommendation.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if item is None:
             raise AppError("FOLLOWUP_NOT_FOUND", "Follow-up not found.", 404)

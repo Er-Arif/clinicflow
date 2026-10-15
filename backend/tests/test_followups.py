@@ -1,4 +1,5 @@
 from datetime import date, time
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -65,6 +66,7 @@ def test_followup_model_has_unique_source_visit_and_linked_appointment() -> None
 def test_followup_booking_already_booked_rejected() -> None:
     db = MagicMock()
     clock = MagicMock()
+    clock.clinic_date.return_value = date(2026, 10, 18)
     context = MagicMock()
     context.clinic_id = uuid4()
 
@@ -74,6 +76,12 @@ def test_followup_booking_already_booked_rejected() -> None:
     mock_record = MagicMock()
     mock_record.response_body = None
     service._reserve_idempotency = MagicMock(return_value=mock_record)
+
+    # Ownership discovery may observe OPEN; the locked recheck must reject BOOKED.
+    service._followup = MagicMock(return_value=SimpleNamespace(
+        patient_id=uuid4(), source_visit_id=uuid4(), status="OPEN"
+    ))
+    db.scalar.return_value = SimpleNamespace(doctor_id=uuid4())
 
     # Mock followup already in BOOKED state
     mock_followup = MagicMock()
@@ -90,6 +98,7 @@ def test_followup_booking_already_booked_rejected() -> None:
         service.book(uuid4(), request, idempotency_key="test-key")
     assert exc_info.value.code == "FOLLOWUP_INVALID_STATE"
     assert exc_info.value.status_code == 409
+    db.add.assert_not_called()
 
 
 def test_followup_booking_past_date_rejected() -> None:
@@ -107,7 +116,7 @@ def test_followup_booking_past_date_rejected() -> None:
 
     mock_followup = MagicMock()
     mock_followup.status = "OPEN"
-    service._locked_followup = MagicMock(return_value=mock_followup)
+    service._followup = MagicMock(return_value=mock_followup)
 
     request = FollowUpBookRequest(
         session_definition_id=uuid4(),

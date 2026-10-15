@@ -129,18 +129,17 @@ class AppointmentService:
                 422,
             )
 
-        patient = self._lock_patient(request.patient_id)
         doctor = self._doctor(request.doctor_id)
+        acquire_doctor_date_locks(self.db, doctor.doctor_id, [request.appointment_date])
+        patient = self._lock_patient(request.patient_id)
         self._validate_no_duplicate_appointment(
             patient_id=patient.patient_id,
             doctor_id=doctor.doctor_id,
             appointment_date=request.appointment_date,
         )
 
-        acquire_doctor_date_locks(self.db, doctor.doctor_id, [request.appointment_date])
-
         occurrence = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
-            request.session_definition_id, request.appointment_date
+            request.session_definition_id, request.appointment_date, doctor_id=doctor.doctor_id
         )
         occurrence = self._lock_occurrence(occurrence.session_occurrence_id)
         self._validate_occurrence_doctor(occurrence, doctor.doctor_id)
@@ -223,6 +222,10 @@ class AppointmentService:
 
     def cancel(self, appointment_id: UUID, request: AppointmentCancelRequest) -> AppointmentResponse:
         appointment = self._locked_appointment(appointment_id)
+        occurrence = self.db.get(SessionOccurrence, appointment.session_occurrence_id)
+        if occurrence is None:  # pragma: no cover - protected by foreign key
+            raise RuntimeError("Appointment occurrence missing")
+        acquire_doctor_date_locks(self.db, appointment.doctor_id, [occurrence.occurrence_date])
         if appointment.status not in {"BOOKED", "CHECKED_IN"}:
             raise AppError(
                 "APPOINTMENT_INVALID_STATE",
@@ -350,7 +353,7 @@ class AppointmentService:
         )
 
         target = SchedulingService(self.db, self.clock, self.context).materialize_occurrence(
-            request.new_session_definition_id, request.new_appointment_date
+            request.new_session_definition_id, request.new_appointment_date, doctor_id=original.doctor_id
         )
         target = self._lock_occurrence(target.session_occurrence_id)
         self._validate_occurrence_doctor(target, original.doctor_id)
@@ -664,6 +667,7 @@ class AppointmentService:
                 SessionOccurrence.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if occurrence is None:  # pragma: no cover - materialization invariant
             raise RuntimeError("Session occurrence disappeared during booking")

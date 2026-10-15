@@ -20,7 +20,7 @@ from app.modules.appointments.models import Appointment
 from app.modules.audit.service import AuditService
 from app.modules.clinic.models import Doctor
 from app.modules.identity.service import AuthContext
-from app.modules.scheduling.concurrency import acquire_doctor_date_locks
+from app.modules.scheduling.concurrency import acquire_doctor_date_locks, acquire_schedule_gate
 from app.modules.scheduling.models import (
     FeeConfiguration,
     ScheduleDefinition,
@@ -675,6 +675,8 @@ class SchedulingService:
 
         t_clinic = self.clock.clinic_date()
 
+        # Prevent writes beyond (or extending) the observed horizon while it is computed.
+        acquire_schedule_gate(self.db, doctor_id, exclusive=True)
         # 2. Acquire doctor-date transaction advisory locks in deterministic order across horizon
         horizon_limit = t_clinic + timedelta(days=30)
         latest_booking_date = self.db.scalar(
@@ -721,7 +723,9 @@ class SchedulingService:
                     ScheduleDefinition.doctor_id == doctor_id,
                     ScheduleDefinition.weekday.in_(request.weekdays),
                 )
+                .order_by(ScheduleDefinition.weekday, ScheduleDefinition.effective_from)
                 .with_for_update()
+                .execution_options(populate_existing=True)
             ).all()
         )
 
@@ -1054,8 +1058,21 @@ class SchedulingService:
         return AvailabilityResponse(doctor_id=doctor_id, date=target_date, sessions=result)
 
     def block(self, request: BlockSessionRequest) -> SessionOccurrenceResponse:
-        occurrence = self.materialize_occurrence(request.session_definition_id, request.date)
-        acquire_doctor_date_locks(self.db, occurrence.doctor_id, [request.date])
+        doctor_id = self.db.scalar(
+            select(ScheduleDefinition.doctor_id)
+            .join(SessionDefinition)
+            .where(
+                SessionDefinition.session_definition_id == request.session_definition_id,
+                SessionDefinition.clinic_id == self.context.clinic_id,
+                ScheduleDefinition.clinic_id == self.context.clinic_id,
+            )
+        )
+        if doctor_id is None:
+            raise AppError("SESSION_DEFINITION_NOT_FOUND", "Session definition not found.", 404)
+        acquire_doctor_date_locks(self.db, doctor_id, [request.date])
+        occurrence = self.materialize_occurrence(
+            request.session_definition_id, request.date, doctor_id=doctor_id
+        )
         occurrence = self.db.scalar(
             select(SessionOccurrence)
             .where(SessionOccurrence.session_occurrence_id == occurrence.session_occurrence_id)
@@ -1085,6 +1102,16 @@ class SchedulingService:
         return self._occurrence_response(occurrence)
 
     def unblock(self, occurrence_id: UUID) -> SessionOccurrenceResponse:
+        # Read only immutable scope first; never hold an occurrence while waiting for its date.
+        scope = self.db.execute(
+            select(SessionOccurrence.doctor_id, SessionOccurrence.occurrence_date).where(
+                SessionOccurrence.session_occurrence_id == occurrence_id,
+                SessionOccurrence.clinic_id == self.context.clinic_id,
+            )
+        ).one_or_none()
+        if scope is None:
+            raise AppError("SESSION_OCCURRENCE_NOT_FOUND", "Session occurrence not found.", 404)
+        acquire_doctor_date_locks(self.db, scope.doctor_id, [scope.occurrence_date])
         occurrence = self.db.scalar(
             select(SessionOccurrence)
             .where(
@@ -1092,10 +1119,10 @@ class SchedulingService:
                 SessionOccurrence.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if occurrence is None:
             raise AppError("SESSION_OCCURRENCE_NOT_FOUND", "Session occurrence not found.", 404)
-        acquire_doctor_date_locks(self.db, occurrence.doctor_id, [occurrence.occurrence_date])
         if occurrence.status != "BLOCKED":
             raise AppError("SESSION_NOT_BLOCKED", "This session is not blocked.", 409)
         occurrence.status = "AVAILABLE"
@@ -1319,7 +1346,7 @@ class SchedulingService:
         else:
             target_occurrences: list[SessionOccurrence] = []
             for s in active_sessions:
-                occ = self.materialize_occurrence(s.session_definition_id, request.date)
+                occ = self.materialize_occurrence(s.session_definition_id, request.date, doctor_id=doctor.doctor_id)
                 locked_occ = self.db.scalar(
                     select(SessionOccurrence)
                     .where(SessionOccurrence.session_occurrence_id == occ.session_occurrence_id)
@@ -1391,20 +1418,27 @@ class SchedulingService:
         if not request.occurrence_ids:
             return UnblockScheduleExceptionResponse(unblocked_count=0)
 
-        unblocked_count = 0
-        for occ_id in request.occurrence_ids:
-            occ = self.db.scalar(
-                select(SessionOccurrence)
-                .where(
-                    SessionOccurrence.session_occurrence_id == occ_id,
-                    SessionOccurrence.clinic_id == self.context.clinic_id,
-                    SessionOccurrence.doctor_id == doctor.doctor_id,
-                )
-                .with_for_update()
+        scope = list(self.db.execute(
+            select(SessionOccurrence.session_occurrence_id, SessionOccurrence.occurrence_date)
+            .where(
+                SessionOccurrence.session_occurrence_id.in_(request.occurrence_ids),
+                SessionOccurrence.clinic_id == self.context.clinic_id,
+                SessionOccurrence.doctor_id == doctor.doctor_id,
             )
-            if occ is None:
-                continue
-            acquire_doctor_date_locks(self.db, occ.doctor_id, [occ.occurrence_date])
+        ))
+        acquire_doctor_date_locks(self.db, doctor.doctor_id, [row.occurrence_date for row in scope])
+        occurrences = self.db.scalars(
+            select(SessionOccurrence).where(
+                SessionOccurrence.session_occurrence_id.in_([row.session_occurrence_id for row in scope]),
+                SessionOccurrence.clinic_id == self.context.clinic_id,
+                SessionOccurrence.doctor_id == doctor.doctor_id,
+            )
+            .order_by(SessionOccurrence.occurrence_date, SessionOccurrence.session_occurrence_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+        unblocked_count = 0
+        for occ in occurrences:
             if occ.status == "BLOCKED":
                 occ.status = "AVAILABLE"
                 occ.block_reason = None
@@ -1426,7 +1460,12 @@ class SchedulingService:
 
         return UnblockScheduleExceptionResponse(unblocked_count=unblocked_count)
 
-    def materialize_occurrence(self, session_definition_id: UUID, target_date: date) -> SessionOccurrence:
+    def materialize_occurrence(
+        self, session_definition_id: UUID, target_date: date, *, doctor_id: UUID
+    ) -> SessionOccurrence:
+        # All callers acquire their complete date set before Patient/FollowUp locks.
+        # Reacquiring here also protects direct materialization before reading schedule state.
+        acquire_doctor_date_locks(self.db, doctor_id, [target_date])
         row = self.db.execute(
             select(SessionDefinition, ScheduleDefinition)
             .join(
@@ -1440,10 +1479,17 @@ class SchedulingService:
                 ScheduleDefinition.clinic_id == self.context.clinic_id,
                 ScheduleDefinition.active.is_(True),
             )
+            .execution_options(populate_existing=True)
         ).one_or_none()
         if row is None:
             raise AppError("SESSION_DEFINITION_NOT_FOUND", "Session definition not found.", 404)
         session_definition, schedule = row
+        if schedule.doctor_id != doctor_id:
+            raise AppError(
+                "SESSION_DOCTOR_MISMATCH",
+                "The selected session does not belong to this doctor.",
+                422,
+            )
         if (
             target_date.weekday() != schedule.weekday
             or target_date < schedule.effective_from
