@@ -142,22 +142,23 @@ class FollowUpService:
         )
         occurrence = appt_service._lock_occurrence(occurrence.session_occurrence_id)
         appt_service._validate_occurrence_doctor(occurrence, source_visit.doctor_id)
-        appt_service._validate_booking_time(occurrence, request.appointment_time)
         if occurrence.status == "BLOCKED":
             raise AppError("SESSION_BLOCKED", "This session is unavailable for booking.", 409)
 
-        used_capacity, slot_taken = appt_service._availability_state(
+        used_capacity, slot_taken, session = appt_service._availability_state(
             occurrence, request.appointment_time
         )
-        needs_override = used_capacity >= occurrence.maximum_capacity_snapshot or slot_taken
+        appt_service._validate_booking_time(session, request.appointment_time)
+        needs_override = used_capacity >= session.maximum_capacity or slot_taken
         override = appt_service._authorize_override(
             request.capacity_override,
             needs_override=needs_override,
             occurrence=occurrence,
             used_capacity=used_capacity,
+            capacity=session.maximum_capacity,
             appointment_time=request.appointment_time,
         )
-        if used_capacity >= occurrence.maximum_capacity_snapshot and not override:
+        if used_capacity >= session.maximum_capacity and not override:
             raise AppError("SESSION_FULL", "This session is already full.", 409)
         if slot_taken and not override:
             raise AppError(
@@ -188,7 +189,7 @@ class FollowUpService:
                 if override and request.capacity_override
                 else None
             ),
-            override_capacity_snapshot=(occurrence.maximum_capacity_snapshot if override else None),
+            override_capacity_snapshot=(session.maximum_capacity if override else None),
             override_existing_count=(used_capacity if override else None),
         )
         self.db.add(appointment)
@@ -204,7 +205,7 @@ class FollowUpService:
         followup.status = "BOOKED"
         followup.linked_appointment_id = appointment.appointment_id
         followup.version += 1
-        appt_service._audit_created(appointment, occurrence, used_capacity)
+        appt_service._audit_created(appointment, occurrence, used_capacity, session.maximum_capacity)
         reminder_service = ReminderService(self.db, self.clock, self.context)
         reminder_service.skip_followup_reminder(followup.followup_id, "FOLLOWUP_BOOKED")
         reminder_service.ensure_appointment_reminder(appointment, occurrence)

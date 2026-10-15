@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.modules.scheduling.slots import generate_slots
+
 
 class SessionWrite(BaseModel):
     session_name: str = Field(min_length=1, max_length=80)
@@ -225,6 +227,4 @@ class FeeConfigurationResponse(BaseModel):
 
 
 def generated_slot_count(start: time, end: time, interval_minutes: int) -> int:
-    start_minutes = start.hour * 60 + start.minute + start.second / 60
-    end_minutes = end.hour * 60 + end.minute + end.second / 60
-    return int((end_minutes - start_minutes) // interval_minutes)
+    return len(generate_slots(start, end, interval_minutes))

@@ -35,8 +35,14 @@ from app.modules.messaging.service import ReminderService
 from app.modules.patients.models import Patient
 from app.modules.payments.models import Payment
 from app.modules.scheduling.concurrency import acquire_doctor_date_locks
-from app.modules.scheduling.models import FeeConfiguration, SessionOccurrence
-from app.modules.scheduling.service import SchedulingService, generate_slots
+from app.modules.scheduling.models import FeeConfiguration, SessionDefinition, SessionOccurrence
+from app.modules.scheduling.occupancy import (
+    effective_occupancy,
+    effective_sessions,
+    timed_session_indices,
+)
+from app.modules.scheduling.service import SchedulingService
+from app.modules.scheduling.slots import is_valid_slot
 from app.modules.visits.models import Visit
 
 
@@ -143,21 +149,22 @@ class AppointmentService:
         )
         occurrence = self._lock_occurrence(occurrence.session_occurrence_id)
         self._validate_occurrence_doctor(occurrence, doctor.doctor_id)
-        used_capacity, slot_taken = self._availability_state(
+        used_capacity, slot_taken, session = self._availability_state(
             occurrence, request.appointment_time
         )
         if occurrence.status == "BLOCKED":
             raise AppError("SESSION_BLOCKED", "This session is unavailable for booking.", 409)
-        needs_override = used_capacity >= occurrence.maximum_capacity_snapshot or slot_taken
-        self._validate_booking_time(occurrence, request.appointment_time)
+        needs_override = used_capacity >= session.maximum_capacity or slot_taken
+        self._validate_booking_time(session, request.appointment_time)
         override = self._authorize_override(
             request.capacity_override,
             needs_override=needs_override,
             occurrence=occurrence,
             used_capacity=used_capacity,
+            capacity=session.maximum_capacity,
             appointment_time=request.appointment_time,
         )
-        if used_capacity >= occurrence.maximum_capacity_snapshot and not override:
+        if used_capacity >= session.maximum_capacity and not override:
             raise AppError("SESSION_FULL", "This session is already full.", 409)
         if slot_taken and not override:
             raise AppError(
@@ -195,7 +202,7 @@ class AppointmentService:
             capacity_override_reason=(
                 request.capacity_override.reason.strip() if override and request.capacity_override else None
             ),
-            override_capacity_snapshot=(occurrence.maximum_capacity_snapshot if override else None),
+            override_capacity_snapshot=(session.maximum_capacity if override else None),
             override_existing_count=(used_capacity if override else None),
         )
         self.db.add(appointment)
@@ -214,7 +221,7 @@ class AppointmentService:
                 new=effective_fee,
                 reason=adjustment.reason,
             )
-        self._audit_created(appointment, occurrence, used_capacity)
+        self._audit_created(appointment, occurrence, used_capacity, session.maximum_capacity)
         ReminderService(self.db, self.clock, self.context).ensure_appointment_reminder(appointment, occurrence)
         response = self._response(appointment)
         self._complete_idempotency(record, response, 201, "APPOINTMENT", appointment.appointment_id)
@@ -357,7 +364,6 @@ class AppointmentService:
         )
         target = self._lock_occurrence(target.session_occurrence_id)
         self._validate_occurrence_doctor(target, original.doctor_id)
-        self._validate_booking_time(target, request.new_appointment_time)
         if (
             target.session_occurrence_id == original.session_occurrence_id
             and request.new_appointment_time == original.appointment_time
@@ -367,20 +373,22 @@ class AppointmentService:
                 "Choose a different appointment date or time.",
                 422,
             )
-        used_capacity, slot_taken = self._availability_state(
+        used_capacity, slot_taken, session = self._availability_state(
             target, request.new_appointment_time, exclude_appointment_id=original.appointment_id
         )
         if target.status == "BLOCKED":
             raise AppError("SESSION_BLOCKED", "The new session is unavailable.", 409)
-        needs_override = used_capacity >= target.maximum_capacity_snapshot or slot_taken
+        self._validate_booking_time(session, request.new_appointment_time)
+        needs_override = used_capacity >= session.maximum_capacity or slot_taken
         override = self._authorize_override(
             request.capacity_override,
             needs_override=needs_override,
             occurrence=target,
             used_capacity=used_capacity,
+            capacity=session.maximum_capacity,
             appointment_time=request.new_appointment_time,
         )
-        if used_capacity >= target.maximum_capacity_snapshot and not override:
+        if used_capacity >= session.maximum_capacity and not override:
             raise AppError("SESSION_FULL", "The new session is already full.", 409)
         if slot_taken and not override:
             raise AppError(
@@ -412,7 +420,7 @@ class AppointmentService:
             capacity_override_reason=(
                 request.capacity_override.reason.strip() if override and request.capacity_override else None
             ),
-            override_capacity_snapshot=(target.maximum_capacity_snapshot if override else None),
+            override_capacity_snapshot=(session.maximum_capacity if override else None),
             override_existing_count=(used_capacity if override else None),
         )
         self.db.add(replacement)
@@ -683,11 +691,12 @@ class AppointmentService:
             )
 
     @staticmethod
-    def _validate_booking_time(occurrence: SessionOccurrence, appointment_time: time) -> None:
-        if appointment_time not in generate_slots(
-            occurrence.start_time_snapshot,
-            occurrence.end_time_snapshot,
-            occurrence.slot_interval_minutes_snapshot,
+    def _validate_booking_time(session: SessionDefinition, appointment_time: time) -> None:
+        if not is_valid_slot(
+            appointment_time,
+            session.start_time,
+            session.end_time,
+            session.slot_interval_minutes,
         ):
             raise AppError(
                 "INVALID_APPOINTMENT_TIME",
@@ -698,27 +707,31 @@ class AppointmentService:
     def _availability_state(
         self,
         occurrence: SessionOccurrence,
-        appointment_time: time,
+        appointment_time: time | None,
         *,
         exclude_appointment_id: UUID | None = None,
-    ) -> tuple[int, bool]:
-        capacity_query = select(func.count(Appointment.appointment_id)).where(
-            Appointment.clinic_id == self.context.clinic_id,
-            Appointment.session_occurrence_id == occurrence.session_occurrence_id,
-            Appointment.status != "CANCELLED",
+    ) -> tuple[int, bool, SessionDefinition]:
+        sessions = effective_sessions(
+            self.db, self.context.clinic_id, occurrence.doctor_id, occurrence.occurrence_date
         )
-        slot_query = select(func.count(Appointment.appointment_id)).where(
-            Appointment.clinic_id == self.context.clinic_id,
-            Appointment.session_occurrence_id == occurrence.session_occurrence_id,
-            Appointment.appointment_time == appointment_time,
-            Appointment.status != "CANCELLED",
+        occupancy = effective_occupancy(
+            self.db,
+            self.context.clinic_id,
+            occurrence.doctor_id,
+            occurrence.occurrence_date,
+            sessions,
+            exclude_appointment_id=exclude_appointment_id,
         )
-        if exclude_appointment_id is not None:
-            capacity_query = capacity_query.where(Appointment.appointment_id != exclude_appointment_id)
-            slot_query = slot_query.where(Appointment.appointment_id != exclude_appointment_id)
-        used_capacity = int(self.db.scalar(capacity_query) or 0)
-        slot_taken = bool(self.db.scalar(slot_query))
-        return used_capacity, slot_taken
+        occupancy.require_valid_mapping()
+        if appointment_time is not None and len(timed_session_indices(sessions, appointment_time)) > 1:
+            raise AppError(
+                "SCHEDULE_OCCUPANCY_CONFLICT", "Appointment has ambiguous session mapping.", 409
+            )
+        for index, session in enumerate(sessions):
+            if session.session_definition_id == occurrence.session_definition_id:
+                usage = occupancy.sessions[index]
+                return usage.used_capacity, appointment_time in usage.occupied_times, session
+        raise AppError("SESSION_NOT_VALID_FOR_DATE", "Session is not effective on this date.", 422)
 
     def _authorize_override(
         self,
@@ -727,6 +740,7 @@ class AppointmentService:
         needs_override: bool,
         occurrence: SessionOccurrence,
         used_capacity: int,
+        capacity: int,
         appointment_time: time | None,
     ) -> bool:
         if not needs_override:
@@ -751,7 +765,7 @@ class AppointmentService:
             request_id=_request_id(),
             reason=requested.reason,
             metadata={
-                "capacity": occurrence.maximum_capacity_snapshot,
+                "capacity": capacity,
                 "existing_count": used_capacity,
                 "appointment_time": appointment_time.isoformat() if appointment_time else None,
                 "session_status": occurrence.status,
@@ -811,7 +825,7 @@ class AppointmentService:
         )
 
     def _audit_created(
-        self, appointment: Appointment, occurrence: SessionOccurrence, used_capacity: int
+        self, appointment: Appointment, occurrence: SessionOccurrence, used_capacity: int, capacity: int
     ) -> None:
         AuditService(self.db).record(
             clinic_id=self.context.clinic_id,
@@ -833,7 +847,7 @@ class AppointmentService:
             },
             metadata={
                 "capacity_before": used_capacity,
-                "capacity": occurrence.maximum_capacity_snapshot,
+                "capacity": capacity,
                 "capacity_override_used": appointment.capacity_override_used,
             },
         )

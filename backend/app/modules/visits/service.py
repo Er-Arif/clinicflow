@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
@@ -162,22 +162,14 @@ class VisitService:
         if occurrence.status == "BLOCKED":
             raise AppError("SESSION_BLOCKED", "This session is unavailable for walk-ins.", 409)
 
-        used_capacity = int(
-            self.db.scalar(
-                select(func.count(Appointment.appointment_id)).where(
-                    Appointment.clinic_id == self.context.clinic_id,
-                    Appointment.session_occurrence_id == occurrence.session_occurrence_id,
-                    Appointment.status != "CANCELLED",
-                )
-            )
-            or 0
-        )
-        needs_override = used_capacity >= occurrence.maximum_capacity_snapshot
+        used_capacity, _, session = appointment_service._availability_state(occurrence, None)
+        needs_override = used_capacity >= session.maximum_capacity
         override = appointment_service._authorize_override(
             request.capacity_override,
             needs_override=needs_override,
             occurrence=occurrence,
             used_capacity=used_capacity,
+            capacity=session.maximum_capacity,
             appointment_time=None,
         )
         if needs_override and not override:
@@ -215,7 +207,7 @@ class VisitService:
                 if override and request.capacity_override
                 else None
             ),
-            override_capacity_snapshot=(occurrence.maximum_capacity_snapshot if override else None),
+            override_capacity_snapshot=(session.maximum_capacity if override else None),
             override_existing_count=(used_capacity if override else None),
         )
         self.db.add(appointment)
@@ -227,7 +219,7 @@ class VisitService:
                 new=effective_fee,
                 reason=request.fee_adjustment.reason,
             )
-        appointment_service._audit_created(appointment, occurrence, used_capacity)
+        appointment_service._audit_created(appointment, occurrence, used_capacity, session.maximum_capacity)
 
         visit = Visit(
             clinic_id=self.context.clinic_id,

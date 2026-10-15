@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -26,6 +26,11 @@ from app.modules.scheduling.models import (
     ScheduleDefinition,
     SessionDefinition,
     SessionOccurrence,
+)
+from app.modules.scheduling.occupancy import (
+    effective_occupancy,
+    effective_sessions,
+    timed_session_indices,
 )
 from app.modules.scheduling.schemas import (
     AvailabilityResponse,
@@ -51,6 +56,7 @@ from app.modules.scheduling.schemas import (
     WeekdayOverviewResponse,
     WeeklyScheduleResponse,
 )
+from app.modules.scheduling.slots import generate_slots
 
 
 def _request_id() -> UUID:
@@ -161,17 +167,6 @@ def _decode_and_verify_proposal_token(
             status_code=409,
         )
     return claims
-
-
-def generate_slots(start: time, end: time, interval_minutes: int) -> list[time]:
-    anchor = date(2000, 1, 1)
-    current = datetime.combine(anchor, start)
-    finish = datetime.combine(anchor, end)
-    slots: list[time] = []
-    while current + timedelta(minutes=interval_minutes) <= finish:
-        slots.append(current.time())
-        current += timedelta(minutes=interval_minutes)
-    return slots
 
 
 class SchedulingService:
@@ -389,22 +384,15 @@ class SchedulingService:
                         can_apply_today = False
                         unstarted_reason = "Cannot remove a session that has already started or completed today."
                         break
-                    booked_in_removed = self.db.scalar(
-                        select(func.count(Appointment.appointment_id))
-                        .join(
-                            SessionOccurrence,
-                            SessionOccurrence.session_occurrence_id
-                            == Appointment.session_occurrence_id,
-                        )
-                        .where(
-                            SessionOccurrence.clinic_id == self.context.clinic_id,
-                            SessionOccurrence.occurrence_date == t_clinic,
-                            SessionOccurrence.session_definition_id
-                            == act_s.session_definition_id,
-                            Appointment.status != "CANCELLED",
-                        )
+                    occupancy = effective_occupancy(
+                        self.db, self.context.clinic_id, doctor_id, t_clinic, active_sessions
                     )
-                    if booked_in_removed and booked_in_removed > 0:
+                    index = active_sessions.index(act_s)
+                    if (
+                        occupancy.mapping_conflicts
+                        or occupancy.slot_conflicts
+                        or occupancy.sessions[index].used_capacity > 0
+                    ):
                         can_apply_today = False
                         unstarted_reason = "Cannot remove a session with existing bookings today."
                         break
@@ -477,82 +465,26 @@ class SchedulingService:
                 )
             )
 
-            appts = list(
-                self.db.scalars(
-                    select(Appointment)
-                    .join(
-                        SessionOccurrence,
-                        SessionOccurrence.session_occurrence_id
-                        == Appointment.session_occurrence_id,
-                    )
-                    .where(
-                        Appointment.clinic_id == self.context.clinic_id,
-                        Appointment.doctor_id == doctor_id,
-                        Appointment.status != "CANCELLED",
-                        SessionOccurrence.occurrence_date == curr,
-                    )
-                ).all()
-            )
-
-            date_conflict = False
-            date_conflict_msg = ""
             active_proposed = [s for s in proposed_sessions if s.active]
-
+            occupancy = effective_occupancy(
+                self.db, self.context.clinic_id, doctor_id, curr, active_proposed
+            )
+            date_conflict_msg = occupancy.conflict_reason(active_proposed) or ""
             if blocked_count and blocked_count > 0:
-                date_conflict = True
                 date_conflict_msg = f"{blocked_count} session(s) blocked on this date."
-            elif not active_proposed and appts:
-                date_conflict = True
-                date_conflict_msg = f"{len(appts)} existing appointment(s) booked on day marked not working."
-            elif active_proposed and appts:
-                session_counts: dict[int, int] = {i: 0 for i in range(len(active_proposed))}
-                for appt in appts:
-                    appt_time = appt.appointment_time
-                    if appt_time is None:
-                        continue
-                    matching_idx = None
-                    for idx, s in enumerate(active_proposed):
-                        if s.start_time <= appt_time < s.end_time:
-                            matching_idx = idx
-                            break
-                    if matching_idx is None:
-                        date_conflict = True
-                        date_conflict_msg = (
-                            f"Appointment at {appt_time.strftime('%H:%M')} falls outside proposed hours."
-                        )
-                        break
-
-                    match_sess = active_proposed[matching_idx]
-                    start_min = match_sess.start_time.hour * 60 + match_sess.start_time.minute
-                    appt_min = appt_time.hour * 60 + appt_time.minute
-                    interval = match_sess.slot_interval_minutes
-                    if (appt_min - start_min) % interval != 0:
-                        date_conflict = True
-                        date_conflict_msg = (
-                            f"Appointment at {appt_time.strftime('%H:%M')} does not align with "
-                            f"{interval}-minute slot intervals."
-                        )
-                        break
-
-                    session_counts[matching_idx] += 1
-
-                if not date_conflict:
-                    for idx, s in enumerate(active_proposed):
-                        if session_counts[idx] > s.maximum_capacity:
-                            date_conflict = True
-                            date_conflict_msg = (
-                                f"Booked appointments ({session_counts[idx]}) exceed proposed "
-                                f"capacity ({s.maximum_capacity}) for {s.session_name}."
-                            )
-                            break
+            elif not active_proposed and occupancy.appointment_count:
+                date_conflict_msg = (
+                    f"{occupancy.appointment_count} existing appointment(s) booked on day marked not working."
+                )
+            date_conflict = bool(date_conflict_msg)
 
             if date_conflict:
                 conflict_detected = True
-                total_conflicts_count += len(appts)
+                total_conflicts_count += occupancy.appointment_count
                 if conflict_metadata is None:
                     conflict_metadata = {
                         "conflicting_date": curr.isoformat(),
-                        "conflicting_appointments_count": len(appts),
+                        "conflicting_appointments_count": occupancy.appointment_count,
                         "reason": date_conflict_msg,
                     }
                 safe_date = max(safe_date, curr + timedelta(days=7))
@@ -951,30 +883,7 @@ class SchedulingService:
 
     def availability(self, doctor_id: UUID, target_date: date) -> AvailabilityResponse:
         self._doctor(doctor_id)
-        definition = self.db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.clinic_id == self.context.clinic_id,
-                ScheduleDefinition.doctor_id == doctor_id,
-                ScheduleDefinition.weekday == target_date.weekday(),
-                ScheduleDefinition.active.is_(True),
-                ScheduleDefinition.effective_from <= target_date,
-                or_(
-                    ScheduleDefinition.effective_to.is_(None),
-                    ScheduleDefinition.effective_to >= target_date,
-                ),
-            )
-        )
-        if definition is None:
-            return AvailabilityResponse(doctor_id=doctor_id, date=target_date, sessions=[])
-
-        sessions = self.db.scalars(
-            select(SessionDefinition)
-            .where(
-                SessionDefinition.schedule_definition_id == definition.schedule_definition_id,
-                SessionDefinition.active.is_(True),
-            )
-            .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
-        ).all()
+        sessions = effective_sessions(self.db, self.context.clinic_id, doctor_id, target_date)
         occurrences = {
             item.session_definition_id: item
             for item in self.db.scalars(
@@ -988,47 +897,21 @@ class SchedulingService:
             ).all()
         } if sessions else {}
 
-        occ_ids = [occ.session_occurrence_id for occ in occurrences.values()]
-        appt_counts: dict[UUID, int] = {}
-        booked_times_by_occ: dict[UUID, set[time]] = {}
-        if occ_ids:
-            count_rows = self.db.execute(
-                select(Appointment.session_occurrence_id, func.count(Appointment.appointment_id))
-                .where(
-                    Appointment.clinic_id == self.context.clinic_id,
-                    Appointment.session_occurrence_id.in_(occ_ids),
-                    Appointment.status != "CANCELLED",
-                )
-                .group_by(Appointment.session_occurrence_id)
-            ).all()
-            appt_counts = {r[0]: int(r[1]) for r in count_rows}
-
-            time_rows = self.db.execute(
-                select(Appointment.session_occurrence_id, Appointment.appointment_time)
-                .where(
-                    Appointment.clinic_id == self.context.clinic_id,
-                    Appointment.session_occurrence_id.in_(occ_ids),
-                    Appointment.status != "CANCELLED",
-                    Appointment.appointment_time.is_not(None),
-                )
-            ).all()
-            for occ_id, appt_time in time_rows:
-                booked_times_by_occ.setdefault(occ_id, set()).add(appt_time)
+        occupancy = effective_occupancy(
+            self.db, self.context.clinic_id, doctor_id, target_date, sessions
+        )
+        occupancy.require_valid_mapping()
 
         result: list[AvailabilitySession] = []
-        for session in sessions:
+        for index, session in enumerate(sessions):
             occurrence = occurrences.get(session.session_definition_id)
             status = occurrence.status if occurrence is not None else "AVAILABLE"
-            start = occurrence.start_time_snapshot if occurrence else session.start_time
-            end = occurrence.end_time_snapshot if occurrence else session.end_time
-            interval = (
-                occurrence.slot_interval_minutes_snapshot
-                if occurrence
-                else session.slot_interval_minutes
-            )
-            capacity = occurrence.maximum_capacity_snapshot if occurrence else session.maximum_capacity
-            used_capacity = appt_counts.get(occurrence.session_occurrence_id, 0) if occurrence else 0
-            booked_slots = booked_times_by_occ.get(occurrence.session_occurrence_id, set()) if occurrence else set()
+            start = session.start_time
+            end = session.end_time
+            interval = session.slot_interval_minutes
+            capacity = session.maximum_capacity
+            used_capacity = occupancy.sessions[index].used_capacity
+            booked_slots = occupancy.sessions[index].occupied_times
             remaining = max(capacity - used_capacity, 0)
             sendable = status == "AVAILABLE" and remaining > 0
             result.append(
@@ -1048,8 +931,14 @@ class SchedulingService:
                     slots=[
                         AvailabilitySlot(
                             time=value,
-                            available=(status == "AVAILABLE" and value not in booked_slots),
-                            normal_booking_allowed=(sendable and value not in booked_slots),
+                            available=(
+                                sendable and value not in booked_slots
+                                and len(timed_session_indices(sessions, value)) == 1
+                            ),
+                            normal_booking_allowed=(
+                                sendable and value not in booked_slots
+                                and len(timed_session_indices(sessions, value)) == 1
+                            ),
                         )
                         for value in generate_slots(start, end, interval)
                     ],
