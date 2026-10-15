@@ -946,6 +946,7 @@ class AppointmentService:
         followup.linked_appointment_id = None
         followup.version += 1
         self.db.flush()
+        ReminderService(self.db, self.clock, self.context).reopen_followup_reminder(followup.followup_id)
         AuditService(self.db).record(
             clinic_id=self.context.clinic_id,
             actor_type="USER",

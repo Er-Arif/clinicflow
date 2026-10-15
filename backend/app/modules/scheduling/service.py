@@ -1035,7 +1035,7 @@ class SchedulingService:
         self, doctor_id: UUID, from_date: date | None = None
     ) -> ScheduleExceptionsListResponse:
         doctor = self._doctor(doctor_id)
-        effective_from = from_date or self.clock.now_utc().date()
+        effective_from = from_date or self.clock.clinic_date()
         blocked_occurrences = list(
             self.db.scalars(
                 select(SessionOccurrence)

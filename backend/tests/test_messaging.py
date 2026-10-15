@@ -36,3 +36,20 @@ def test_reminder_has_unique_appointment_and_followup_type_indexes() -> None:
     indexes = {index.name: index for index in Reminder.__table__.indexes}
     assert indexes["uq_reminders_appointment_type"].unique is True
     assert indexes["uq_reminders_followup_type"].unique is True
+
+
+@pytest.mark.parametrize("body", [
+    "{PATIENT_NAME}", "{unknown1}", "{}", "{0}", "{patient_name.upper}",
+    "{patient_name[0]}", "{patient_name!r}", "{patient_name:>20}",
+    "{patient_name:{diagnosis}}", "{patient_name", "patient_name}",
+])
+def test_template_rejects_unsupported_format_syntax(body):
+    with pytest.raises(AppError) as error:
+        validate_template_body(body)
+    assert error.value.status_code == 422
+
+
+def test_escaped_braces_are_literal_text_not_variables():
+    body = "{{not_a_variable}} {patient_name}"
+    validate_template_body(body)
+    assert extract_template_variables(body) == {"patient_name"}

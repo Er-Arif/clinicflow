@@ -14,12 +14,15 @@ M8 implements ClinicFlow V1 operational messaging without introducing WhatsApp B
   - appointment cancellation skips obsolete due confirmation/appointment reminders;
   - reschedule skips old reminders and creates a qualifying replacement reminder;
   - follow-up booking/closure skips its due follow-up reminder;
+  - cancelling a linked booking reopens only a reminder skipped for `FOLLOWUP_BOOKED`, clearing skip metadata and requiring a fresh preview; sent reminders and manual skips retain their history;
   - blocked sessions suppress sending of normal appointment reminders without destroying reminder history.
 - Message rendering from current template and patient language, with temporary EN/HI override.
 - Rendered `message_snapshot` is retained on the Reminder.
 - WhatsApp click-to-chat URL generation using the patient's normalized international number and URL-encoded message.
 - `SENT` remains an Assistant assertion only. ClinicFlow does not claim delivery/read verification.
 - Template placeholder allowlist prevents accidental unsupported/clinical variables.
+  - Bootstrap creation, template updates, and runtime preparation share validation using the renderer's brace grammar. Only the seven advertised named variables are accepted; attribute/index access, positional fields, conversions, and format specifiers are rejected. `{{` and `}}` escape literal braces.
+  - Missing optional/context-specific values remain empty strings. All built-in EN/HI templates remain valid. Persisted unsupported templates are left intact and return a controlled validation error during preparation so an administrator can correct them; no template content is silently rewritten.
 - Audit events for sent/skipped reminder actions and template edits.
 
 ## API

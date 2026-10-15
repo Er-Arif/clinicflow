@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timedelta
+from string import Formatter
 from urllib.parse import quote
 from uuid import UUID
 
@@ -39,7 +39,6 @@ ALLOWED_TEMPLATE_VARIABLES = {
     "appointment_time",
     "followup_due_date",
 }
-VARIABLE_RE = re.compile(r"\{([a-z_]+)\}")
 
 
 def _request_id() -> UUID:
@@ -50,7 +49,23 @@ def _request_id() -> UUID:
 
 
 def extract_template_variables(body: str) -> set[str]:
-    return set(VARIABLE_RE.findall(body))
+    # Use the renderer's grammar, including escaped literal braces. V1 supports
+    # named substitutions only, not Python attribute/index access or formatting.
+    try:
+        parts = list(Formatter().parse(body))
+    except ValueError as exc:
+        raise AppError(
+            "INVALID_TEMPLATE_SYNTAX",
+            "Invalid message braces. Use {variable} or {{literal braces}}.",
+            422,
+        ) from exc
+    if any(spec or conversion for _, field, spec, conversion in parts if field is not None):
+        raise AppError(
+            "INVALID_TEMPLATE_SYNTAX",
+            "Message variables do not support format specifiers or conversions.",
+            422,
+        )
+    return {field for _, field, _, _ in parts if field is not None}
 
 
 def validate_template_body(body: str) -> None:
@@ -166,6 +181,38 @@ class ReminderService:
         )
         if reminder:
             self._skip_record(reminder, reason)
+
+    def reopen_followup_reminder(self, followup_id: UUID) -> None:
+        # Caller holds the follow-up lock and has reopened it. Restore only the
+        # unsent task suppressed by booking; SENT and human skips stay historical.
+        reminder = self.db.scalar(
+            select(Reminder).where(
+                Reminder.clinic_id == self.context.clinic_id,
+                Reminder.followup_id == followup_id,
+                Reminder.reminder_type == "FOLLOWUP_REMINDER",
+                Reminder.status == "SKIPPED",
+                Reminder.skip_reason == "FOLLOWUP_BOOKED",
+            ).with_for_update().execution_options(populate_existing=True)
+        )
+        if reminder is None:
+            return
+        reminder.status = "DUE"
+        reminder.skipped_by = None
+        reminder.skipped_at = None
+        reminder.skip_reason = None
+        reminder.message_snapshot = None  # Require a fresh preview before marking sent.
+        self.db.flush()
+        AuditService(self.db).record(
+            clinic_id=self.context.clinic_id,
+            actor_type="USER",
+            actor_user_id=self.context.user_id,
+            action_type="REMINDER_REOPENED",
+            entity_type="REMINDER",
+            entity_id=reminder.reminder_id,
+            request_id=_request_id(),
+            previous_values={"status": "SKIPPED", "skip_reason": "FOLLOWUP_BOOKED"},
+            new_values={"status": "DUE", "followup_id": str(followup_id)},
+        )
 
     def list(
         self,
@@ -363,15 +410,14 @@ class ReminderService:
         clinic = self.db.get(Clinic, self.context.clinic_id)
         if clinic is None:
             raise RuntimeError("Clinic integrity failure")
-        values = {
-            "patient_name": patient.full_name,
-            "doctor_name": "",
-            "clinic_name": clinic.clinic_name,
-            "clinic_contact_number": clinic.contact_number or "",
-            "appointment_date": "",
-            "appointment_time": "",
-            "followup_due_date": "",
-        }
+        # Every accepted variable always has a string value. Missing optional or
+        # context-specific data retains the existing empty-string behavior.
+        values = dict.fromkeys(ALLOWED_TEMPLATE_VARIABLES, "")
+        values.update(
+            patient_name=patient.full_name,
+            clinic_name=clinic.clinic_name,
+            clinic_contact_number=clinic.contact_number or "",
+        )
         if reminder.appointment_id:
             appointment = self.db.get(Appointment, reminder.appointment_id)
             if appointment is None:

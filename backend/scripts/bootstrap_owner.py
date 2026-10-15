@@ -14,6 +14,7 @@ from app.modules.clinic.models import Clinic, Doctor
 from app.modules.identity.models import Role, User, UserRole
 from app.modules.messaging.defaults import DEFAULT_MESSAGE_TEMPLATES
 from app.modules.messaging.models import MessageTemplate
+from app.modules.messaging.service import validate_template_body
 from app.modules.scheduling.models import FeeConfiguration
 
 
@@ -72,6 +73,7 @@ def main() -> None:
                 )
             )
             for template_type, language, body in DEFAULT_MESSAGE_TEMPLATES:
+                validate_template_body(body)
                 db.add(
                     MessageTemplate(
                         clinic_id=clinic.clinic_id,
