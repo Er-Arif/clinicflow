@@ -9,6 +9,7 @@ interface TimePickerProps {
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }
 
 export function TimePicker({
@@ -17,6 +18,7 @@ export function TimePicker({
   placeholder = 'HH:mm',
   style,
   disabled = false,
+  accessibilityLabel,
 }: TimePickerProps) {
   const [show, setShow] = useState(false);
 
@@ -33,6 +35,9 @@ export function TimePicker({
     <View style={style}>
       <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityState={{ disabled }}
           disabled={disabled}
           style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }}
           onPress={() => setShow(true)}

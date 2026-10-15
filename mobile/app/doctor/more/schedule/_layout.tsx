@@ -5,6 +5,7 @@ export default function ScheduleLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="weekly/index" />
+      <Stack.Screen name="weekly/edit" />
       <Stack.Screen name="exceptions/index" />
       <Stack.Screen name="exceptions/new" />
     </Stack>

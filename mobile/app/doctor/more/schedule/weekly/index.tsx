@@ -1,239 +1,69 @@
-import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import {
-  useClinicTimeQuery,
-  useGetScheduleQuery,
-  useListDoctorsQuery,
-} from '@/api/api';
+import { useGetScheduleOverviewQuery, useListDoctorsQuery } from '@/api/api';
+import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import type { ScheduleDay } from '@/features/scheduling/types';
+import { dateLabel, isWorking } from '@/features/scheduling/weeklyEditor';
 import { colors, radius, spacing } from '@/theme/tokens';
 
-const weekdayNames = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
+function Hours({ day }: { day: ScheduleDay | null }) {
+  if (!isWorking(day)) return <Text style={styles.hint}>Day off</Text>;
+  return <>{day!.sessions.filter(s => s.active).sort((a, b) => a.display_order - b.display_order).map(session => (
+    <View key={session.session_definition_id} style={styles.session}>
+      <Text style={styles.heading}>{session.session_name}</Text>
+      <Text style={styles.hint}>{session.start_time.slice(0, 5)} – {session.end_time.slice(0, 5)} · {session.slot_interval_minutes} min · Capacity {session.maximum_capacity}</Text>
+    </View>
+  ))}</>;
+}
 
 export default function WeeklyScheduleIndexScreen() {
-  const clinicTime = useClinicTimeQuery();
-  const today = clinicTime.data?.clinic_date ?? '';
+  const router = useRouter();
+  const { saved, doctorId: requestedDoctor } = useLocalSearchParams<{ saved?: string; doctorId?: string }>();
   const doctors = useListDoctorsQuery();
-  const [selectedDoctor] = useState<string | null>(null);
-  const doctorId = selectedDoctor ?? doctors.data?.[0]?.doctor_id ?? '';
-
-  const scheduleQuery = useGetScheduleQuery(
-    { doctorId, effectiveOn: today },
-    { skip: !doctorId }
-  );
-
-  const days = scheduleQuery.data?.days ?? [];
-
+  const doctor = doctors.data?.find(d => d.doctor_id === requestedDoctor) ?? doctors.data?.[0];
+  const doctorId = doctor?.doctor_id ?? '';
+  const overview = useGetScheduleOverviewQuery(doctorId, { skip: !doctorId, refetchOnMountOrArgChange: true });
+  const edit = (weekday?: number) => router.push({ pathname: '/doctor/more/schedule/weekly/edit', params: {
+    doctorId, ...(weekday === undefined ? {} : { weekday: String(weekday) }),
+  } });
+  const retry = () => { if (doctorId) void overview.refetch(); else void doctors.refetch(); };
   return (
-    <AppScreen>
+    <AppScreen refreshing={overview.isFetching} onRefresh={retry}>
       <BackButton />
-      <View style={styles.header}>
-        <Text style={styles.title}>Weekly Working Hours</Text>
-        <Text style={styles.subtitle}>
-          Current active recurring weekly schedule across all days.
-        </Text>
-      </View>
-
-      {/* Phase notice banner */}
-      <View style={styles.noticeBanner}>
-        <Text style={styles.noticeTitle}>Upcoming Phase 3 Feature</Text>
-        <Text style={styles.noticeText}>
-          Weekly hours editor will be updated in the next phase. Existing schedule definitions remain safely active.
-        </Text>
-      </View>
-
-      {scheduleQuery.isLoading ? (
-        <Text style={styles.loadingText}>Loading weekly hours...</Text>
-      ) : days.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No weekly schedule configured.</Text>
-        </View>
-      ) : (
-        <View style={styles.daysList}>
-          {days.map((day) => {
-            const dayName = weekdayNames[day.weekday] ?? `Day ${day.weekday}`;
-            const activeSessions = day.sessions.filter((s) => s.active);
-            const isWorking = day.active && activeSessions.length > 0;
-
-            return (
-              <View key={day.weekday} style={styles.dayCard}>
-                <View style={styles.dayHeader}>
-                  <Text style={styles.dayName}>{dayName}</Text>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      isWorking ? styles.statusPillActive : styles.statusPillOff,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        isWorking ? styles.statusTextActive : styles.statusTextOff,
-                      ]}
-                    >
-                      {isWorking ? 'Working' : 'Off'}
-                    </Text>
-                  </View>
-                </View>
-
-                {isWorking ? (
-                  <View style={styles.sessionsContainer}>
-                    {activeSessions.map((session) => (
-                      <View key={session.session_definition_id} style={styles.sessionRow}>
-                        <Text style={styles.sessionName}>{session.session_name}</Text>
-                        <Text style={styles.sessionTime}>
-                          {session.start_time.slice(0, 5)} – {session.end_time.slice(0, 5)}
-                        </Text>
-                        <Text style={styles.sessionCapacity}>
-                          (cap: {session.maximum_capacity})
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.dayOffText}>Clinic closed</Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
+      <Text accessibilityRole="header" style={styles.title}>Weekly Working Hours</Text>
+      {doctor ? <Text style={styles.hint}>{doctor.display_name}</Text> : null}
+      {saved === '1' ? <Text accessibilityRole="alert" style={styles.success}>Weekly schedule updated.</Text> : null}
+      <AppButton label="Edit weekly schedule" disabled={!overview.data || overview.isFetching || overview.isError} onPress={() => edit()} />
+      {doctors.isError || overview.isError ? <>
+        <Text style={styles.error}>Unable to refresh weekly hours. Retry to see the latest schedule.</Text>
+        <AppButton label="Retry" tone="secondary" onPress={retry} />
+      </> : overview.isFetching || doctors.isLoading ? <Text style={styles.hint}>Loading weekly hours…</Text>
+        : !doctorId ? <Text style={styles.hint}>No doctor is configured.</Text>
+        : overview.data?.days.map(day => (
+          <View key={day.weekday} style={styles.card}>
+            <Text style={styles.heading}>{day.weekday_name}</Text>
+            <Hours day={day.current} />
+            {day.upcoming ? <View style={styles.planned}>
+              <Text style={styles.heading}>Planned {isWorking(day.upcoming) ? 'hours' : 'day off'} from {dateLabel(day.upcoming.effective_from)}</Text>
+              <Hours day={day.upcoming} />
+            </View> : null}
+            <AppButton label={`Edit ${day.weekday_name}`} tone="secondary" onPress={() => edit(day.weekday)} />
+          </View>
+        ))}
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.muted,
-    marginTop: spacing.xs,
-  },
-  noticeBanner: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  noticeTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E40AF',
-    marginBottom: 2,
-  },
-  noticeText: {
-    fontSize: 13,
-    color: '#1E3A8A',
-    lineHeight: 18,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.muted,
-  },
-  daysList: {
-    gap: spacing.sm,
-    paddingBottom: spacing.xl,
-  },
-  dayCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  dayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dayName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  statusPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  statusPillActive: {
-    backgroundColor: '#DCFCE7',
-  },
-  statusPillOff: {
-    backgroundColor: '#F3F4F6',
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statusTextActive: {
-    color: '#166534',
-  },
-  statusTextOff: {
-    color: colors.muted,
-  },
-  sessionsContainer: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: 4,
-  },
-  sessionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sessionName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-    minWidth: 70,
-  },
-  sessionTime: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  sessionCapacity: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  dayOffText: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: spacing.xs,
-    fontStyle: 'italic',
-  },
+  title: { fontSize: 22, fontWeight: '700', color: colors.text },
+  heading: { fontSize: 16, fontWeight: '600', color: colors.text },
+  hint: { fontSize: 14, color: colors.muted, lineHeight: 21 },
+  card: { padding: spacing.md, gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md },
+  session: { gap: spacing.xs },
+  planned: { padding: spacing.sm, gap: spacing.sm, backgroundColor: colors.softPrimary, borderRadius: radius.sm },
+  success: { color: colors.success, fontSize: 14 },
+  error: { color: colors.danger, fontSize: 14 },
 });

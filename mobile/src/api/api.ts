@@ -69,6 +69,10 @@ import {
   ScheduleExceptionsListResponse,
   UnblockScheduleExceptionPayload,
   WeeklySchedule,
+  ScheduleOverview,
+  ScheduleProposal,
+  SchedulePreview,
+  ScheduleApply,
 } from '@/features/scheduling/types';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8000';
@@ -267,6 +271,26 @@ export const api = createApi({
         { type: 'Schedule', id: arg.doctorId },
         { type: 'Schedule', id: 'LIST' },
       ],
+    }),
+    getScheduleOverview: builder.query<ScheduleOverview, string>({
+      query: (doctorId) => `/api/v1/doctors/${doctorId}/schedule/overview`,
+      providesTags: (_result, _error, doctorId) => [
+        { type: 'Schedule', id: doctorId },
+        { type: 'Schedule', id: 'LIST' },
+      ],
+    }),
+    previewScheduleImpact: builder.mutation<SchedulePreview, { doctorId: string; body: ScheduleProposal }>({
+      query: ({ doctorId, body }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule/preview-impact`, method: 'POST', body,
+      }),
+    }),
+    smartApplySchedule: builder.mutation<ScheduleOverview, { doctorId: string; body: ScheduleApply }>({
+      query: ({ doctorId, body }) => ({
+        url: `/api/v1/doctors/${doctorId}/schedule/smart-apply`, method: 'PUT', body,
+      }),
+      // Also refresh availability and the schedule hub, including after an
+      // ambiguous network failure where the server may have committed the change.
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
     }),
     getAvailability: builder.query<AvailabilityResponse, { doctorId: string; date: string }>({
       query: ({ doctorId, date }) => ({
@@ -768,6 +792,9 @@ export const {
   useClinicTimeQuery,
   useListDoctorsQuery,
   useGetScheduleQuery,
+  useGetScheduleOverviewQuery,
+  usePreviewScheduleImpactMutation,
+  useSmartApplyScheduleMutation,
   useGetAvailabilityQuery,
   useListAppointmentsQuery,
   useGetAppointmentQuery,

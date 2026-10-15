@@ -33,6 +33,37 @@ export type WeeklySchedule = {
   days: ScheduleDay[];
 };
 
+export type WeekdayOverview = {
+  weekday: number;
+  weekday_name: string;
+  current: ScheduleDay | null;
+  upcoming: ScheduleDay | null;
+};
+
+export type ScheduleOverview = {
+  doctor_id: string;
+  effective_on: string;
+  days: WeekdayOverview[];
+};
+
+export type SessionWrite = Omit<SessionDefinition, 'session_definition_id'>;
+export type ScheduleProposal = { weekdays: number[]; sessions: SessionWrite[] };
+export type ScheduleImpact = {
+  weekday: number;
+  weekday_name: string;
+  applies_from: string;
+  reason: string;
+  conflict_detected: boolean;
+  existing_appointments_count: number;
+  conflict_metadata: Record<string, unknown> | null;
+};
+export type SchedulePreview = {
+  proposal_token: string;
+  evaluated_at: string;
+  impacts: ScheduleImpact[];
+};
+export type ScheduleApply = ScheduleProposal & { proposal_token: string };
+
 export type AvailabilitySlot = {
   time: string;
   available: boolean;
