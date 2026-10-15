@@ -245,7 +245,10 @@ class ReminderService:
         rows = self.db.scalars(
             select(Reminder)
             .where(*conditions)
-            .order_by(Reminder.due_on.asc(), Reminder.due_at.asc().nulls_last(), Reminder.created_at.asc())
+            .order_by(
+                Reminder.due_on.asc(), Reminder.due_at.asc().nulls_last(),
+                Reminder.created_at.asc(), Reminder.reminder_id.asc(),
+            )
             .limit(limit)
             .offset(offset)
         ).all()

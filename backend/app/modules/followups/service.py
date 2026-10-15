@@ -83,7 +83,11 @@ class FollowUpService:
         rows = self.db.scalars(
             select(FollowUpRecommendation)
             .where(*conditions)
-            .order_by(FollowUpRecommendation.due_date.asc(), FollowUpRecommendation.created_at.desc())
+            .order_by(
+                FollowUpRecommendation.due_date.asc(),
+                FollowUpRecommendation.created_at.desc(),
+                FollowUpRecommendation.followup_id.asc(),
+            )
             .limit(limit)
             .offset(offset)
         ).all()

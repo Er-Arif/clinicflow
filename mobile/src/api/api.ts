@@ -4,9 +4,11 @@ import {
   FetchBaseQueryError,
   createApi,
   fetchBaseQuery,
+  type TypedMutationOnQueryStarted,
 } from '@reduxjs/toolkit/query/react';
 
 import { newRequestId } from '@/api/requestId';
+import { WORKLIST_PAGE_SIZE, worklistOptions } from '@/api/worklists';
 import { notifySessionExpired } from '@/auth/sessionEvents';
 import {
   AuthUser,
@@ -140,6 +142,33 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   }
   return result;
 };
+
+function refreshPendingWorklists(domains: ('FollowUp' | 'Reminder')[]): TypedMutationOnQueryStarted<unknown, unknown, typeof baseQueryWithReauth> {
+  return async (_arg, { dispatch, getState, queryFulfilled }) => {
+    const pendingPages = (nextOnly: boolean) => {
+      const state = getState() as Parameters<typeof api.util.selectInvalidatedBy>[0];
+      return domains.flatMap(domain => {
+        const name = domain === 'FollowUp' ? 'followUpWorklist' : 'reminderWorklist';
+        return api.util.selectCachedArgsForQuery(state, name).flatMap(arg => {
+          const query = api.endpoints[name].select(arg)(state);
+          // A first read started during the write has no provided tags yet.
+          if (!query.isLoading || (nextOnly && !query.isFetchingNextPage && query.data)) return [];
+          const running = dispatch(api.util.getRunningQueryThunk(name, arg));
+          return running ? [running] : [];
+        });
+      });
+    };
+    const started = pendingPages(false);
+    try { await queryFulfilled; } catch { /* Failed writes still reconcile any overlapping read. */ }
+    const pending = [...started, ...pendingPages(true)];
+    if (pending.length === 0) return;
+    // RTK 2.13's delayed invalidation does not count infinite-query requests.
+    // Replay the tags after overlapping pages settle so a skipped refetch cannot
+    // leave their pre-mutation data attached. Ordinary mutations refetch only once.
+    await Promise.all(pending);
+    dispatch(api.util.invalidateTags(domains.map(type => ({ type, id: 'LIST' }))));
+  };
+}
 
 export const api = createApi({
   reducerPath: 'clinicflowApi',
@@ -328,6 +357,7 @@ export const api = createApi({
       Appointment,
       { body: AppointmentCreatePayload; idempotencyKey: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ body, idempotencyKey }) => ({
         url: '/api/v1/appointments',
         method: 'POST',
@@ -335,6 +365,7 @@ export const api = createApi({
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
       invalidatesTags: [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
         { type: 'FollowUp', id: 'LIST' },
@@ -345,12 +376,14 @@ export const api = createApi({
       CheckInResult,
       { appointmentId: string; idempotencyKey: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ appointmentId, idempotencyKey }) => ({
         url: `/api/v1/appointments/${appointmentId}/check-in`,
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
       invalidatesTags: (_result, _error, arg) => [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'Appointment', id: arg.appointmentId },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Visit', id: 'LIST' },
@@ -384,18 +417,21 @@ export const api = createApi({
       VisitCompletionResult,
       { visitId: string; body: VisitCompletionPayload; idempotencyKey: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['FollowUp', 'Reminder']),
       query: ({ visitId, body, idempotencyKey }) => ({
         url: `/api/v1/visits/${visitId}/complete`,
         method: 'POST',
         body,
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
-      invalidatesTags: (_result, _error, arg) => [
+      invalidatesTags: (result, _error, arg) => [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'Visit', id: arg.visitId },
         { type: 'Visit', id: 'LIST' },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Payment', id: 'LIST' },
         { type: 'FollowUp', id: 'LIST' },
+        ...(result?.closed_previous_followup_id ? [{ type: 'FollowUp' as const, id: result.closed_previous_followup_id }] : []),
         'Report',
       ],
     }),
@@ -415,6 +451,17 @@ export const api = createApi({
             ]
           : [{ type: 'FollowUp' as const, id: 'LIST' }],
     }),
+    followUpWorklist: builder.infiniteQuery<FollowUpList, { state?: string; patientId?: string }, number>({
+      infiniteQueryOptions: worklistOptions,
+      query: ({ queryArg, pageParam }) => ({
+        url: '/api/v1/followups',
+        params: { state: queryArg.state, patient_id: queryArg.patientId, limit: WORKLIST_PAGE_SIZE, offset: pageParam },
+      }),
+      providesTags: (result) => [
+        { type: 'FollowUp', id: 'LIST' },
+        ...(result?.pages.flatMap(page => page.items.map(item => ({ type: 'FollowUp' as const, id: item.followup_id }))) ?? []),
+      ],
+    }),
     getFollowUp: builder.query<FollowUp, string>({
       query: (followupId) => `/api/v1/followups/${followupId}`,
       providesTags: (_result, _error, followupId) => [{ type: 'FollowUp', id: followupId }],
@@ -423,6 +470,7 @@ export const api = createApi({
       FollowUpBookResult,
       { followupId: string; body: FollowUpBookPayload; idempotencyKey: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['FollowUp', 'Reminder']),
       query: ({ followupId, body, idempotencyKey }) => ({
         url: `/api/v1/followups/${followupId}/book`,
         method: 'POST',
@@ -430,6 +478,7 @@ export const api = createApi({
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
       invalidatesTags: (_result, _error, arg) => [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'FollowUp', id: arg.followupId },
         { type: 'FollowUp', id: 'LIST' },
         { type: 'Appointment', id: 'LIST' },
@@ -441,12 +490,14 @@ export const api = createApi({
       FollowUp,
       { followupId: string; reason: string; note?: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['FollowUp', 'Reminder']),
       query: ({ followupId, reason, note }) => ({
         url: `/api/v1/followups/${followupId}/close`,
         method: 'POST',
         body: { reason, ...(note ? { note } : {}) },
       }),
       invalidatesTags: (_result, _error, arg) => [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'FollowUp', id: arg.followupId },
         { type: 'FollowUp', id: 'LIST' },
         'Report',
@@ -456,16 +507,20 @@ export const api = createApi({
       Appointment,
       { appointmentId: string; reason: string; note?: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['FollowUp', 'Reminder']),
       query: ({ appointmentId, reason, note }) => ({
         url: `/api/v1/appointments/${appointmentId}/cancel`,
         method: 'POST',
         body: { reason, note },
       }),
+      // Cancellation clears the link before returning, so its response cannot
+      // reliably identify the reopened follow-up. Invalidate this domain's details too.
       invalidatesTags: (_result, _error, arg) => [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'Appointment', id: arg.appointmentId },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
-        { type: 'FollowUp', id: 'LIST' },
+        'FollowUp',
         'Report',
       ],
     }),
@@ -473,6 +528,7 @@ export const api = createApi({
       AppointmentRescheduleResult,
       { appointmentId: string; body: AppointmentReschedulePayload; idempotencyKey: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['FollowUp', 'Reminder']),
       query: ({ appointmentId, body, idempotencyKey }) => ({
         url: `/api/v1/appointments/${appointmentId}/reschedule`,
         method: 'POST',
@@ -480,9 +536,10 @@ export const api = createApi({
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
       invalidatesTags: [
+        { type: 'Reminder', id: 'LIST' },
         { type: 'Appointment', id: 'LIST' },
         { type: 'Schedule', id: 'LIST' },
-        { type: 'FollowUp', id: 'LIST' },
+        'FollowUp',
         'Report',
       ],
     }),
@@ -490,19 +547,21 @@ export const api = createApi({
       unknown,
       { sessionDefinitionId: string; date: string; reason: string }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ sessionDefinitionId, date, reason }) => ({
         url: '/api/v1/session-occurrences/block',
         method: 'POST',
         body: { session_definition_id: sessionDefinitionId, date, reason },
       }),
-      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }, { type: 'Reminder', id: 'LIST' }],
     }),
     unblockSession: builder.mutation<unknown, string>({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: (occurrenceId) => ({
         url: `/api/v1/session-occurrences/${occurrenceId}/unblock`,
         method: 'POST',
       }),
-      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }, { type: 'Reminder', id: 'LIST' }],
     }),
     listScheduleExceptions: builder.query<
       ScheduleExceptionsListResponse,
@@ -518,23 +577,25 @@ export const api = createApi({
       ScheduleException,
       { doctorId: string; body: BlockScheduleExceptionPayload }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ doctorId, body }) => ({
         url: `/api/v1/doctors/${doctorId}/schedule/exceptions/block`,
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }, { type: 'Reminder', id: 'LIST' }],
     }),
     unblockScheduleExceptions: builder.mutation<
       { unblocked_count: number },
       { doctorId: string; body: UnblockScheduleExceptionPayload }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ doctorId, body }) => ({
         url: `/api/v1/doctors/${doctorId}/schedule/exceptions/unblock`,
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Schedule', id: 'LIST' }, { type: 'Reminder', id: 'LIST' }],
     }),
     getCurrentFee: builder.query<FeeConfiguration, { asOf?: string } | void>({
       query: (arg) => ({
@@ -655,7 +716,19 @@ export const api = createApi({
             ]
           : [{ type: 'Reminder' as const, id: 'LIST' }],
     }),
+    reminderWorklist: builder.infiniteQuery<ReminderList, { status?: string; dueThrough?: string }, number>({
+      infiniteQueryOptions: worklistOptions,
+      query: ({ queryArg, pageParam }) => ({
+        url: '/api/v1/reminders',
+        params: { status: queryArg.status, due_through: queryArg.dueThrough, limit: WORKLIST_PAGE_SIZE, offset: pageParam },
+      }),
+      providesTags: (result) => [
+        { type: 'Reminder', id: 'LIST' },
+        ...(result?.pages.flatMap(page => page.items.map(item => ({ type: 'Reminder' as const, id: item.reminder_id }))) ?? []),
+      ],
+    }),
     prepareReminder: builder.mutation<PreparedMessage, { reminderId: string; language?: 'EN' | 'HI' }>({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ reminderId, language }) => ({
         url: `/api/v1/reminders/${reminderId}/prepare`,
         method: 'POST',
@@ -664,6 +737,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, arg) => [{ type: 'Reminder', id: arg.reminderId }],
     }),
     markReminderSent: builder.mutation<Reminder, string>({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: (reminderId) => ({ url: `/api/v1/reminders/${reminderId}/mark-sent`, method: 'POST' }),
       invalidatesTags: (_result, _error, reminderId) => [
         { type: 'Reminder', id: reminderId },
@@ -672,6 +746,7 @@ export const api = createApi({
       ],
     }),
     skipReminder: builder.mutation<Reminder, { reminderId: string; reason: string }>({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ reminderId, reason }) => ({
         url: `/api/v1/reminders/${reminderId}/skip`,
         method: 'POST',
@@ -687,6 +762,7 @@ export const api = createApi({
       PreparedMessage,
       { appointmentId: string; messageType: Extract<ReminderType, 'APPOINTMENT_CONFIRMATION' | 'APPOINTMENT_CANCELLED' | 'APPOINTMENT_RESCHEDULED'>; language?: 'EN' | 'HI' }
     >({
+      onQueryStarted: refreshPendingWorklists(['Reminder']),
       query: ({ appointmentId, messageType, language }) => ({
         url: `/api/v1/appointments/${appointmentId}/messages`,
         method: 'POST',
@@ -804,6 +880,7 @@ export const {
   useGetVisitQuery,
   useCompleteVisitMutation,
   useListFollowUpsQuery,
+  useFollowUpWorklistInfiniteQuery,
   useGetFollowUpQuery,
   useBookFollowUpMutation,
   useCloseFollowUpMutation,
@@ -824,6 +901,7 @@ export const {
   useGetUpiIntentQuery,
   useGetUpiConfigurationQuery,
   useListRemindersQuery,
+  useReminderWorklistInfiniteQuery,
   usePrepareReminderMutation,
   useMarkReminderSentMutation,
   useSkipReminderMutation,

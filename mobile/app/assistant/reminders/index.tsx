@@ -2,22 +2,25 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useClinicTimeQuery, useListRemindersQuery, useSkipReminderMutation } from '@/api/api';
+import { useClinicTimeQuery, useReminderWorklistInfiniteQuery, useSkipReminderMutation } from '@/api/api';
+import { worklistItems } from '@/api/worklists';
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { WorklistControls } from '@/components/WorklistControls';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function RemindersScreen() {
   const router = useRouter();
   const clinicTime = useClinicTimeQuery();
-  const reminders = useListRemindersQuery(
+  const reminders = useReminderWorklistInfiniteQuery(
     { status: 'DUE', dueThrough: clinicTime.data?.clinic_date },
-    { skip: !clinicTime.data?.clinic_date },
+    { skip: !clinicTime.data?.clinic_date, refetchOnMountOrArgChange: true },
   );
   const [skipReminder, skipState] = useSkipReminderMutation();
   const [error, setError] = useState<string | null>(null);
+  const items = worklistItems(reminders.currentData, item => item.reminder_id);
 
   async function skip(reminderId: string) {
     setError(null);
@@ -29,14 +32,18 @@ export default function RemindersScreen() {
   }
 
   return (
-    <AppScreen>
+    <AppScreen refreshing={reminders.isFetching && !reminders.isFetchingNextPage}
+      onRefresh={() => { if (clinicTime.data?.clinic_date) void reminders.refetch(); else void clinicTime.refetch(); }}>
       <BackButton />
       <Text style={styles.title}>Reminders</Text>
       <Text style={styles.subtitle}>Due through {clinicTime.data?.clinic_date ?? 'today'} · WhatsApp is sent manually.</Text>
-      {reminders.isFetching ? <ActivityIndicator /> : null}
+      {clinicTime.isLoading ? <ActivityIndicator /> : null}
+      {clinicTime.isError ? <>
+        <Text style={styles.error}>Unable to load clinic date.</Text>
+        <AppButton label="Retry" tone="secondary" onPress={() => { void clinicTime.refetch(); }} />
+      </> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {reminders.data?.items.length === 0 ? <Text style={styles.subtitle}>All reminders are handled.</Text> : null}
-      {reminders.data?.items.map((item) => (
+      {items.map((item) => (
         <View key={item.reminder_id} style={styles.card}>
           <Text style={styles.patient}>{item.patient_name}</Text>
           <Text style={styles.subtitle}>{item.reminder_type.replaceAll('_', ' ')} · Due {item.due_on} · {item.language}</Text>
@@ -49,6 +56,7 @@ export default function RemindersScreen() {
           <AppButton label="Skip" tone="secondary" loading={skipState.isLoading} onPress={() => void skip(item.reminder_id)} />
         </View>
       ))}
+      <WorklistControls query={reminders} count={items.length} emptyText="All reminders are handled." />
     </AppScreen>
   );
 }
