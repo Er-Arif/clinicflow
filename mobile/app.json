@@ -2,7 +2,6 @@
   "expo": {
     "name": "ClinicFlow",
     "slug": "clinicflow",
-    "scheme": "clinicflow",
     "version": "1.0.0-rc.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
