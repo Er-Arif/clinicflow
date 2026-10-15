@@ -88,9 +88,12 @@ are deferred to a measured follow-up; scheduling command queries/locks remain un
    production restore drill with independently recorded business counts/receipts.
 5. Continuous uptime/error/backup monitoring. Railway deploy healthchecks alone do
    not provide ongoing monitoring. SSE and external telemetry SDKs remain deferred.
-6. Review the existing npm audit findings (32: 10 moderate, 22 high) separately. Do not apply automatic fixes
-   or claim they were remediated by lock enforcement. Address native build-host
-   JDK/CMake portability before moving Android builds to another machine.
+6. Native build-host JDK/CMake portability remains to be addressed before moving
+   Android builds to another machine. The npm audit review is complete: no critical
+   findings were reported; automatic fixes were rejected because they proposed
+   incompatible Expo/React Native downgrades. The meaningful externally reachable
+   Android deep-link path was reduced by removing the unused `clinicflow://` scheme
+   in commit `0118bcf`; package versions and lockfiles remain unchanged.
 
 See the [production runbook](../operations/production-runbook.md) and
 [backup/restore runbook](../operations/backup-restore.md). Approval for production
