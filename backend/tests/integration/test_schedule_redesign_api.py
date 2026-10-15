@@ -242,6 +242,26 @@ def _seed_appointment(
 # ---------------------------------------------------------------------------
 
 
+def _session_content(db, definition_id: UUID) -> list[dict[str, Any]]:
+    sessions = db.scalars(
+        select(SessionDefinition)
+        .where(SessionDefinition.schedule_definition_id == definition_id)
+        .order_by(SessionDefinition.display_order)
+    ).all()
+    return [
+        {
+            "session_name": session.session_name,
+            "start_time": session.start_time.isoformat(),
+            "end_time": session.end_time.isoformat(),
+            "slot_interval_minutes": session.slot_interval_minutes,
+            "maximum_capacity": session.maximum_capacity,
+            "active": session.active,
+            "display_order": session.display_order,
+        }
+        for session in sessions
+    ]
+
+
 def test_schedule_overview_endpoint_all_weekdays_and_upcoming():
     session_factory, engine = _session_factory()
     redesign_case = _seed_redesign_case(session_factory)
@@ -304,7 +324,7 @@ def test_immutability_active_edit_creates_new_version():
     redesign_case = _seed_redesign_case(session_factory)
 
     # Monday 1 Oct v1 active
-    _seed_schedule(
+    original_id = _seed_schedule(
         session_factory,
         redesign_case,
         weekday=0,
@@ -313,6 +333,13 @@ def test_immutability_active_edit_creates_new_version():
         version=1,
         sessions_data=[{"session_name": "Morning", "start_time": time(10, 0), "end_time": time(13, 0)}],
     )
+
+    with session_factory() as db:
+        original_sessions = list(db.execute(
+            select(SessionDefinition.__table__).where(
+                SessionDefinition.schedule_definition_id == original_id
+            )
+        ).mappings())
 
     # Today is Monday 12 Oct at 08:30 (before 10:00 start)
     clock = MockClock(instant=datetime(2026, 10, 12, 8, 30, tzinfo=UTC), current_date=date(2026, 10, 12))
@@ -370,6 +397,14 @@ def test_immutability_active_edit_creates_new_version():
         assert v2.version == 2
         assert v2.effective_from == date(2026, 10, 12)
         assert v2.effective_to is None
+        assert v1.schedule_definition_id == original_id
+        assert v2.schedule_definition_id != original_id
+        assert _session_content(db, v2.schedule_definition_id) == preview_req["sessions"]
+        assert list(db.execute(
+            select(SessionDefinition.__table__).where(
+                SessionDefinition.schedule_definition_id == original_id
+            )
+        ).mappings()) == original_sessions
 
     app.dependency_overrides.clear()
     engine.dispose()
@@ -554,7 +589,8 @@ def test_future_planned_definition_edits_in_place_without_version_inflation():
 # ---------------------------------------------------------------------------
 
 
-def test_appointments_before_edit_retain_original_occurrence_references():
+@pytest.mark.parametrize("appointment_date", [date(2026, 10, 5), date(2026, 10, 19)])
+def test_appointments_before_edit_retain_original_occurrence_references(appointment_date):
     session_factory, engine = _session_factory()
     redesign_case = _seed_redesign_case(session_factory)
 
@@ -575,14 +611,25 @@ def test_appointments_before_edit_retain_original_occurrence_references():
         assert sess_def is not None
         sess_def_id = sess_def.session_definition_id
 
-    # Create appointment on Monday 5 Oct
+    # Preserve both past appointments and bookings after the new version takes effect.
     appt_id = _seed_appointment(
         session_factory,
         redesign_case,
-        occurrence_date=date(2026, 10, 5),
+        occurrence_date=appointment_date,
         appointment_time=time(10, 15),
         session_def_id=sess_def_id,
     )
+
+    with session_factory() as db:
+        original_appointment = dict(db.execute(
+            select(Appointment.__table__).where(Appointment.appointment_id == appt_id)
+        ).mappings().one())
+        original_occurrence = dict(db.execute(
+            select(SessionOccurrence.__table__).where(
+                SessionOccurrence.session_occurrence_id
+                == original_appointment["session_occurrence_id"]
+            )
+        ).mappings().one())
 
     # Edit schedule on 12 Oct
     clock = MockClock(instant=datetime(2026, 10, 12, 8, 0, tzinfo=UTC), current_date=date(2026, 10, 12))
@@ -593,7 +640,7 @@ def test_appointments_before_edit_retain_original_occurrence_references():
         "sessions": [
             {
                 "session_name": "Morning New",
-                "start_time": "11:00:00",
+                "start_time": "10:00:00",
                 "end_time": "14:00:00",
                 "slot_interval_minutes": 15,
                 "maximum_capacity": 8,
@@ -603,12 +650,15 @@ def test_appointments_before_edit_retain_original_occurrence_references():
         ],
     }
     p_res = client.post(f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/preview-impact", json=preview_req)
+    assert p_res.status_code == 200, p_res.text
     token = p_res.json()["proposal_token"]
 
-    client.put(
+    a_res = client.put(
         f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/smart-apply",
         json={"proposal_token": token, "weekdays": [0], "sessions": preview_req["sessions"]},
     )
+
+    assert a_res.status_code == 200, a_res.text
 
     # Verify appointment still points to original occurrence and original session definition
     with session_factory() as db:
@@ -616,9 +666,17 @@ def test_appointments_before_edit_retain_original_occurrence_references():
         assert appt is not None
         occ = db.get(SessionOccurrence, appt.session_occurrence_id)
         assert occ is not None
-        assert occ.occurrence_date == date(2026, 10, 5)
+        assert occ.occurrence_date == appointment_date
         assert occ.session_definition_id == sess_def_id
         assert occ.start_time_snapshot == time(10, 0)
+        assert dict(db.execute(
+            select(Appointment.__table__).where(Appointment.appointment_id == appt_id)
+        ).mappings().one()) == original_appointment
+        assert dict(db.execute(
+            select(SessionOccurrence.__table__).where(
+                SessionOccurrence.session_occurrence_id == occ.session_occurrence_id
+            )
+        ).mappings().one()) == original_occurrence
 
     app.dependency_overrides.clear()
     engine.dispose()
@@ -928,6 +986,84 @@ def test_appointment_safety_expanding_hours_applies_immediately():
 # ---------------------------------------------------------------------------
 
 
+def test_smart_apply_weekday_groups_remain_independent():
+    session_factory, engine = _session_factory()
+    case = _seed_redesign_case(session_factory)
+    clock = MockClock(datetime(2026, 10, 12, 8, 0, tzinfo=UTC), date(2026, 10, 12))
+    client = _client(session_factory, case, clock)
+    base_path = f"/api/v1/doctors/{case.doctor_id}/schedule"
+
+    def apply(weekdays, name, start, end):
+        payload = {
+            "weekdays": weekdays,
+            "sessions": [{
+                "session_name": name,
+                "start_time": start,
+                "end_time": end,
+                "slot_interval_minutes": 20,
+                "maximum_capacity": 8,
+                "active": True,
+                "display_order": 0,
+            }],
+        }
+        preview = client.post(f"{base_path}/preview-impact", json=payload)
+        assert preview.status_code == 200, preview.text
+        result = client.put(
+            f"{base_path}/smart-apply",
+            json={**payload, "proposal_token": preview.json()["proposal_token"]},
+        )
+        assert result.status_code == 200, result.text
+        return payload["sessions"]
+
+    def other_weekday_rows():
+        with session_factory() as db:
+            definitions = db.execute(
+                select(ScheduleDefinition.__table__).where(
+                    ScheduleDefinition.doctor_id == case.doctor_id,
+                    ScheduleDefinition.weekday.not_in([1, 3]),
+                ).order_by(ScheduleDefinition.weekday)
+            ).mappings().all()
+            definition_ids = [row["schedule_definition_id"] for row in definitions]
+            sessions = db.execute(
+                select(SessionDefinition.__table__).where(
+                    SessionDefinition.schedule_definition_id.in_(definition_ids)
+                ).order_by(SessionDefinition.session_definition_id)
+            ).mappings().all()
+            return definitions, sessions
+
+    try:
+        morning = apply([0, 2, 4], "Morning", "10:00:00", "13:00:00")
+        evening = apply([1, 3, 5, 6], "Evening", "15:00:00", "18:00:00")
+        with session_factory() as db:
+            definitions = db.scalars(select(ScheduleDefinition).where(
+                ScheduleDefinition.doctor_id == case.doctor_id
+            )).all()
+            assert sorted(d.weekday for d in definitions) == list(range(7))
+            for definition in definitions:
+                expected = morning if definition.weekday in [0, 2, 4] else evening
+                assert definition.version == 1
+                assert _session_content(db, definition.schedule_definition_id) == expected
+            planned_ids = {d.weekday: d.schedule_definition_id for d in definitions if d.weekday in [1, 3]}
+        untouched = other_weekday_rows()
+        changed = apply([1, 3], "Evening Updated", "16:00:00", "19:00:00")
+        assert other_weekday_rows() == untouched
+        with session_factory() as db:
+            selected = db.scalars(select(ScheduleDefinition).where(
+                ScheduleDefinition.doctor_id == case.doctor_id,
+                ScheduleDefinition.weekday.in_([1, 3]),
+            )).all()
+            assert len(selected) == 2
+            for definition in selected:
+                assert definition.schedule_definition_id == planned_ids[definition.weekday]
+                assert definition.version == 1
+                assert definition.effective_from > clock.clinic_date()
+                assert _session_content(db, definition.schedule_definition_id) == changed
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+
 def test_multiday_mixed_histories_independent_dates_atomic_success():
     session_factory, engine = _session_factory()
     redesign_case = _seed_redesign_case(session_factory)
@@ -1008,6 +1144,20 @@ def test_multiday_mixed_histories_independent_dates_atomic_success():
         json={"proposal_token": p_data["proposal_token"], "weekdays": [0, 1], "sessions": preview_req["sessions"]},
     )
     assert a_res.status_code == 200
+
+    with session_factory() as db:
+        for weekday, effective_date in [(0, date(2026, 10, 26)), (1, date(2026, 10, 13))]:
+            definitions = db.scalars(
+                select(ScheduleDefinition).where(
+                    ScheduleDefinition.doctor_id == redesign_case.doctor_id,
+                    ScheduleDefinition.weekday == weekday,
+                ).order_by(ScheduleDefinition.version)
+            ).all()
+            assert len(definitions) == 2
+            assert definitions[0].version == 1
+            assert definitions[1].version == 2
+            assert definitions[1].effective_from == effective_date
+            assert _session_content(db, definitions[1].schedule_definition_id) == preview_req["sessions"]
 
     app.dependency_overrides.clear()
     engine.dispose()
@@ -1556,6 +1706,7 @@ def test_schedule_adding_unscheduled_weekday_creates_v1():
             )
         )
         assert wed_def is not None
+        assert _session_content(db, wed_def.schedule_definition_id) == preview_req["sessions"]
         assert wed_def.version == 1
         assert wed_def.effective_from == date(2026, 10, 14)
 
@@ -1917,19 +2068,22 @@ def test_cross_token_misuse_proposal_token_rejected_as_auth_token():
 # ---------------------------------------------------------------------------
 
 
-def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
+@pytest.mark.parametrize("first_day_scheduled", [True, False])
+def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch, first_day_scheduled):
     session_factory, engine = _session_factory()
     redesign_case = _seed_redesign_case(session_factory)
 
-    mon_id = _seed_schedule(
-        session_factory,
-        redesign_case,
-        weekday=0,
-        effective_from=date(2026, 10, 1),
-        effective_to=None,
-        version=1,
-        sessions_data=[{"session_name": "Morning Mon", "start_time": time(10, 0), "end_time": time(13, 0)}],
-    )
+    mon_id = None
+    if first_day_scheduled:
+        mon_id = _seed_schedule(
+            session_factory,
+            redesign_case,
+            weekday=0,
+            effective_from=date(2026, 10, 1),
+            effective_to=None,
+            version=1,
+            sessions_data=[{"session_name": "Morning Mon", "start_time": time(10, 0), "end_time": time(13, 0)}],
+        )
     tue_id = _seed_schedule(
         session_factory,
         redesign_case,
@@ -1940,28 +2094,29 @@ def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
         sessions_data=[{"session_name": "Morning Tue", "start_time": time(10, 0), "end_time": time(13, 0)}],
     )
 
-    # Materialize an available occurrence for Monday 19 Oct to verify occurrence delete rollback
-    with session_factory.begin() as db:
-        mon_sess_def = db.scalar(
-            select(SessionDefinition).where(SessionDefinition.schedule_definition_id == mon_id)
-        )
-        assert mon_sess_def is not None
-        occ = SessionOccurrence(
-            clinic_id=redesign_case.clinic_id,
-            doctor_id=redesign_case.doctor_id,
-            session_definition_id=mon_sess_def.session_definition_id,
-            occurrence_date=date(2026, 10, 19),
-            session_name_snapshot="Morning Mon",
-            start_time_snapshot=time(10, 0),
-            end_time_snapshot=time(13, 0),
-            slot_interval_minutes_snapshot=15,
-            maximum_capacity_snapshot=10,
-            status="AVAILABLE",
-            version=1,
-        )
-        db.add(occ)
-        db.flush()
-        occ_id = occ.session_occurrence_id
+    if first_day_scheduled:
+        # Materialize an available occurrence for Monday 19 Oct to verify occurrence delete rollback
+        with session_factory.begin() as db:
+            mon_sess_def = db.scalar(
+                select(SessionDefinition).where(SessionDefinition.schedule_definition_id == mon_id)
+            )
+            assert mon_sess_def is not None
+            occ = SessionOccurrence(
+                clinic_id=redesign_case.clinic_id,
+                doctor_id=redesign_case.doctor_id,
+                session_definition_id=mon_sess_def.session_definition_id,
+                occurrence_date=date(2026, 10, 19),
+                session_name_snapshot="Morning Mon",
+                start_time_snapshot=time(10, 0),
+                end_time_snapshot=time(13, 0),
+                slot_interval_minutes_snapshot=15,
+                maximum_capacity_snapshot=10,
+                status="AVAILABLE",
+                version=1,
+            )
+            db.add(occ)
+            db.flush()
+            occ_id = occ.session_occurrence_id
 
     clock = MockClock(instant=datetime(2026, 10, 12, 8, 0, tzinfo=UTC), current_date=date(2026, 10, 12))
     client = _client(session_factory, redesign_case, clock)
@@ -1984,14 +2139,22 @@ def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
     assert p_res.status_code == 200
     token = p_res.json()["proposal_token"]
 
-    # Monkeypatch: during write phase, after Monday (weekday 0) is written, force an error on Tuesday (weekday 1)
+    # Fail at the actual second weekday write, after verifying Monday's writes exist.
     from sqlalchemy.orm import Session as OrmSession
     real_flush = OrmSession.flush
-    call_count = {"count": 0}
+    failed_after_first_day = []
 
     def failing_flush(self, *args, **kwargs):
-        call_count["count"] += 1
-        if call_count["count"] >= 3:
+        if any(isinstance(row, ScheduleDefinition) and row.weekday == 1 for row in self.new):
+            with self.no_autoflush:
+                monday = self.scalar(select(ScheduleDefinition).where(
+                    ScheduleDefinition.doctor_id == redesign_case.doctor_id,
+                    ScheduleDefinition.weekday == 0,
+                    ScheduleDefinition.effective_from == date(2026, 10, 12),
+                ))
+                assert monday is not None
+                assert _session_content(self, monday.schedule_definition_id) == preview_req["sessions"]
+            failed_after_first_day.append(True)
             raise RuntimeError("Forced database write failure on second weekday")
         return real_flush(self, *args, **kwargs)
 
@@ -2006,6 +2169,7 @@ def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
         client.put(f"/api/v1/doctors/{redesign_case.doctor_id}/schedule/smart-apply", json=apply_req)
 
     monkeypatch.undo()
+    assert failed_after_first_day == [True]
 
     # Prove complete atomic rollback in PostgreSQL transaction:
     with session_factory() as db:
@@ -2015,10 +2179,14 @@ def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
             .where(ScheduleDefinition.doctor_id == redesign_case.doctor_id, ScheduleDefinition.weekday == 0)
             .order_by(ScheduleDefinition.version)
         ).all()
-        assert len(mon_defs) == 1
-        assert mon_defs[0].effective_to is None
-        assert mon_defs[0].version == 1
-        assert mon_defs[0].schedule_definition_id == mon_id
+        if first_day_scheduled:
+            assert len(mon_defs) == 1
+            assert mon_defs[0].effective_to is None
+            assert mon_defs[0].version == 1
+            assert mon_defs[0].schedule_definition_id == mon_id
+
+        else:
+            assert mon_defs == []
 
         # 2. Tuesday definition: effective_to was NOT closed! (remains None)
         tue_defs = db.scalars(
@@ -2031,10 +2199,11 @@ def test_multiday_atomic_rollback_on_write_phase_failure(monkeypatch):
         assert tue_defs[0].version == 1
         assert tue_defs[0].schedule_definition_id == tue_id
 
-        # 3. Monday occurrence was NOT deleted!
-        occ_check = db.get(SessionOccurrence, occ_id)
-        assert occ_check is not None
-        assert occ_check.occurrence_date == date(2026, 10, 19)
+        if first_day_scheduled:
+            # 3. Monday occurrence was NOT deleted!
+            occ_check = db.get(SessionOccurrence, occ_id)
+            assert occ_check is not None
+            assert occ_check.occurrence_date == date(2026, 10, 19)
 
     app.dependency_overrides.clear()
     engine.dispose()

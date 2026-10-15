@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.main import app
 from app.modules.appointments.models import Appointment
 from app.modules.clinic.models import Clinic, Doctor
-from app.modules.identity.dependencies import get_auth_context, require_permission
+from app.modules.identity.dependencies import get_auth_context
 from app.modules.identity.models import User
 from app.modules.identity.service import AuthContext
 from app.modules.patients.models import Patient
@@ -213,588 +213,81 @@ def _setup_api_client(session_factory, case: ApiCase, clock: FrozenClock | None 
     app.dependency_overrides[get_db] = get_test_db
     app.dependency_overrides[get_clock] = lambda: clock
     app.dependency_overrides[get_auth_context] = lambda: auth_ctx
-    app.dependency_overrides[require_permission("schedule.manage")] = lambda: auth_ctx
     return TestClient(app, raise_server_exceptions=False)
 
 
-# 1. create schedule via PUT /api/v1/doctors/{id}/schedule
-def test_api_create_schedule() -> None:
+def _stored_schedule_state(session_factory, case: ApiCase) -> dict[str, list[dict]]:
+    # Compare every persisted column, including IDs, versions, and operational state.
+    with session_factory() as db:
+        return {
+            model.__tablename__: [
+                dict(row)
+                for row in db.execute(
+                    select(model.__table__)
+                    .where(model.__table__.c.clinic_id == case.clinic_id)
+                    .order_by(*model.__table__.primary_key.columns)
+                ).mappings()
+            ]
+            for model in (ScheduleDefinition, SessionDefinition, SessionOccurrence, Appointment)
+        }
+
+
+@pytest.mark.parametrize(
+    ("suffix", "status_code"), [("", 405), ("/0", 404)], ids=["multi-day", "single-day"]
+)
+@pytest.mark.parametrize(
+    "clinic_date",
+    [date(2026, 10, 12), TARGET_DATE, date(2026, 10, 4)],
+    ids=["historical", "effective-today", "future-plan"],
+)
+@pytest.mark.parametrize("edit", ["replace-sessions", "day-off", "deactivate-session"])
+def test_retired_legacy_edits_preserve_schedule_and_appointments(
+    suffix: str, status_code: int, clinic_date: date, edit: str
+) -> None:
     session_factory, engine = _session_factory()
     case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
+    client = _setup_api_client(session_factory, case, FrozenClock(current_date=clinic_date))
+    sessions = [
+        {
+            "session_name": "Changed Morning",
+            "start_time": "09:00:00",
+            "end_time": "11:00:00",
+            "slot_interval_minutes": 30,
+            "maximum_capacity": 3,
+            "active": edit != "deactivate-session",
+            "display_order": 0,
+        },
+        {
+            "session_name": "New Afternoon",
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "slot_interval_minutes": 20,
+            "maximum_capacity": 3,
+            "active": True,
+            "display_order": 1,
+        },
+    ]
     payload = {
-        "weekdays": [5],  # Saturday
         "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Saturday Morning",
-                "start_time": "10:00:00",
-                "end_time": "13:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 12,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
+        "sessions": [] if edit == "day-off" else sessions,
     }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert len(data) == 1
-    assert data[0]["weekday"] == 5
-    assert data[0]["version"] == 1
-    assert data[0]["effective_from"] == TARGET_DATE.isoformat()
-    assert len(data[0]["sessions"]) == 1
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 2. same-date replacement via PUT /api/v1/doctors/{id}/schedule
-def test_api_same_date_replacement() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    payload = {
-        "weekdays": [0],  # Monday
-        "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Updated Morning",
-                "start_time": "10:00:00",
-                "end_time": "12:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert len(data) == 1
-    assert data[0]["weekday"] == 0
-    assert data[0]["version"] == 2
-    assert data[0]["effective_from"] == TARGET_DATE.isoformat()
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 3. time change via PUT /api/v1/doctors/{id}/schedule
-def test_api_time_change() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    payload = {
-        "weekdays": [0],
-        "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Morning Consultations",
-                "start_time": "11:00:00",
-                "end_time": "13:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert data[0]["sessions"][0]["start_time"] == "11:00:00"
-    assert data[0]["sessions"][0]["end_time"] == "13:00:00"
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 4. multi-day replacement via PUT /api/v1/doctors/{id}/schedule
-def test_api_multi_day_replacement() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    payload = {
-        "weekdays": [1, 2, 3, 4, 5, 6],  # Tue-Sun
-        "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Regular Shift",
-                "start_time": "10:00:00",
-                "end_time": "13:00:00",
-                "slot_interval_minutes": 30,
-                "maximum_capacity": 6,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert len(data) == 6
-    weekdays_returned = [d["weekday"] for d in data]
-    assert weekdays_returned == [1, 2, 3, 4, 5, 6]
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 5. Monday specifically (weekday=0) mapping verified through API
-def test_api_monday_specifically() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    payload = {
-        "weekdays": [0],
-        "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Monday Exclusive",
-                "start_time": "09:00:00",
-                "end_time": "12:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 10,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200
-    assert response.json()[0]["weekday"] == 0
-    assert response.json()[0]["sessions"][0]["session_name"] == "Monday Exclusive"
-
-    with session_factory() as db:
-        sched = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.clinic_id == case.clinic_id,
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
+    if not suffix:
+        # An unscheduled second weekday must not be created either.
+        payload["weekdays"] = [0, 1]
+    try:
+        before = _stored_schedule_state(session_factory, case)
+        response = client.put(
+            f"/api/v1/doctors/{case.doctor_id}/schedule{suffix}", json=payload
         )
-        assert sched is not None
-        assert sched.weekday == 0
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 6. existing booked appointment preservation via API
-def test_api_preserves_existing_booked_appointment() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    payload = {
-        "weekdays": [0],
-        "effective_from": TARGET_DATE.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Renamed Session",
-                "start_time": "10:00:00",
-                "end_time": "12:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200
-
-    with session_factory() as db:
-        appt = db.scalar(select(Appointment).where(Appointment.appointment_id == case.appointment_id))
-        assert appt is not None
-        assert appt.status == "BOOKED"
-        assert appt.session_occurrence_id == case.occurrence_id
-        assert appt.appointment_time == time(10, 0)
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 7. future version creation via API
-def test_api_future_version() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    future_date = date(2026, 11, 2)  # Future Monday
-    payload = {
-        "weekdays": [0],
-        "effective_from": future_date.isoformat(),
-        "sessions": [
-            {
-                "session_name": "November Schedule",
-                "start_time": "10:00:00",
-                "end_time": "13:00:00",
-                "slot_interval_minutes": 20,
-                "maximum_capacity": 9,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data[0]["version"] == 2
-    assert data[0]["effective_from"] == future_date.isoformat()
-
-    with session_factory() as db:
-        prev = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.clinic_id == case.clinic_id,
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-                ScheduleDefinition.effective_from == TARGET_DATE,
-            )
+        assert response.status_code == status_code, response.text
+        assert _stored_schedule_state(session_factory, case) == before
+        # Removing the PUT must preserve the read endpoint used by the mobile app.
+        schedule = client.get(
+            f"/api/v1/doctors/{case.doctor_id}/schedule",
+            params={"effective_on": TARGET_DATE.isoformat()},
         )
-        assert prev is not None
-        assert prev.effective_to == date(2026, 11, 1)
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 8. conflict response shape via API
-def test_api_conflict_response_shape() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-    client = _setup_api_client(session_factory, case)
-
-    # First plan future schedule for 2026-11-20
-    future_date = date(2026, 11, 20)
-    payload_future = {
-        "weekdays": [0],
-        "effective_from": future_date.isoformat(),
-        "sessions": [
-            {
-                "session_name": "Late Nov",
-                "start_time": "10:00:00",
-                "end_time": "12:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    res_future = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload_future)
-    assert res_future.status_code == 200
-
-    # Now attempt intermediate schedule for 2026-11-10 (which collides with 2026-11-20)
-    payload_collision = {
-        "weekdays": [0],
-        "effective_from": "2026-11-10",
-        "sessions": [
-            {
-                "session_name": "Collision",
-                "start_time": "10:00:00",
-                "end_time": "12:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    response = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload_collision)
-    assert response.status_code == 409
-    body = response.json()
-    assert "error" in body
-    err = body["error"]
-    assert err["code"] == "SCHEDULE_EFFECTIVE_DATE_CONFLICT"
-    assert "20 Nov 2026" in err["message"]
-    assert err["details"]["conflicting_effective_from"] == "2026-11-20"
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 9. Existing Monday schedule (effective_from = 2026-10-01), current date = 2026-10-12
-# Edit time 10:00-13:00 -> 12:00-16:00 preserving effective_from = 2026-10-01
-def test_api_monday_past_effective_date_in_place_edit() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-
-    past_effective = date(2026, 10, 1)
-    with session_factory() as db:
-        sched = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert sched is not None
-        sched.effective_from = past_effective
-        db.commit()
-
-    simulated_today = date(2026, 10, 12)
-    clock = FrozenClock(current_date=simulated_today)
-    client = _setup_api_client(session_factory, case, clock)
-
-    # Hydrate/fetch schedule: returns effective_from = 2026-10-01
-    get_res = client.get(
-        f"/api/v1/doctors/{case.doctor_id}/schedule?effective_on={simulated_today.isoformat()}"
-    )
-    assert get_res.status_code == 200
-    days = get_res.json()["days"]
-    mon = next(d for d in days if d["weekday"] == 0)
-    assert mon["effective_from"] == "2026-10-01"
-
-    # Client preserves effective_from = 2026-10-01 and edits time to 12:00-16:00
-    payload = {
-        "weekdays": [0],
-        "effective_from": "2026-10-01",
-        "sessions": [
-            {
-                "session_name": "Afternoon Shift",
-                "start_time": "12:00:00",
-                "end_time": "16:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 10,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    put_res = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert put_res.status_code == 200, put_res.text
-    put_data = put_res.json()
-    assert put_data[0]["effective_from"] == "2026-10-01"
-    assert put_data[0]["version"] == 2
-    assert put_data[0]["sessions"][0]["start_time"] == "12:00:00"
-    assert put_data[0]["sessions"][0]["end_time"] == "16:00:00"
-
-    # Re-fetch shows 12:00-16:00
-    refetch = client.get(
-        f"/api/v1/doctors/{case.doctor_id}/schedule?effective_on={simulated_today.isoformat()}"
-    )
-    assert refetch.status_code == 200
-    refetch_mon = next(d for d in refetch.json()["days"] if d["weekday"] == 0)
-    assert refetch_mon["sessions"][0]["start_time"] == "12:00:00"
-    assert refetch_mon["sessions"][0]["end_time"] == "16:00:00"
-    assert refetch_mon["version"] == 2
-
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 10. Multi-day same effective_from succeeds atomically
-def test_api_multiday_same_effective_from_success() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-
-    past_effective = date(2026, 10, 1)
-    with session_factory() as db:
-        mon = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert mon is not None
-        mon.effective_from = past_effective
-
-        tue = ScheduleDefinition(
-            clinic_id=case.clinic_id,
-            doctor_id=case.doctor_id,
-            weekday=1,
-            effective_from=past_effective,
-            active=True,
-            created_by=case.user_id,
-        )
-        db.add(tue)
-        db.flush()
-        db.add(
-            SessionDefinition(
-                clinic_id=case.clinic_id,
-                schedule_definition_id=tue.schedule_definition_id,
-                session_name="Tuesday Morning",
-                start_time=time(10, 0),
-                end_time=time(12, 0),
-                slot_interval_minutes=15,
-                maximum_capacity=8,
-                active=True,
-                display_order=0,
-            )
-        )
-        db.commit()
-
-    simulated_today = date(2026, 10, 12)
-    clock = FrozenClock(current_date=simulated_today)
-    client = _setup_api_client(session_factory, case, clock)
-
-    payload = {
-        "weekdays": [0, 1],
-        "effective_from": "2026-10-01",
-        "sessions": [
-            {
-                "session_name": "Shared Session",
-                "start_time": "11:00:00",
-                "end_time": "14:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    put_res = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert put_res.status_code == 200, put_res.text
-    assert len(put_res.json()) == 2
-    for day in put_res.json():
-        assert day["effective_from"] == "2026-10-01"
-        assert day["sessions"][0]["start_time"] == "11:00:00"
-
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 11. Multi-day different effective_from rolls back atomically on past-date collision
-def test_api_multiday_different_effective_from_rollback() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-
-    # Mon has effective_from = 2026-10-01, Tue has effective_from = 2026-10-05
-    with session_factory() as db:
-        mon = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert mon is not None
-        mon.effective_from = date(2026, 10, 1)
-
-        tue = ScheduleDefinition(
-            clinic_id=case.clinic_id,
-            doctor_id=case.doctor_id,
-            weekday=1,
-            effective_from=date(2026, 10, 5),
-            active=True,
-            created_by=case.user_id,
-        )
-        db.add(tue)
-        db.flush()
-        db.add(
-            SessionDefinition(
-                clinic_id=case.clinic_id,
-                schedule_definition_id=tue.schedule_definition_id,
-                session_name="Tuesday Orig",
-                start_time=time(10, 0),
-                end_time=time(12, 0),
-                slot_interval_minutes=15,
-                maximum_capacity=8,
-                active=True,
-                display_order=0,
-            )
-        )
-        db.commit()
-
-    simulated_today = date(2026, 10, 12)
-    clock = FrozenClock(current_date=simulated_today)
-    client = _setup_api_client(session_factory, case, clock)
-
-    payload = {
-        "weekdays": [0, 1],
-        "effective_from": "2026-10-01",
-        "sessions": [
-            {
-                "session_name": "Overwriting Session",
-                "start_time": "11:00:00",
-                "end_time": "14:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    put_res = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert put_res.status_code == 422
-    assert "SCHEDULE_EFFECTIVE_DATE_PAST" in put_res.text
-
-    # Atomic rollback verification: Monday was NOT modified
-    with session_factory() as db:
-        mon_after = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert mon_after is not None
-        assert mon_after.version == 1
-        tue_after = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 1,
-            )
-        )
-        assert tue_after is not None
-        assert tue_after.version == 1
-
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-# 12. One scheduled + one unscheduled weekday with past date rolls back atomically
-def test_api_multiday_scheduled_and_unscheduled_past_date_rollback() -> None:
-    session_factory, engine = _session_factory()
-    case = _seed_api_case(session_factory)
-
-    with session_factory() as db:
-        mon = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert mon is not None
-        mon.effective_from = date(2026, 10, 1)
-        db.commit()
-
-    simulated_today = date(2026, 10, 12)
-    clock = FrozenClock(current_date=simulated_today)
-    client = _setup_api_client(session_factory, case, clock)
-
-    payload = {
-        "weekdays": [0, 2],
-        "effective_from": "2026-10-01",
-        "sessions": [
-            {
-                "session_name": "Attempt",
-                "start_time": "11:00:00",
-                "end_time": "14:00:00",
-                "slot_interval_minutes": 15,
-                "maximum_capacity": 8,
-                "active": True,
-                "display_order": 0,
-            }
-        ],
-    }
-    put_res = client.put(f"/api/v1/doctors/{case.doctor_id}/schedule", json=payload)
-    assert put_res.status_code == 422
-
-    with session_factory() as db:
-        mon_after = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 0,
-            )
-        )
-        assert mon_after is not None
-        assert mon_after.version == 1
-        wed_after = db.scalar(
-            select(ScheduleDefinition).where(
-                ScheduleDefinition.doctor_id == case.doctor_id,
-                ScheduleDefinition.weekday == 2,
-            )
-        )
-        assert wed_after is None
-
-    app.dependency_overrides.clear()
-    engine.dispose()
+        assert schedule.status_code == 200, schedule.text
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+        engine.dispose()

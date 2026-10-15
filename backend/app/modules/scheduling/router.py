@@ -17,14 +17,11 @@ from app.modules.scheduling.schemas import (
     BlockSessionRequest,
     FeeConfigurationCreateRequest,
     FeeConfigurationResponse,
-    MultiDayScheduleReplaceRequest,
-    ScheduleDefinitionResponse,
     ScheduleExceptionResponse,
     ScheduleExceptionsListResponse,
     ScheduleOverviewResponse,
     SchedulePreviewImpactRequest,
     SchedulePreviewImpactResponse,
-    ScheduleReplaceRequest,
     SessionOccurrenceResponse,
     SmartScheduleApplyRequest,
     UnblockScheduleExceptionRequest,
@@ -114,37 +111,6 @@ def smart_apply_schedule(
 ) -> ScheduleOverviewResponse:
     with db.begin():
         return SchedulingService(db, clock, context).smart_apply_schedule(doctor_id, request)
-
-
-@router.put(
-    "/doctors/{doctor_id}/schedule", response_model=list[ScheduleDefinitionResponse]
-)
-def replace_multiple_weekdays_schedule(
-    doctor_id: UUID,
-    request: MultiDayScheduleReplaceRequest,
-    context: AuthContext = Depends(require_permission("schedule.manage")),
-    db: Session = Depends(get_db),
-    clock: Clock = Depends(get_clock),
-) -> list[ScheduleDefinitionResponse]:
-    with db.begin():
-        return SchedulingService(db, clock, context).replace_multiple_weekdays(
-            doctor_id, request
-        )
-
-
-@router.put(
-    "/doctors/{doctor_id}/schedule/{weekday}", response_model=ScheduleDefinitionResponse
-)
-def replace_weekday_schedule(
-    doctor_id: UUID,
-    weekday: int,
-    request: ScheduleReplaceRequest,
-    context: AuthContext = Depends(require_permission("schedule.manage")),
-    db: Session = Depends(get_db),
-    clock: Clock = Depends(get_clock),
-) -> ScheduleDefinitionResponse:
-    with db.begin():
-        return SchedulingService(db, clock, context).replace_weekday(doctor_id, weekday, request)
 
 
 @router.post("/session-occurrences/block", response_model=SessionOccurrenceResponse)

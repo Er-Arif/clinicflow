@@ -67,7 +67,6 @@ import {
   FeeConfiguration,
   ScheduleException,
   ScheduleExceptionsListResponse,
-  SessionWrite,
   UnblockScheduleExceptionPayload,
   WeeklySchedule,
 } from '@/features/scheduling/types';
@@ -268,28 +267,6 @@ export const api = createApi({
         { type: 'Schedule', id: arg.doctorId },
         { type: 'Schedule', id: 'LIST' },
       ],
-    }),
-    replaceWeekdaySchedule: builder.mutation<
-      WeeklySchedule['days'][number],
-      { doctorId: string; weekday: number; effectiveFrom: string; sessions: SessionWrite[] }
-    >({
-      query: ({ doctorId, weekday, effectiveFrom, sessions }) => ({
-        url: `/api/v1/doctors/${doctorId}/schedule/${weekday}`,
-        method: 'PUT',
-        body: { effective_from: effectiveFrom, sessions },
-      }),
-      invalidatesTags: (_result, _error, arg) => [{ type: 'Schedule', id: arg.doctorId }],
-    }),
-    replaceMultiDaySchedule: builder.mutation<
-      WeeklySchedule['days'],
-      { doctorId: string; weekdays: number[]; effectiveFrom: string; sessions: SessionWrite[] }
-    >({
-      query: ({ doctorId, weekdays, effectiveFrom, sessions }) => ({
-        url: `/api/v1/doctors/${doctorId}/schedule`,
-        method: 'PUT',
-        body: { weekdays, effective_from: effectiveFrom, sessions },
-      }),
-      invalidatesTags: (_result, _error, arg) => [{ type: 'Schedule', id: arg.doctorId }],
     }),
     getAvailability: builder.query<AvailabilityResponse, { doctorId: string; date: string }>({
       query: ({ doctorId, date }) => ({
@@ -791,8 +768,6 @@ export const {
   useClinicTimeQuery,
   useListDoctorsQuery,
   useGetScheduleQuery,
-  useReplaceWeekdayScheduleMutation,
-  useReplaceMultiDayScheduleMutation,
   useGetAvailabilityQuery,
   useListAppointmentsQuery,
   useGetAppointmentQuery,

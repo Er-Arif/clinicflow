@@ -28,36 +28,6 @@ class SessionWrite(BaseModel):
         return self
 
 
-class ScheduleReplaceRequest(BaseModel):
-    effective_from: date
-    sessions: list[SessionWrite] = Field(default_factory=list, max_length=12)
-
-    @model_validator(mode="after")
-    def validate_orders(self) -> ScheduleReplaceRequest:
-        orders = [session.display_order for session in self.sessions]
-        if len(orders) != len(set(orders)):
-            raise ValueError("Session display order must be unique within a weekday.")
-        return self
-
-
-class MultiDayScheduleReplaceRequest(BaseModel):
-    weekdays: list[int] = Field(min_length=1, max_length=7)
-    effective_from: date
-    sessions: list[SessionWrite] = Field(default_factory=list, max_length=12)
-
-    @model_validator(mode="after")
-    def validate_multiday(self) -> MultiDayScheduleReplaceRequest:
-        for w in self.weekdays:
-            if w < 0 or w > 6:
-                raise ValueError("Weekday must be between 0 (Monday) and 6 (Sunday).")
-        if len(self.weekdays) != len(set(self.weekdays)):
-            raise ValueError("Duplicate weekdays are not permitted in request.")
-        orders = [session.display_order for session in self.sessions]
-        if len(orders) != len(set(orders)):
-            raise ValueError("Session display order must be unique within a weekday.")
-        return self
-
-
 class DayImpactResponse(BaseModel):
     weekday: int
     weekday_name: str

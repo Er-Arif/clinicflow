@@ -33,16 +33,6 @@ export type WeeklySchedule = {
   days: ScheduleDay[];
 };
 
-export type SessionWrite = {
-  session_name: string;
-  start_time: string;
-  end_time: string;
-  slot_interval_minutes: number;
-  maximum_capacity: number;
-  active: boolean;
-  display_order: number;
-};
-
 export type AvailabilitySlot = {
   time: string;
   available: boolean;

@@ -1,15 +1,38 @@
-from datetime import date, time
+from datetime import time
 from decimal import Decimal
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.main import app
 from app.modules.scheduling.schemas import (
     FeeConfigurationCreateRequest,
-    MultiDayScheduleReplaceRequest,
+    SchedulePreviewImpactRequest,
     SessionWrite,
 )
 from app.modules.scheduling.service import generate_slots
+
+
+def test_only_approved_recurring_schedule_mutations_are_exposed() -> None:
+    paths = app.openapi()["paths"]
+    schedule_path = "/api/v1/doctors/{doctor_id}/schedule"
+    assert "get" in paths[schedule_path]
+    assert "put" not in paths[schedule_path]
+    assert f"{schedule_path}/{{weekday}}" not in paths
+    assert "post" in paths[f"{schedule_path}/preview-impact"]
+    assert "put" in paths[f"{schedule_path}/smart-apply"]
+
+
+@pytest.mark.parametrize(("suffix", "status_code"), [("", 405), ("/0", 404)])
+def test_legacy_schedule_mutation_routes_are_retired(suffix: str, status_code: int) -> None:
+    doctor_id = "00000000-0000-0000-0000-000000000001"
+    with TestClient(app) as client:
+        response = client.put(
+            f"/api/v1/doctors/{doctor_id}/schedule{suffix}",
+            json={"weekdays": [0], "effective_from": "2026-10-05", "sessions": []},
+        )
+    assert response.status_code == status_code
 
 
 def test_slot_generation_is_end_exclusive() -> None:
@@ -53,35 +76,31 @@ def test_fee_values_are_quantized() -> None:
     assert request.followup_fee == Decimal("300.50")
 
 
-def test_multiday_schedule_request_validation() -> None:
+def test_multiday_preview_request_validation() -> None:
     # Valid multi-day request
-    req = MultiDayScheduleReplaceRequest(
+    req = SchedulePreviewImpactRequest(
         weekdays=[0, 2, 4],
-        effective_from=date(2026, 10, 15),
         sessions=[],
     )
     assert req.weekdays == [0, 2, 4]
 
     # Duplicate weekdays rejected
     with pytest.raises(ValidationError):
-        MultiDayScheduleReplaceRequest(
+        SchedulePreviewImpactRequest(
             weekdays=[0, 1, 0],
-            effective_from=date(2026, 10, 15),
             sessions=[],
         )
 
     # Out-of-range weekday rejected
     with pytest.raises(ValidationError):
-        MultiDayScheduleReplaceRequest(
+        SchedulePreviewImpactRequest(
             weekdays=[0, 7],
-            effective_from=date(2026, 10, 15),
             sessions=[],
         )
 
     # Empty weekdays rejected
     with pytest.raises(ValidationError):
-        MultiDayScheduleReplaceRequest(
+        SchedulePreviewImpactRequest(
             weekdays=[],
-            effective_from=date(2026, 10, 15),
             sessions=[],
         )
