@@ -34,6 +34,7 @@ from app.modules.payments.schemas import (
     UpiIntentResponse,
 )
 from app.modules.scheduling.models import SessionOccurrence
+from app.modules.visits.locking import lock_visit_lifecycle
 from app.modules.visits.models import Visit
 
 
@@ -135,20 +136,12 @@ class PaymentService:
         if record.response_body is not None:
             return PaymentConfirmationResponse.model_validate(record.response_body)
 
-        payment = self._locked_payment(payment_id)
+        payment, visit = self._locked_payment_visit(payment_id)
         if payment.status == "CONFIRMED":
             raise AppError("PAYMENT_ALREADY_CONFIRMED", "Payment has already been confirmed.", 409)
         if payment.status != "PENDING":
             raise AppError("PAYMENT_INVALID_STATE", "Only a pending payment can be confirmed.", 409)
 
-        visit = self.db.scalar(
-            select(Visit).where(
-                Visit.visit_id == payment.visit_id,
-                Visit.clinic_id == self.context.clinic_id,
-            ).with_for_update()
-        )
-        if visit is None:
-            raise RuntimeError("Payment visit integrity failure")
         if visit.status == "ABORTED":
             raise AppError("VISIT_ABORTED", "Payment cannot be confirmed for an aborted visit.", 409)
         if visit.status not in {"ACTIVE", "COMPLETED"}:
@@ -202,7 +195,7 @@ class PaymentService:
         if record.response_body is not None:
             return PaymentVoidResponse.model_validate(record.response_body)
 
-        payment = self._locked_payment(payment_id)
+        payment, _visit = self._locked_payment_visit(payment_id)
         if payment.status != "CONFIRMED":
             raise AppError("PAYMENT_INVALID_STATE", "Only a confirmed payment can be voided.", 409)
         now = self.clock.now_utc()
@@ -491,7 +484,13 @@ class PaymentService:
             raise AppError("PAYMENT_NOT_FOUND", "Payment not found.", 404)
         return payment
 
-    def _locked_payment(self, payment_id: UUID) -> Payment:
+    def _locked_payment_visit(self, payment_id: UUID) -> tuple[Payment, Visit]:
+        visit_id = self.db.scalar(select(Payment.visit_id).where(
+            Payment.payment_id == payment_id, Payment.clinic_id == self.context.clinic_id
+        ))
+        if visit_id is None:
+            raise AppError("PAYMENT_NOT_FOUND", "Payment not found.", 404)
+        _, visit = lock_visit_lifecycle(self.db, self.context.clinic_id, visit_id)
         payment = self.db.scalar(
             select(Payment)
             .where(
@@ -499,10 +498,11 @@ class PaymentService:
                 Payment.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if payment is None:
             raise AppError("PAYMENT_NOT_FOUND", "Payment not found.", 404)
-        return payment
+        return payment, visit
 
     def _upi_config(self, *, required_active: bool) -> UpiConfiguration:
         config = self.db.scalar(

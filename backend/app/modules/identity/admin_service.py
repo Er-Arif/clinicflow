@@ -10,7 +10,7 @@ from app.core.context import request_id_var
 from app.core.errors import AppError
 from app.core.security import PasswordService
 from app.modules.audit.service import AuditService
-from app.modules.clinic.models import Doctor
+from app.modules.clinic.models import Clinic, Doctor
 from app.modules.identity.admin_schemas import (
     ALLOWED_ROLE_CODES,
     RolePresetResponse,
@@ -80,6 +80,8 @@ class UserAdminService:
         return self._response(user)
 
     def create(self, request: UserCreateRequest) -> UserAdminResponse:
+        if "OWNER_ADMIN" in request.role_codes:
+            self._lock_clinic_authority()
         display_name = _clean_required(request.display_name, field="Name")
         login_identifier = request.login_identifier.strip()
         validate_new_password(request.temporary_password)
@@ -128,10 +130,13 @@ class UserAdminService:
         return self._response(user)
 
     def update(self, user_id: UUID, request: UserUpdateRequest) -> UserAdminResponse:
+        if request.role_codes is not None or request.active is not None:
+            self._lock_clinic_authority()
         user = self.db.scalar(
             select(User)
             .where(User.user_id == user_id, User.clinic_id == self.context.clinic_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if user is None:
             self._not_found()
@@ -301,6 +306,18 @@ class UserAdminService:
                 .where(UserRole.user_id == user_id, Role.active.is_(True))
             ).all()
         )
+
+    def _lock_clinic_authority(self) -> None:
+        # All authority additions/removals take this before any user row lock.
+        # NO KEY UPDATE serializes the count + mutation while allowing FK KEY SHARE
+        # checks from unrelated user/audit inserts. The caller owns the transaction.
+        clinic_id = self.db.scalar(
+            select(Clinic.clinic_id)
+            .where(Clinic.clinic_id == self.context.clinic_id)
+            .with_for_update(key_share=True)
+        )
+        if clinic_id is None:
+            raise AppError("CLINIC_NOT_FOUND", "Clinic configuration was not found.", 404)
 
     def _assert_another_active_owner(self, user_id: UUID) -> None:
         owner_role_id = self.db.scalar(

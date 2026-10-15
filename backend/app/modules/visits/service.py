@@ -25,6 +25,7 @@ from app.modules.payments.schemas import PaymentSummary
 from app.modules.scheduling.concurrency import acquire_doctor_date_locks
 from app.modules.scheduling.models import SessionOccurrence
 from app.modules.scheduling.service import SchedulingService
+from app.modules.visits.locking import lock_visit_lifecycle
 from app.modules.visits.models import Visit
 from app.modules.visits.schemas import CheckInResponse, VisitResponse, WalkInRequest
 
@@ -272,29 +273,9 @@ class VisitService:
         if record.response_body is not None:
             return VisitCompletionResponse.model_validate(record.response_body)
 
-        visit = self.db.scalar(
-            select(Visit)
-            .where(
-                Visit.visit_id == visit_id,
-                Visit.clinic_id == self.context.clinic_id,
-            )
-            .with_for_update()
-        )
-        if visit is None:
-            raise AppError("VISIT_NOT_FOUND", "Visit not found.", 404)
+        appointment, visit = lock_visit_lifecycle(self.db, self.context.clinic_id, visit_id)
         if visit.status != "ACTIVE":
             raise AppError("VISIT_INVALID_STATE", "Only an active visit can be completed.", 409)
-
-        appointment = self.db.scalar(
-            select(Appointment)
-            .where(
-                Appointment.appointment_id == visit.appointment_id,
-                Appointment.clinic_id == self.context.clinic_id,
-            )
-            .with_for_update()
-        )
-        if appointment is None:
-            raise RuntimeError("Visit appointment integrity failure")
         if appointment.status != "CHECKED_IN":
             raise AppError(
                 "APPOINTMENT_INVALID_STATE",
@@ -310,6 +291,7 @@ class VisitService:
                 Payment.status.in_(["PENDING", "CONFIRMED"]),
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         now = self.clock.now_utc()
         today = self.clock.clinic_date()

@@ -638,12 +638,15 @@ class AppointmentService:
                 Appointment.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if appointment is None:
             raise AppError("APPOINTMENT_NOT_FOUND", "Appointment not found.", 404)
         return appointment
 
     def _locked_visit_payment(self, appointment_id: UUID) -> tuple[Visit, Payment]:
+        # Caller already holds Appointment: keep the lifecycle A -> V -> P order
+        # shared with visits.locking and payment confirmation/correction.
         visit = self.db.scalar(
             select(Visit)
             .where(
@@ -651,6 +654,7 @@ class AppointmentService:
                 Visit.clinic_id == self.context.clinic_id,
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if visit is None:
             raise AppError("VISIT_NOT_FOUND", "No visit exists for this appointment.", 409)
@@ -662,6 +666,7 @@ class AppointmentService:
                 Payment.status.in_(["PENDING", "CONFIRMED"]),
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if payment is None:
             raise AppError("PAYMENT_NOT_FOUND", "No current payment exists for this visit.", 409)
