@@ -21,6 +21,7 @@ from app.modules.audit.service import AuditService
 from app.modules.clinic.models import Doctor
 from app.modules.identity.service import AuthContext
 from app.modules.scheduling.concurrency import acquire_doctor_date_locks, acquire_schedule_gate
+from app.modules.scheduling.lifecycle import WeekdayTimeline, load_weekday_timeline
 from app.modules.scheduling.models import (
     FeeConfiguration,
     ScheduleDefinition,
@@ -75,8 +76,8 @@ def _normalize_proposal_hash(weekdays: list[int], sessions: list[SessionWrite]) 
             {
                 "display_order": s.display_order,
                 "session_name": s.session_name.strip(),
-                "start_time": s.start_time.strftime("%H:%M:%S"),
-                "end_time": s.end_time.strftime("%H:%M:%S"),
+                "start_time": s.start_time.isoformat(),
+                "end_time": s.end_time.isoformat(),
                 "slot_interval_minutes": s.slot_interval_minutes,
                 "maximum_capacity": s.maximum_capacity,
                 "active": s.active,
@@ -207,7 +208,6 @@ class SchedulingService:
             .where(
                 ScheduleDefinition.clinic_id == self.context.clinic_id,
                 ScheduleDefinition.doctor_id == doctor_id,
-                ScheduleDefinition.active.is_(True),
             )
             .order_by(ScheduleDefinition.weekday, ScheduleDefinition.effective_from)
         ).all()
@@ -263,11 +263,44 @@ class SchedulingService:
             days=weekday_responses,
         )
 
+    def _protection_horizon(self, doctor_id: UUID) -> date:
+        # No persisted booking-horizon setting exists in V1: use the spec's 30-day
+        # fallback, active booking tail, and existing exception-tail protection.
+        horizon_limit = self.clock.clinic_date() + timedelta(days=30)
+        latest_booking_date = self.db.scalar(
+            select(func.max(SessionOccurrence.occurrence_date))
+            .join(
+                Appointment,
+                Appointment.session_occurrence_id == SessionOccurrence.session_occurrence_id,
+            )
+            .where(
+                Appointment.clinic_id == self.context.clinic_id,
+                Appointment.doctor_id == doctor_id,
+                Appointment.status != "CANCELLED",
+            )
+        )
+        if latest_booking_date and (latest_booking_date + timedelta(days=7)) > horizon_limit:
+            horizon_limit = latest_booking_date + timedelta(days=7)
+
+        latest_blocked_date = self.db.scalar(
+            select(func.max(SessionOccurrence.occurrence_date)).where(
+                SessionOccurrence.clinic_id == self.context.clinic_id,
+                SessionOccurrence.doctor_id == doctor_id,
+                SessionOccurrence.status == "BLOCKED",
+            )
+        )
+        if latest_blocked_date and (latest_blocked_date + timedelta(days=7)) > horizon_limit:
+            horizon_limit = latest_blocked_date + timedelta(days=7)
+
+        return horizon_limit
+
     def _evaluate_weekday_safe_date(
         self,
         doctor_id: UUID,
         weekday: int,
         proposed_sessions: list[SessionWrite],
+        *,
+        timeline: WeekdayTimeline | None = None,
     ) -> tuple[
         date,
         str,
@@ -280,35 +313,32 @@ class SchedulingService:
         t_clinic = self.clock.clinic_date()
         clock_now = self.clock.clinic_now().time()
 
-        defs = self.db.scalars(
-            select(ScheduleDefinition)
-            .where(
-                ScheduleDefinition.clinic_id == self.context.clinic_id,
-                ScheduleDefinition.doctor_id == doctor_id,
-                ScheduleDefinition.weekday == weekday,
-                ScheduleDefinition.active.is_(True),
+        timeline = timeline or load_weekday_timeline(
+            self.db, self.context.clinic_id, doctor_id, weekday, t_clinic
+        )
+        def_active = timeline.current
+        def_upcoming = timeline.planned
+
+        # PostgreSQL's exclusion constraint only covers working definitions.
+        # Refuse malformed existing lifecycle boundaries even for day-off plans;
+        # never turn an in-place edit into an overlapping or gapped timeline.
+        if def_upcoming and (
+            (
+                timeline.predecessor is not None
+                and timeline.predecessor.effective_to
+                != def_upcoming.effective_from - timedelta(days=1)
             )
-            .order_by(ScheduleDefinition.effective_from.desc())
-        ).all()
-
-        current_candidates = [
-            d
-            for d in defs
-            if d.effective_from <= t_clinic
-            and (d.effective_to is None or d.effective_to >= t_clinic)
-        ]
-        def_active = (
-            max(current_candidates, key=lambda d: d.effective_from)
-            if current_candidates
-            else None
-        )
-
-        upcoming_candidates = [d for d in defs if d.effective_from > t_clinic]
-        def_upcoming = (
-            min(upcoming_candidates, key=lambda d: d.effective_from)
-            if upcoming_candidates
-            else None
-        )
+            or (
+                timeline.successor is not None
+                and def_upcoming.effective_to
+                != timeline.successor.effective_from - timedelta(days=1)
+            )
+        ):
+            raise AppError(
+                "UNRESOLVABLE_APPOINTMENT_CONFLICT",
+                "Existing planned schedule boundaries require review before editing.",
+                409,
+            )
 
         initial_reason: str
         d_candidate: date
@@ -331,21 +361,7 @@ class SchedulingService:
             )
         elif weekday == t_clinic.weekday():
             # Same-day evaluation: check affected sessions
-            active_sessions = (
-                list(
-                    self.db.scalars(
-                        select(SessionDefinition)
-                        .where(
-                            SessionDefinition.schedule_definition_id
-                            == def_active.schedule_definition_id,
-                            SessionDefinition.active.is_(True),
-                        )
-                        .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
-                    ).all()
-                )
-                if def_active
-                else []
-            )
+            active_sessions = timeline.working_sessions(def_active)
 
             can_apply_today = True
             unstarted_reason = ""
@@ -419,43 +435,33 @@ class SchedulingService:
             d_candidate = t_clinic + timedelta(days=delta)
             initial_reason = f"Applies from {d_candidate.strftime('%d %b %Y')}."
 
-        # Scan for appointment conflicts across deterministic horizon
-        latest_booking_date = self.db.scalar(
-            select(func.max(SessionOccurrence.occurrence_date))
-            .join(
-                Appointment,
-                Appointment.session_occurrence_id == SessionOccurrence.session_occurrence_id,
-            )
-            .where(
-                Appointment.clinic_id == self.context.clinic_id,
-                Appointment.doctor_id == doctor_id,
-                Appointment.status != "CANCELLED",
-                func.extract("dow", SessionOccurrence.occurrence_date) == ((weekday + 1) % 7),
-            )
+        # A plan starts at P and may only move later (spec 7.1). Scan its entire
+        # affected period, stopping at an independent successor, never at old P.
+        horizon_limit = self._protection_horizon(doctor_id)
+        # A shrinking occupancy horizon must not invalidate an existing planned
+        # start. Only retain that start beyond the horizon; lifecycle bounds still
+        # constrain it, and conflict-driven advancement remains horizon-limited.
+        candidate_limit = (
+            max(horizon_limit, def_upcoming.effective_from) if def_upcoming else horizon_limit
         )
-
-        horizon_limit = t_clinic + timedelta(days=30)
-        if latest_booking_date and (latest_booking_date + timedelta(days=7)) > horizon_limit:
-            horizon_limit = latest_booking_date + timedelta(days=7)
-
-        latest_blocked_date = self.db.scalar(
-            select(func.max(SessionOccurrence.occurrence_date)).where(
-                SessionOccurrence.clinic_id == self.context.clinic_id,
-                SessionOccurrence.doctor_id == doctor_id,
-                SessionOccurrence.status == "BLOCKED",
-                func.extract("dow", SessionOccurrence.occurrence_date) == ((weekday + 1) % 7),
+        period_end = horizon_limit
+        if def_upcoming and def_upcoming.effective_to is not None:
+            period_end = min(period_end, def_upcoming.effective_to)
+            candidate_limit = min(candidate_limit, def_upcoming.effective_to)
+        if timeline.successor:
+            period_end = min(period_end, timeline.successor.effective_from - timedelta(days=1))
+            candidate_limit = min(
+                candidate_limit, timeline.successor.effective_from - timedelta(days=1)
             )
-        )
-        if latest_blocked_date and (latest_blocked_date + timedelta(days=7)) > horizon_limit:
-            horizon_limit = latest_blocked_date + timedelta(days=7)
 
-        curr = d_candidate
         conflict_detected = False
         total_conflicts_count = 0
         conflict_metadata: dict[str, Any] | None = None
         safe_date = d_candidate
-
-        while curr <= horizon_limit:
+        active_proposed = [s for s in proposed_sessions if s.active]
+        conflicts: dict[date, tuple[str, int]] = {}
+        curr = d_candidate + timedelta(days=(weekday - d_candidate.weekday()) % 7)
+        while curr <= period_end:
             blocked_count = self.db.scalar(
                 select(func.count(SessionOccurrence.session_occurrence_id)).where(
                     SessionOccurrence.clinic_id == self.context.clinic_id,
@@ -464,45 +470,76 @@ class SchedulingService:
                     SessionOccurrence.status == "BLOCKED",
                 )
             )
-
-            active_proposed = [s for s in proposed_sessions if s.active]
             occupancy = effective_occupancy(
                 self.db, self.context.clinic_id, doctor_id, curr, active_proposed
             )
-            date_conflict_msg = occupancy.conflict_reason(active_proposed) or ""
-            if blocked_count and blocked_count > 0:
-                date_conflict_msg = f"{blocked_count} session(s) blocked on this date."
+            reason = occupancy.conflict_reason(active_proposed)
+            if blocked_count:
+                reason = f"{blocked_count} session(s) blocked on this date."
             elif not active_proposed and occupancy.appointment_count:
-                date_conflict_msg = (
-                    f"{occupancy.appointment_count} existing appointment(s) booked on day marked not working."
-                )
-            date_conflict = bool(date_conflict_msg)
-
-            if date_conflict:
-                conflict_detected = True
-                total_conflicts_count += occupancy.appointment_count
-                if conflict_metadata is None:
-                    conflict_metadata = {
-                        "conflicting_date": curr.isoformat(),
-                        "conflicting_appointments_count": occupancy.appointment_count,
-                        "reason": date_conflict_msg,
-                    }
-                safe_date = max(safe_date, curr + timedelta(days=7))
-
+                reason = f"{occupancy.appointment_count} existing appointment(s) booked on day marked not working."
+            if reason:
+                conflicts[curr] = (reason, occupancy.appointment_count)
             curr += timedelta(days=7)
 
-        if safe_date > horizon_limit:
+        # The first candidate after the last incompatible recurrence is the earliest
+        # whose whole proposed period is compatible. No first-empty-date shortcut.
+        if conflicts:
+            weeks_to_advance = (max(conflicts) - d_candidate).days // 7 + 1
+            safe_date = d_candidate + timedelta(days=7 * weeks_to_advance)
+            conflict_detected = True
+            total_conflicts_count = sum(count for _, count in conflicts.values())
+            first = min(conflicts)
+            conflict_metadata = {
+                "conflicting_date": first.isoformat(),
+                "conflicting_appointments_count": conflicts[first][1],
+                "reason": conflicts[first][0],
+            }
+
+        restoration_conflict = None
+        if def_upcoming and safe_date > def_upcoming.effective_from:
+            predecessor = timeline.predecessor
+            if predecessor and predecessor.effective_to is not None and predecessor.effective_to < t_clinic:
+                restoration_conflict = "Retargeting cannot rewrite an already-ended historical period."
+            curr = def_upcoming.effective_from + timedelta(
+                days=(weekday - def_upcoming.effective_from.weekday()) % 7
+            )
+            while restoration_conflict is None and curr < safe_date and curr <= period_end:
+                restored = effective_occupancy(
+                    self.db, self.context.clinic_id, doctor_id, curr,
+                    timeline.working_sessions(predecessor),
+                )
+                restoration_conflict = restored.conflict_reason(timeline.working_sessions(predecessor))
+                # A displaced block cannot silently become bookable
+                # through the restored predecessor's different session identity.
+                block_query = (
+                    select(SessionOccurrence.session_occurrence_id)
+                    .join(SessionDefinition)
+                    .where(
+                        SessionOccurrence.clinic_id == self.context.clinic_id,
+                        SessionOccurrence.doctor_id == doctor_id,
+                        SessionOccurrence.occurrence_date == curr,
+                        SessionOccurrence.status == "BLOCKED",
+                    )
+                )
+                if predecessor:
+                    block_query = block_query.where(
+                        SessionDefinition.schedule_definition_id != predecessor.schedule_definition_id
+                    )
+                displaced_block = self.db.scalar(block_query.limit(1))
+                if displaced_block:
+                    restoration_conflict = "Retargeting would displace a blocked planned session."
+                curr += timedelta(days=7)
+
+        if safe_date > candidate_limit or restoration_conflict:
             raise AppError(
                 code="UNRESOLVABLE_APPOINTMENT_CONFLICT",
-                message=(
-                    f"All upcoming occurrences through {horizon_limit.strftime('%d %b %Y')} "
-                    f"have conflicting appointments."
-                ),
+                message="No compatible schedule date exists within the protected lifecycle period.",
                 status_code=409,
                 details={
-                    "latest_conflicting_date": horizon_limit.isoformat(),
+                    "latest_conflicting_date": period_end.isoformat(),
                     "conflicting_appointments_count": total_conflicts_count,
-                    "suggested_action": "Reschedule conflicting appointments or select a date beyond the horizon.",
+                    "suggested_action": "Review conflicting appointments and planned schedule boundaries.",
                 },
             )
         if conflict_detected and conflict_metadata:
@@ -543,6 +580,10 @@ class SchedulingService:
         ]
 
         for weekday in sorted(request.weekdays):
+            timeline = load_weekday_timeline(
+                self.db, self.context.clinic_id, doctor_id, weekday, self.clock.clinic_date()
+            )
+            stored_fingerprint = timeline.fingerprint()
             (
                 safe_date,
                 reason,
@@ -551,7 +592,9 @@ class SchedulingService:
                 conflict_meta,
                 def_active,
                 def_upcoming,
-            ) = self._evaluate_weekday_safe_date(doctor_id, weekday, request.sessions)
+            ) = self._evaluate_weekday_safe_date(
+                doctor_id, weekday, request.sessions, timeline=timeline
+            )
 
             impacts.append(
                 DayImpactResponse(
@@ -570,6 +613,7 @@ class SchedulingService:
                 "upcoming_id": str(def_upcoming.schedule_definition_id) if def_upcoming else None,
                 "upcoming_version": def_upcoming.version if def_upcoming else None,
                 "safe_date": safe_date.isoformat(),
+                "stored_state_fingerprint": stored_fingerprint,
             }
 
         token = _create_proposal_token(
@@ -603,6 +647,8 @@ class SchedulingService:
             expected_payload_hash=payload_hash,
             now=now,
         )
+        if token_claims.get("weekdays") != sorted(request.weekdays):
+            raise AppError("STALE_SCHEDULE_PREVIEW", "Preview scope has changed. Please review again.", 409)
         expected_states = token_claims["expected_states"]
 
         t_clinic = self.clock.clinic_date()
@@ -610,31 +656,7 @@ class SchedulingService:
         # Prevent writes beyond (or extending) the observed horizon while it is computed.
         acquire_schedule_gate(self.db, doctor_id, exclusive=True)
         # 2. Acquire doctor-date transaction advisory locks in deterministic order across horizon
-        horizon_limit = t_clinic + timedelta(days=30)
-        latest_booking_date = self.db.scalar(
-            select(func.max(SessionOccurrence.occurrence_date))
-            .join(
-                Appointment,
-                Appointment.session_occurrence_id == SessionOccurrence.session_occurrence_id,
-            )
-            .where(
-                Appointment.clinic_id == self.context.clinic_id,
-                Appointment.doctor_id == doctor_id,
-                Appointment.status != "CANCELLED",
-            )
-        )
-        if latest_booking_date and (latest_booking_date + timedelta(days=7)) > horizon_limit:
-            horizon_limit = latest_booking_date + timedelta(days=7)
-
-        latest_blocked_date = self.db.scalar(
-            select(func.max(SessionOccurrence.occurrence_date)).where(
-                SessionOccurrence.clinic_id == self.context.clinic_id,
-                SessionOccurrence.doctor_id == doctor_id,
-                SessionOccurrence.status == "BLOCKED",
-            )
-        )
-        if latest_blocked_date and (latest_blocked_date + timedelta(days=7)) > horizon_limit:
-            horizon_limit = latest_blocked_date + timedelta(days=7)
+        horizon_limit = self._protection_horizon(doctor_id)
 
         dates_to_lock: list[date] = []
         for weekday in request.weekdays:
@@ -647,62 +669,33 @@ class SchedulingService:
         acquire_doctor_date_locks(self.db, doctor_id, dates_to_lock)
 
         # 3. Acquire ScheduleDefinition row locks
-        locked_defs = list(
-            self.db.scalars(
-                select(ScheduleDefinition)
-                .where(
-                    ScheduleDefinition.clinic_id == self.context.clinic_id,
-                    ScheduleDefinition.doctor_id == doctor_id,
-                    ScheduleDefinition.weekday.in_(request.weekdays),
-                )
-                .order_by(ScheduleDefinition.weekday, ScheduleDefinition.effective_from)
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            ).all()
-        )
+        self.db.scalars(
+            select(ScheduleDefinition)
+            .where(
+                ScheduleDefinition.clinic_id == self.context.clinic_id,
+                ScheduleDefinition.doctor_id == doctor_id,
+                ScheduleDefinition.weekday.in_(request.weekdays),
+            )
+            .order_by(ScheduleDefinition.weekday, ScheduleDefinition.effective_from)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
 
-        # 3. Verify expected schedule identities & versions against locked DB state
+        # 3. Compare canonical stored content under the existing exclusive gate
+        # and row locks. Business versions are deliberately not edit counters.
+        timelines: dict[int, WeekdayTimeline] = {}
         for weekday in request.weekdays:
-            state = expected_states.get(str(weekday))
-            if not state:
-                raise AppError("STALE_SCHEDULE_PREVIEW", "Preview state missing for weekday.", 409)
-
-            w_defs = [d for d in locked_defs if d.weekday == weekday and d.active]
-            curr_active_cands = [
-                d
-                for d in w_defs
-                if d.effective_from <= t_clinic
-                and (d.effective_to is None or d.effective_to >= t_clinic)
-            ]
-            curr_active = (
-                max(curr_active_cands, key=lambda d: d.effective_from)
-                if curr_active_cands
-                else None
+            timeline = load_weekday_timeline(
+                self.db, self.context.clinic_id, doctor_id, weekday, t_clinic
             )
-
-            curr_upcoming_cands = [d for d in w_defs if d.effective_from > t_clinic]
-            curr_upcoming = (
-                min(curr_upcoming_cands, key=lambda d: d.effective_from)
-                if curr_upcoming_cands
-                else None
-            )
-
-            curr_active_id = str(curr_active.schedule_definition_id) if curr_active else None
-            curr_active_ver = curr_active.version if curr_active else None
-            curr_upcoming_id = str(curr_upcoming.schedule_definition_id) if curr_upcoming else None
-            curr_upcoming_ver = curr_upcoming.version if curr_upcoming else None
-
-            if (
-                curr_active_id != state["active_id"]
-                or curr_active_ver != state["active_version"]
-                or curr_upcoming_id != state["upcoming_id"]
-                or curr_upcoming_ver != state["upcoming_version"]
-            ):
+            state = expected_states.get(str(weekday), {})
+            if timeline.fingerprint() != state.get("stored_state_fingerprint"):
                 raise AppError(
-                    code="STALE_SCHEDULE_PREVIEW",
-                    message="Schedule has been modified by another user. Please review and apply again.",
-                    status_code=409,
+                    "STALE_SCHEDULE_PREVIEW",
+                    "Schedule has been modified. Please review and apply again.",
+                    409,
                 )
+            timelines[weekday] = timeline
 
         # 4. Rerun complete live conflict scan & safe-date calculation
         recomputed: dict[
@@ -718,7 +711,9 @@ class SchedulingService:
                 _meta,
                 def_active,
                 def_upcoming,
-            ) = self._evaluate_weekday_safe_date(doctor_id, weekday, request.sessions)
+            ) = self._evaluate_weekday_safe_date(
+                doctor_id, weekday, request.sessions, timeline=timelines[weekday]
+            )
             expected_safe_date_str = expected_states[str(weekday)]["safe_date"]
             if safe_date.isoformat() != expected_safe_date_str:
                 raise AppError(
@@ -732,68 +727,25 @@ class SchedulingService:
         for weekday in sorted(request.weekdays):
             safe_date, def_active, def_upcoming = recomputed[weekday]
 
-            if def_upcoming and safe_date == def_upcoming.effective_from:
-                # Update future planned definition in-place
-                def_upcoming.active = bool(request.sessions)
-                existing_sessions = list(
-                    self.db.scalars(
-                        select(SessionDefinition)
-                        .where(
-                            SessionDefinition.schedule_definition_id
-                            == def_upcoming.schedule_definition_id
-                        )
-                        .order_by(SessionDefinition.display_order, SessionDefinition.start_time)
-                    ).all()
-                )
-                min_len = min(len(existing_sessions), len(request.sessions))
-                for i in range(min_len):
-                    sess = existing_sessions[i]
-                    req_sess = request.sessions[i]
-                    sess.session_name = req_sess.session_name.strip()
-                    sess.start_time = req_sess.start_time
-                    sess.end_time = req_sess.end_time
-                    sess.slot_interval_minutes = req_sess.slot_interval_minutes
-                    sess.maximum_capacity = req_sess.maximum_capacity
-                    sess.active = req_sess.active
-                    sess.display_order = req_sess.display_order
-
-                if len(request.sessions) > len(existing_sessions):
-                    for i in range(len(existing_sessions), len(request.sessions)):
-                        req_sess = request.sessions[i]
-                        self.db.add(
-                            SessionDefinition(
-                                clinic_id=self.context.clinic_id,
-                                schedule_definition_id=def_upcoming.schedule_definition_id,
-                                session_name=req_sess.session_name.strip(),
-                                start_time=req_sess.start_time,
-                                end_time=req_sess.end_time,
-                                slot_interval_minutes=req_sess.slot_interval_minutes,
-                                maximum_capacity=req_sess.maximum_capacity,
-                                active=req_sess.active,
-                                display_order=req_sess.display_order,
-                            )
-                        )
-                elif len(existing_sessions) > len(request.sessions):
-                    for i in range(len(request.sessions), len(existing_sessions)):
-                        sess = existing_sessions[i]
-                        occ_count = self.db.scalar(
-                            select(func.count(SessionOccurrence.session_occurrence_id)).where(
-                                SessionOccurrence.session_definition_id
-                                == sess.session_definition_id
-                            )
-                        )
-                        if occ_count == 0:
-                            self.db.delete(sess)
-                        else:
-                            sess.active = False
-                            sess.display_order = 1000 + i
-
+            if def_upcoming:
+                # Shrink/move the plan first so extending its predecessor cannot
+                # violate the immediate PostgreSQL exclusion constraint.
+                retargeted = def_upcoming.effective_from != safe_date
+                def_upcoming.effective_from = safe_date
+                def_upcoming.active = any(session.active for session in request.sessions)
+                self.db.flush()
+                predecessor = timelines[weekday].predecessor
+                if retargeted and predecessor is not None:
+                    predecessor.effective_to = safe_date - timedelta(days=1)
+                    self.db.flush()
+                self._replace_planned_sessions(def_upcoming, request.sessions)
                 target_def = def_upcoming
             else:
                 # Close active definition & create new business version
                 if def_active:
                     def_active.effective_to = safe_date - timedelta(days=1)
                     next_version = def_active.version + 1
+                    self.db.flush()
                 else:
                     next_version = 1
 
@@ -803,7 +755,7 @@ class SchedulingService:
                     weekday=weekday,
                     effective_from=safe_date,
                     effective_to=None,
-                    active=bool(request.sessions),
+                    active=any(session.active for session in request.sessions),
                     version=next_version,
                     created_by=self.context.user_id,
                 )
@@ -880,6 +832,53 @@ class SchedulingService:
 
         self.db.flush()
         return self.schedule_overview(doctor_id)
+
+    def _replace_planned_sessions(
+        self, definition: ScheduleDefinition, proposed: list[SessionWrite]
+    ) -> None:
+        """Edit unactivated content without deleting any occurrence's anchor."""
+        existing = list(
+            self.db.scalars(
+                select(SessionDefinition)
+                .where(
+                    SessionDefinition.schedule_definition_id == definition.schedule_definition_id,
+                )
+                .order_by(SessionDefinition.display_order, SessionDefinition.session_definition_id)
+            ).all()
+        )
+        # Reserve distinct temporary orders before assigning the final ones. This
+        # avoids transient unique-key collisions on swaps and repeated off/on edits.
+        for index, session in enumerate(existing):
+            session.display_order = -index - 1
+        self.db.flush()
+        for index, request in enumerate(sorted(proposed, key=lambda s: s.display_order)):
+            if index < len(existing):
+                session = existing[index]
+            else:
+                session = SessionDefinition(
+                    clinic_id=self.context.clinic_id,
+                    schedule_definition_id=definition.schedule_definition_id,
+                )
+                self.db.add(session)
+            session.session_name = request.session_name.strip()
+            session.start_time = request.start_time
+            session.end_time = request.end_time
+            session.slot_interval_minutes = request.slot_interval_minutes
+            session.maximum_capacity = request.maximum_capacity
+            session.active = request.active
+            session.display_order = request.display_order
+        for index, session in enumerate(existing[len(proposed):], start=len(proposed)):
+            referenced = self.db.scalar(
+                select(SessionOccurrence.session_occurrence_id)
+                .where(SessionOccurrence.session_definition_id == session.session_definition_id)
+                .limit(1)
+            )
+            if referenced is None:
+                self.db.delete(session)
+            else:
+                session.active = False
+                session.display_order = 1000 + index
+        self.db.flush()
 
     def availability(self, doctor_id: UUID, target_date: date) -> AvailabilityResponse:
         self._doctor(doctor_id)
