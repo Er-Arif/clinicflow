@@ -96,6 +96,72 @@ def test_only_explicitly_trusted_proxy_can_supply_client_ip(peer, forwarded, exp
     with TestClient(proxy, client=(peer, 1234)) as client:
         assert client.get("/peer", headers={"X-Forwarded-For": forwarded}).json() == {"ip": expected}
 
+def test_railway_client_ip_uses_valid_x_real_ip(monkeypatch):
+    from fastapi import Request
+
+    from app.core import auth_throttle as auth_throttle_module
+
+    probe = FastAPI()
+
+    @probe.get("/peer")
+    def identity(request: Request):
+        return {"ip": auth_client_ip(request)}
+
+    monkeypatch.setattr(
+        auth_throttle_module.settings,
+        "client_ip_source",
+        "railway",
+    )
+
+    with TestClient(probe, client=("10.0.0.1", 1234)) as client:
+        response = client.get(
+            "/peer",
+            headers={
+                "X-Real-IP": "203.0.113.42",
+                "X-Forwarded-For": "198.51.100.99",
+            },
+        )
+
+    assert response.json() == {"ip": "203.0.113.42"}
+
+
+@pytest.mark.parametrize(
+    "x_real_ip",
+    [
+        None,
+        "",
+        "not-an-ip",
+        "203.0.113.1, 198.51.100.2",
+    ],
+)
+def test_railway_client_ip_rejects_missing_or_invalid_header(
+    monkeypatch,
+    x_real_ip,
+):
+    from fastapi import Request
+
+    from app.core import auth_throttle as auth_throttle_module
+
+    probe = FastAPI()
+
+    @probe.get("/peer")
+    def identity(request: Request):
+        return {"ip": auth_client_ip(request)}
+
+    monkeypatch.setattr(
+        auth_throttle_module.settings,
+        "client_ip_source",
+        "railway",
+    )
+
+    headers = {}
+    if x_real_ip is not None:
+        headers["X-Real-IP"] = x_real_ip
+
+    with TestClient(probe, client=("10.0.0.1", 1234)) as client:
+        response = client.get("/peer", headers=headers)
+
+    assert response.json() == {"ip": "unknown"}
 
 @pytest.mark.parametrize("overrides", [
     {"access_token_secret": "replace-with-" + "x" * 40},

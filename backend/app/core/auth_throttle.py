@@ -8,11 +8,13 @@ import hashlib
 import logging
 import math
 from collections import deque
+from ipaddress import ip_address
 from threading import Lock
 from time import monotonic
 
 from fastapi import Request
 
+from app.core.config import settings
 from app.core.context import request_id_var
 from app.core.errors import AppError
 
@@ -76,7 +78,20 @@ auth_throttle = AuthThrottle()
 
 
 def auth_client_ip(request: Request) -> str:
-    # Only Uvicorn's explicitly trusted proxy middleware may rewrite this.
+    if settings.client_ip_source == "railway":
+        forwarded = request.headers.get("X-Real-IP")
+        if not forwarded:
+            return "unknown"
+
+        try:
+            return ip_address(forwarded.strip()).compressed
+        except ValueError:
+            logger.warning(
+                "invalid_client_ip_header",
+                extra={"request_id": request_id_var.get()},
+            )
+            return "unknown"
+
     return request.client.host if request.client else "unknown"
 
 

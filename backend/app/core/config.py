@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"])
     cors_origins: list[str] = Field(default_factory=list)
     trusted_proxy_ips: list[str] = Field(default_factory=list)
+    client_ip_source: Literal["socket", "railway"] = "socket"
     db_pool_size: int = Field(default=5, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
     db_pool_timeout: int = Field(default=10, ge=1, le=120)
