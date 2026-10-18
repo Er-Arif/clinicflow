@@ -1,11 +1,12 @@
 import Constants from 'expo-constants';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useGetSystemInfoQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { ClinicFlowLogo } from '@/components/ClinicFlowLogo';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 type SystemInfoWithUpdates = {
@@ -51,13 +52,7 @@ export function AboutScreen() {
     <AppScreen>
       <BackButton />
       <View style={styles.brandHeader}>
-        <Image
-          source={require('../../../assets/clinicflow-lockup.png')}
-          style={styles.logo}
-          resizeMode="contain"
-          accessibilityLabel="ClinicFlow"
-        />
-        <Text style={styles.tagline}>Appointments · Payments · Follow-ups</Text>
+        <ClinicFlowLogo />
       </View>
 
       <View style={styles.card}>
@@ -118,9 +113,7 @@ function compareVersions(a: string, b: string) {
 }
 
 const styles = StyleSheet.create({
-  brandHeader: { alignItems: 'center', marginBottom: spacing.sm, gap: 4 },
-  logo: { width: '78%', height: 64, alignSelf: 'center' },
-  tagline: { fontSize: 13, color: colors.muted, textAlign: 'center' },
+  brandHeader: { alignItems: 'center', marginBottom: spacing.sm },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.muted, flex: 1, fontSize: 13 },
