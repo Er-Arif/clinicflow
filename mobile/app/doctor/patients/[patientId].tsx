@@ -34,7 +34,7 @@ export default function DoctorPatientSummaryScreen() {
       <Text style={styles.subtitle}>
         {data.patient.patient_code} · {data.patient.age != null ? `${data.patient.age} years` : 'Age not recorded'} · {humanize(data.patient.gender)}
       </Text>
-      <Text style={styles.subtitle}>{formatPhone(data.patient.mobile_number)}</Text>
+      <Text style={styles.subtitle}>{data.patient.mobile_number ? formatPhone(data.patient.mobile_number) : 'No mobile number'}</Text>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Visit summary</Text>
