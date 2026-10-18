@@ -21,8 +21,10 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function PaymentDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ paymentId: string }>();
+  const params = useLocalSearchParams<{ paymentId: string; appointmentId?: string; visitId?: string }>();
   const paymentId = String(params.paymentId ?? '');
+  const appointmentId = params.appointmentId ? String(params.appointmentId) : undefined;
+  const visitId = params.visitId ? String(params.visitId) : undefined;
   const payment = useGetPaymentQuery(paymentId, { skip: !paymentId });
   const me = useMeQuery();
   const [confirmPayment, confirmState] = useConfirmPaymentMutation();
@@ -48,7 +50,13 @@ export default function PaymentDetailsScreen() {
 
   async function confirmCash() {
     try {
-      const result = await confirmPayment({ paymentId, paymentMethod: 'CASH', idempotencyKey: cashIdempotencyKey }).unwrap();
+      const result = await confirmPayment({
+        paymentId,
+        paymentMethod: 'CASH',
+        idempotencyKey: cashIdempotencyKey,
+        appointmentId,
+        visitId,
+      }).unwrap();
       router.replace({ pathname: '/assistant/payments/receipt', params: { paymentId: result.payment.payment_id } });
     } catch {
       // Error rendered below.
@@ -88,7 +96,18 @@ export default function PaymentDetailsScreen() {
       {item.status === 'PENDING' ? (
         <>
           <AppButton label={`Confirm ₹${item.amount_due} Cash`} loading={confirmState.isLoading} onPress={() => void confirmCash()} />
-          <AppButton label="Pay by UPI" tone="secondary" onPress={() => router.push({ pathname: '/assistant/payments/upi', params: { paymentId } })} />
+          <AppButton
+            label="Pay by UPI"
+            tone="secondary"
+            onPress={() => router.push({
+              pathname: '/assistant/payments/upi',
+              params: {
+                paymentId,
+                ...(appointmentId ? { appointmentId } : {}),
+                ...(visitId ? { visitId } : {}),
+              },
+            })}
+          />
         </>
       ) : null}
       {item.status === 'CONFIRMED' && item.receipt_number ? (
