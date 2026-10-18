@@ -45,7 +45,7 @@ export default function DoctorPatientSearchScreen() {
       {patients.currentData?.items.map((patient) => (
         <Pressable key={patient.patient_id} style={styles.card} onPress={() => router.push(`/doctor/patients/${patient.patient_id}`)}>
           <Text style={styles.name}>{patient.full_name}</Text>
-          <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number}</Text>
+          <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number || 'No mobile number'}</Text>
           <Text style={styles.meta}>{formatVisitSummary(patient.previous_completed_visits, patient.last_visit_date)}</Text>
         </Pressable>
       ))}
