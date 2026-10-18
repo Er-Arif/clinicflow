@@ -11,7 +11,6 @@ import {
 import { AppScreen } from '@/components/AppScreen';
 import { DateRangeControls, useReportRange } from '@/components/DateRangeControls';
 import { QueryState } from '@/components/QueryState';
-import { MetricCard } from '@/components/MetricCard';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function ReportsScreen() {
@@ -33,71 +32,75 @@ export default function ReportsScreen() {
     <AppScreen refreshing={refreshing} onRefresh={refreshAll}>
       <View style={styles.header}>
         <Text style={styles.title}>Reports</Text>
-        <Text style={styles.subtitle}>Detailed clinic performance</Text>
+        <Text style={styles.subtitle}>Clinic performance and financial activity</Text>
       </View>
 
       <QueryState query={clinicTime} label="clinic date" />
       <View style={styles.filterCard}>
-        <Text style={styles.filterTitle}>Reporting period</Text>
+        <Text style={styles.filterTitle}>Period</Text>
         <DateRangeControls today={clinicTime.data?.clinic_date} selection={selection} />
       </View>
 
       <QueryState query={appointments} label="appointment report" hasData={Boolean(appointments.currentData)} />
       {appointments.currentData ? (
         <ReportSection title="Appointments">
-          <MetricCard label="Total" value={appointments.currentData.total_appointments} />
-          <MetricCard label="Completed" value={appointments.currentData.completed} />
-          <MetricCard label="Cancelled" value={appointments.currentData.cancelled} />
-          <MetricCard label="No-show" value={appointments.currentData.no_show} />
-          <MetricCard label="Rescheduled" value={appointments.currentData.rescheduled} />
-          <MetricCard label="Still booked" value={appointments.currentData.booked} />
-          <View style={styles.chartCard}>
-            <Text style={styles.chartHeading}>Status distribution</Text>
-            {appointments.currentData.total_appointments === 0 ? (
-              <Text style={styles.emptyChart}>No appointments recorded for this period.</Text>
-            ) : (
-              <View style={styles.chartList}>
-                <ChartBarRow label="Completed" count={appointments.currentData.completed} total={appointments.currentData.total_appointments} color={colors.success} />
-                <ChartBarRow label="Booked" count={appointments.currentData.booked} total={appointments.currentData.total_appointments} color={colors.primary} />
-                <ChartBarRow label="Checked in" count={appointments.currentData.checked_in} total={appointments.currentData.total_appointments} color={colors.accent} />
-                <ChartBarRow label="Cancelled" count={appointments.currentData.cancelled} total={appointments.currentData.total_appointments} color={colors.danger} />
-                <ChartBarRow label="No-show" count={appointments.currentData.no_show} total={appointments.currentData.total_appointments} color={colors.warning} />
-                <ChartBarRow label="Rescheduled" count={appointments.currentData.rescheduled} total={appointments.currentData.total_appointments} color={colors.muted} />
-              </View>
-            )}
-          </View>
+          <StatGrid items={[
+            ['Total', appointments.currentData.total_appointments],
+            ['Completed', appointments.currentData.completed],
+            ['Cancelled', appointments.currentData.cancelled],
+            ['No-show', appointments.currentData.no_show],
+            ['Rescheduled', appointments.currentData.rescheduled],
+            ['Still booked', appointments.currentData.booked],
+          ]} />
+          {appointments.currentData.total_appointments > 0 ? (
+            <View style={styles.chartBlock}>
+              <Text style={styles.chartHeading}>Status distribution</Text>
+              <ChartBarRow label="Completed" count={appointments.currentData.completed} total={appointments.currentData.total_appointments} color={colors.success} />
+              <ChartBarRow label="Booked" count={appointments.currentData.booked} total={appointments.currentData.total_appointments} color={colors.primary} />
+              <ChartBarRow label="Checked in" count={appointments.currentData.checked_in} total={appointments.currentData.total_appointments} color={colors.accent} />
+              <ChartBarRow label="Cancelled" count={appointments.currentData.cancelled} total={appointments.currentData.total_appointments} color={colors.danger} />
+              <ChartBarRow label="No-show" count={appointments.currentData.no_show} total={appointments.currentData.total_appointments} color={colors.warning} />
+              <ChartBarRow label="Rescheduled" count={appointments.currentData.rescheduled} total={appointments.currentData.total_appointments} color={colors.muted} />
+            </View>
+          ) : <Text style={styles.empty}>No appointments in this period.</Text>}
         </ReportSection>
       ) : null}
 
       <QueryState query={patients} label="patient report" hasData={Boolean(patients.currentData)} />
       {patients.currentData ? (
         <ReportSection title="Patients">
-          <MetricCard label="New patients" value={patients.currentData.new_patients} />
-          <MetricCard label="Returning visits" value={patients.currentData.returning_patient_visits} />
-          <MetricCard label="Unique patients" value={patients.currentData.unique_patients} />
+          <StatGrid items={[
+            ['New patients', patients.currentData.new_patients],
+            ['Returning visits', patients.currentData.returning_patient_visits],
+            ['Unique patients', patients.currentData.unique_patients],
+          ]} />
         </ReportSection>
       ) : null}
 
       <QueryState query={followups} label="follow-up report" hasData={Boolean(followups.currentData)} />
       {followups.currentData ? (
         <ReportSection title="Follow-ups">
-          <MetricCard label="Created" value={followups.currentData.created} />
-          <MetricCard label="Booked" value={followups.currentData.booked_events} />
-          <MetricCard label="Closed" value={followups.currentData.closed_events} />
-          <MetricCard label="Open now" value={followups.currentData.open_current} />
-          <MetricCard label="Overdue" value={followups.currentData.overdue_current} />
+          <StatGrid items={[
+            ['Created', followups.currentData.created],
+            ['Booked', followups.currentData.booked_events],
+            ['Closed', followups.currentData.closed_events],
+            ['Open now', followups.currentData.open_current],
+            ['Overdue', followups.currentData.overdue_current],
+          ]} />
         </ReportSection>
       ) : null}
 
       <QueryState query={payments} label="payment report" hasData={Boolean(payments.currentData)} />
       {payments.currentData ? (
         <ReportSection title="Payments">
-          <MetricCard label="Confirmed" value={`₹${payments.currentData.confirmed_total}`} />
-          <MetricCard label="Cash" value={`₹${payments.currentData.cash}`} />
-          <MetricCard label="UPI" value={`₹${payments.currentData.upi}`} />
-          <MetricCard label="Pending" value={`₹${payments.currentData.pending}`} />
-          <MetricCard label="Transactions" value={payments.currentData.confirmed_transaction_count} />
-          <MetricCard label="Voided" value={payments.currentData.voided_payment_count} />
+          <StatGrid items={[
+            ['Confirmed', `₹${payments.currentData.confirmed_total}`],
+            ['Cash', `₹${payments.currentData.cash}`],
+            ['UPI', `₹${payments.currentData.upi}`],
+            ['Pending', `₹${payments.currentData.pending}`],
+            ['Transactions', payments.currentData.confirmed_transaction_count],
+            ['Voided', payments.currentData.voided_payment_count],
+          ]} />
         </ReportSection>
       ) : null}
     </AppScreen>
@@ -105,7 +108,11 @@ export default function ReportsScreen() {
 }
 
 function ReportSection({ title, children }: { title: string; children: ReactNode }) {
-  return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><View style={styles.metrics}>{children}</View></View>;
+  return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><View style={styles.sectionCard}>{children}</View></View>;
+}
+
+function StatGrid({ items }: { items: [string, string | number][] }) {
+  return <View style={styles.stats}>{items.map(([label, value]) => <View key={label} style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}</View>;
 }
 
 function ChartBarRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
@@ -119,22 +126,25 @@ function ChartBarRow({ label, count, total, color }: { label: string; count: num
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 3 },
-  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
-  subtitle: { color: colors.muted, fontSize: 14 },
-  filterCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm },
-  filterTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 15 },
-  section: { gap: spacing.sm, marginTop: spacing.xs },
-  sectionTitle: { fontSize: 19, fontWeight: '800', color: colors.primaryDark },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chartCard: { width: '100%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.xs, gap: spacing.sm },
-  chartHeading: { fontSize: 15, fontWeight: '800', color: colors.primaryDark },
-  emptyChart: { color: colors.muted, fontSize: 14 },
-  chartList: { gap: spacing.sm },
+  header: { gap: 2 },
+  title: { fontSize: 25, fontWeight: '800', color: colors.primaryDark },
+  subtitle: { color: colors.muted, fontSize: 13 },
+  filterCard: { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 13, gap: spacing.sm },
+  filterTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 14 },
+  section: { gap: spacing.xs, marginTop: 2 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
+  sectionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 13, gap: spacing.md },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  stat: { flexBasis: '50%', minWidth: 0, paddingRight: 8, gap: 2 },
+  statValue: { color: colors.primaryDark, fontSize: 19, lineHeight: 23, fontWeight: '800' },
+  statLabel: { color: colors.muted, fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  chartBlock: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.sm },
+  chartHeading: { fontSize: 14, fontWeight: '800', color: colors.primaryDark },
+  empty: { color: colors.muted, fontSize: 13 },
   barItem: { gap: 5 },
   barLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  barLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
-  barValue: { fontSize: 12, fontWeight: '700', color: colors.muted },
-  barTrack: { height: 7, backgroundColor: colors.surfaceSoft, borderRadius: 4, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 4 },
+  barLabel: { fontSize: 12, fontWeight: '600', color: colors.text },
+  barValue: { fontSize: 11, fontWeight: '700', color: colors.muted },
+  barTrack: { height: 6, backgroundColor: colors.surfaceSoft, borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 3 },
 });
