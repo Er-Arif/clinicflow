@@ -5,17 +5,16 @@ import { useClinicTimeQuery, useGetOwnerDashboardQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
 import { MetricCard } from '@/components/MetricCard';
 import { QueryState } from '@/components/QueryState';
-import { quickRange } from '@/components/DateRangeControls';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicDate } from '@/utils/dates';
 
-type DashboardPeriod = 'Today' | 'Week' | 'Month';
+type DashboardPeriod = 'Today' | '7Days' | '30Days';
 
 export default function OwnerDashboardScreen() {
   const clinicTime = useClinicTimeQuery();
   const [period, setPeriod] = useState<DashboardPeriod>('Today');
   const today = clinicTime.data?.clinic_date;
-  const range = today ? quickRange(period, today) : { from: '', to: '' };
+  const range = today ? dashboardRange(period, today) : { from: '', to: '' };
   const dashboard = useGetOwnerDashboardQuery(range, { skip: !today });
   const data = dashboard.currentData;
   const refresh = () => { if (today) void dashboard.refetch(); else void clinicTime.refetch(); };
@@ -29,7 +28,7 @@ export default function OwnerDashboardScreen() {
 
       <QueryState query={clinicTime} label="clinic date" />
       <View style={styles.periods}>
-        {(['Today', 'Week', 'Month'] as const).map(value => (
+        {(['Today', '7Days', '30Days'] as const).map(value => (
           <Pressable
             key={value}
             accessibilityRole="button"
@@ -38,7 +37,7 @@ export default function OwnerDashboardScreen() {
             style={[styles.period, period === value && styles.periodActive]}
           >
             <Text style={[styles.periodText, period === value && styles.periodTextActive]}>
-              {value === 'Week' ? 'This week' : value === 'Month' ? 'This month' : 'Today'}
+              {value === '7Days' ? 'Last 7 days' : value === '30Days' ? 'Last 30 days' : 'Today'}
             </Text>
           </Pressable>
         ))}
@@ -84,6 +83,14 @@ export default function OwnerDashboardScreen() {
   );
 }
 
+function dashboardRange(period: DashboardPeriod, today: string) {
+  if (period === 'Today') return { from: today, to: today };
+  const days = period === '7Days' ? 7 : 30;
+  const date = new Date(`${today}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - (days - 1));
+  return { from: date.toISOString().slice(0, 10), to: today };
+}
+
 function CompactMetric({ label, value }: { label: string; value: string | number }) {
   return <View style={styles.compactMetric}><Text style={styles.compactValue}>{value}</Text><Text style={styles.compactLabel}>{label}</Text></View>;
 }
@@ -93,9 +100,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, fontSize: 14 },
   periods: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
-  period: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: 8 },
+  period: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: 6 },
   periodActive: { backgroundColor: colors.softPrimary },
-  periodText: { color: colors.muted, fontWeight: '600', fontSize: 13 },
+  periodText: { color: colors.muted, fontWeight: '600', fontSize: 12, textAlign: 'center' },
   periodTextActive: { color: colors.primaryDark, fontWeight: '800' },
   range: { color: colors.muted, fontSize: 12, textAlign: 'right' },
   revenueCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
