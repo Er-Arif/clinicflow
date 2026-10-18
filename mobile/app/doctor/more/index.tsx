@@ -82,17 +82,17 @@ function MenuItem({ label, onPress, danger = false }: { label: string; onPress: 
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 3, marginBottom: spacing.xs },
-  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  header: { gap: 2, marginBottom: 2 },
+  title: { fontSize: 25, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, fontSize: 13 },
-  sectionContainer: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.primaryDark },
-  accordionIndicator: { fontSize: 18, color: colors.muted, fontWeight: '700' },
+  sectionContainer: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: 'hidden' },
+  sectionHeader: { minHeight: 54, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.primaryDark },
+  accordionIndicator: { fontSize: 16, color: colors.muted, fontWeight: '700' },
   sectionContent: { borderTopWidth: 1, borderTopColor: colors.border },
-  item: { minHeight: 49, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surfaceSoft },
+  item: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surfaceSoft },
   text: { fontSize: 14, fontWeight: '600', color: colors.text },
   danger: { color: colors.danger },
-  chevron: { color: colors.muted, fontSize: 22 },
+  chevron: { color: colors.muted, fontSize: 20 },
   pressed: { opacity: 0.72 },
 });
