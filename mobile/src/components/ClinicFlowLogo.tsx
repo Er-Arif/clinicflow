@@ -13,9 +13,9 @@ export function ClinicFlowLogo() {
 
 const styles = StyleSheet.create({
   logo: {
-    width: '88%',
-    maxWidth: 340,
-    height: 88,
+    width: '92%',
+    maxWidth: 390,
+    height: 104,
     alignSelf: 'center',
   },
 });
