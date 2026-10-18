@@ -44,16 +44,16 @@ export default function UpiSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>UPI Settings</Text>
-      <Text style={styles.subtitle}>{missing ? 'Configure UPI before accepting UPI payments.' : 'Clinic-wide payee details used to generate dynamic QR codes.'}</Text>
+      <Text style={styles.title}>Payment Settings</Text>
+      <Text style={styles.subtitle}>{missing ? 'Configure UPI before accepting UPI payments.' : 'Clinic payment details used to generate UPI QR codes.'}</Text>
       <Text style={styles.label}>UPI ID</Text>
       <KeyboardSafeTextInput value={upiId} onChangeText={setUpiId} autoCapitalize="none" placeholder="clinic@upi" style={styles.input} />
       <Text style={styles.label}>Payee Name</Text>
       <KeyboardSafeTextInput value={payeeName} onChangeText={setPayeeName} placeholder="Clinic name" style={styles.input} />
       <View style={styles.toggle}><Text style={styles.label}>UPI enabled</Text><Switch value={active} onValueChange={setActive} /></View>
-      {updateState.data ? <Text style={styles.success}>UPI settings saved.</Text> : null}
-      {updateState.error ? <Text style={styles.error}>{apiError(updateState.error)?.message ?? 'Unable to save UPI settings.'}</Text> : null}
-      <AppButton label="Save UPI Details" loading={updateState.isLoading} disabled={upiId.trim().length < 3 || payeeName.trim().length < 1} onPress={() => void save()} />
+      {updateState.data ? <Text style={styles.success}>Payment settings saved.</Text> : null}
+      {updateState.error ? <Text style={styles.error}>{apiError(updateState.error)?.message ?? 'Unable to save payment settings.'}</Text> : null}
+      <AppButton label="Save Payment Settings" loading={updateState.isLoading} disabled={upiId.trim().length < 3 || payeeName.trim().length < 1} onPress={() => void save()} />
     </KeyboardSafeFormScreen>
   );
 }
