@@ -9,6 +9,7 @@ import { AppButton } from '@/components/AppButton';
 import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicDate } from '@/utils/dates';
 
 export default function FeeSettingsScreen() {
   const clinicTime = useClinicTimeQuery();
@@ -34,10 +35,10 @@ export default function FeeSettingsScreen() {
         followup_fee: followupFee,
         assistant_adjustment_allowed: assistantAdjust,
       }).unwrap();
-      setMessage('Fee configuration saved.');
+      setMessage('Consultation fees saved.');
       void current.refetch();
     } catch (error) {
-      setMessage(apiError(error)?.message ?? 'Unable to save fees.');
+      setMessage(apiError(error)?.message ?? 'Unable to save consultation fees.');
     }
   }
 
@@ -52,15 +53,15 @@ export default function FeeSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>Fee Settings</Text>
-      <Text style={styles.subtitle}>Fee changes apply to new bookings only.</Text>
+      <Text style={styles.title}>Consultation Fees</Text>
+      <Text style={styles.subtitle}>Changes apply to new bookings only.</Text>
 
       {current.data ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Current fees</Text>
           <Text style={styles.value}>Regular ₹{money(current.data.regular_fee)}</Text>
           <Text style={styles.value}>Follow-up ₹{money(current.data.followup_fee)}</Text>
-          <Text style={styles.subtitle}>Effective from {current.data.effective_from}</Text>
+          <Text style={styles.subtitle}>Effective from {formatClinicDate(current.data.effective_from)}</Text>
           <AppButton label="Prepare Next Fee Version" tone="secondary" onPress={prepareNextVersion} />
         </View>
       ) : null}
@@ -71,7 +72,7 @@ export default function FeeSettingsScreen() {
       <View style={styles.switchRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>Allow Assistant Fee Adjustment</Text>
-          <Text style={styles.subtitle}>Every adjustment will still require a reason and audit entry.</Text>
+          <Text style={styles.subtitle}>Every adjustment still requires a reason and audit entry.</Text>
         </View>
         <Switch value={assistantAdjust} onValueChange={setAssistantAdjust} />
       </View>
@@ -92,10 +93,8 @@ function money(value: string | number) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
-  link: { color: colors.primary, fontWeight: '700', paddingTop: 6 },
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
   cardTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
   value: { color: colors.text, fontSize: 16, fontWeight: '700' },
@@ -104,4 +103,3 @@ const styles = StyleSheet.create({
   success: { color: colors.success, fontWeight: '700' },
   error: { color: colors.danger },
 });
-
