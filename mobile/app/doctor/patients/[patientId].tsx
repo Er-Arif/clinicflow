@@ -7,7 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
-import { formatClinicDate } from '@/utils/dates';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 
 export default function DoctorPatientSummaryScreen() {
   const params = useLocalSearchParams<{ patientId: string }>();
@@ -31,44 +31,51 @@ export default function DoctorPatientSummaryScreen() {
       <BackButton />
       <QueryState query={summary} label="patient history" />
       <Text style={styles.title}>{data.patient.full_name}</Text>
-      <Text style={styles.subtitle}>{data.patient.patient_code} · Age {data.patient.age ?? '—'} · {data.patient.gender.replaceAll('_', ' ')}</Text>
+      <Text style={styles.subtitle}>
+        {data.patient.patient_code} · {data.patient.age != null ? `${data.patient.age} years` : 'Age not recorded'} · {humanize(data.patient.gender)}
+      </Text>
       <Text style={styles.subtitle}>{formatPhone(data.patient.mobile_number)}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Visit Summary</Text>
+        <Text style={styles.cardTitle}>Visit summary</Text>
         <Row label="Completed visits" value={String(data.total_completed_visits)} />
-        <Row label="Last visit" value={data.last_visit_date ? formatClinicDate(data.last_visit_date) : 'No completed visit'} />
+        <Row label="Last visit" value={data.last_visit_date ? formatClinicDate(data.last_visit_date) : 'No completed visits yet'} />
       </View>
 
       {data.upcoming_appointment ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Upcoming Appointment</Text>
+          <Text style={styles.cardTitle}>Upcoming appointment</Text>
           <Row label="Date" value={formatClinicDate(data.upcoming_appointment.date)} />
-          <Row label="Time" value={data.upcoming_appointment.appointment_time?.slice(0, 5) ?? 'Walk-in'} />
+          <Row label="Time" value={data.upcoming_appointment.appointment_time ? formatClinicTime(data.upcoming_appointment.appointment_time) : 'Walk-in'} />
           <Row label="Type" value={labelType(data.upcoming_appointment.appointment_type)} />
         </View>
       ) : null}
 
       {data.open_followup ? (
         <View style={[styles.card, data.open_followup.overdue && styles.warningCard]}>
-          <Text style={styles.cardTitle}>{data.open_followup.overdue ? 'Overdue Follow-up' : 'Open Follow-up'}</Text>
+          <Text style={styles.cardTitle}>{data.open_followup.overdue ? 'Overdue follow-up' : 'Open follow-up'}</Text>
           <Row label="Due" value={formatClinicDate(data.open_followup.due_date)} />
         </View>
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Completed Visits</Text>
-        <Text style={styles.subtitle}>Showing {data.visit_history.length} of {data.total_completed_visits} completed visits. Operational history only.</Text>
+        <Text style={styles.sectionTitle}>Recent completed visits</Text>
+        <Text style={styles.subtitle}>
+          {data.total_completed_visits === 0
+            ? 'No completed visit history yet.'
+            : `Showing ${data.visit_history.length} of ${data.total_completed_visits} completed ${data.total_completed_visits === 1 ? 'visit' : 'visits'}.`}
+        </Text>
         {data.visit_history.map((visit) => (
           <View key={visit.visit_id} style={styles.visitCard}>
             <View style={styles.rowTop}>
               <Text style={styles.visitDate}>{formatClinicDate(visit.date)}</Text>
               <Text style={styles.type}>{labelType(visit.appointment_type)}</Text>
             </View>
-            <Text style={styles.subtitle}>Payment {visit.payment_status ?? '—'} · Follow-up {visit.followup_status ?? 'None'}</Text>
+            <Text style={styles.subtitle}>
+              {`Payment ${humanize(visit.payment_status ?? 'Not recorded')} · ${visit.followup_status && visit.followup_status !== 'NONE' ? `Follow-up ${humanize(visit.followup_status)}` : 'No follow-up'}`}
+            </Text>
           </View>
         ))}
-        {data.visit_history.length === 0 ? <Text style={styles.subtitle}>No completed visit history.</Text> : null}
       </View>
     </AppScreen>
   );
@@ -79,12 +86,22 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function labelType(value: string) {
-  return value === 'FOLLOW_UP' ? 'Follow-up' : 'Regular Consultation';
+  return value === 'FOLLOW_UP' ? 'Follow-up' : 'Regular consultation';
+}
+
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '—';
 }
 
 function formatPhone(value: string) {
-  const digits = value.replace('+91', '');
-  return digits.length === 10 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : value;
+  const compact = value.replace(/\s/g, '');
+  if (/^\+91\d{10}$/.test(compact)) {
+    const digits = compact.slice(3);
+    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  if (/^\d{10}$/.test(compact)) return `${compact.slice(0, 5)} ${compact.slice(5)}`;
+  return value;
 }
 
 const styles = StyleSheet.create({
