@@ -2,11 +2,12 @@ import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, useLoginMutation } from '@/api/api';
 import { getInitialRouteForRoles, setSessionTokens } from '@/auth/session';
 import { AppButton } from '@/components/AppButton';
+import { ClinicFlowLogo } from '@/components/ClinicFlowLogo';
 import { resetApiCache, store } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -40,7 +41,7 @@ export default function LoginScreen() {
   return (
     <KeyboardSafeFormScreen contentStyle={styles.screen}>
       <View style={styles.shell}>
-        <Image source={require('../../assets/clinicflow-lockup.png')} style={styles.logo} resizeMode="contain" accessibilityLabel="ClinicFlow" />
+        <ClinicFlowLogo />
         <View style={styles.card}>
           <Text style={styles.heading}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to your clinic workspace</Text>
@@ -59,7 +60,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.xl },
   shell: { gap: spacing.lg },
-  logo: { width: '82%', height: 72, alignSelf: 'center' },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl, padding: spacing.lg, gap: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2 },
   heading: { fontSize: 24, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, fontSize: 14 },
