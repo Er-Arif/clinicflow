@@ -32,12 +32,19 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    missing_mobile = bind.scalar(
-        sa.text("SELECT COUNT(*) FROM patients WHERE mobile_e164 IS NULL")
+    incompatible_rows = bind.scalar(
+        sa.text(
+            """
+            SELECT COUNT(*)
+            FROM patients
+            WHERE mobile_e164 IS NULL
+               OR (whatsapp_same_as_mobile = FALSE AND whatsapp_e164 IS NULL)
+            """
+        )
     )
-    if missing_mobile:
+    if incompatible_rows:
         raise RuntimeError(
-            "Cannot downgrade 0013 while patients without mobile numbers exist."
+            "Cannot downgrade 0013 while patients without the legacy required contacts exist."
         )
 
     op.drop_constraint("whatsapp_contact_consistency", "patients", type_="check")
