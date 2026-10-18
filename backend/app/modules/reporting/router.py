@@ -13,6 +13,7 @@ from app.modules.reporting.schemas import (
     AssistantHomeResponse,
     AuditEventListResponse,
     AuditEventResponse,
+    DoctorTodayDetailsResponse,
     DoctorTodayResponse,
     FollowUpReportResponse,
     OwnerDashboardResponse,
@@ -21,6 +22,7 @@ from app.modules.reporting.schemas import (
     PaymentReportResponse,
 )
 from app.modules.reporting.service import ReportingService
+from app.modules.reporting.today_details import doctor_today_details
 
 router = APIRouter(tags=["reporting"])
 
@@ -42,6 +44,17 @@ def doctor_today(
     clock: Clock = Depends(get_clock),
 ) -> DoctorTodayResponse:
     return ReportingService(db, clock, context).doctor_today(date_)
+
+
+@router.get("/doctor/today-details", response_model=DoctorTodayDetailsResponse)
+def doctor_today_detail_list(
+    date_: date | None = Query(default=None, alias="date"),
+    view: str = Query(default="all", pattern="^(all|checked_in|upcoming)$"),
+    context: AuthContext = Depends(require_permission("appointment.read")),
+    db: Session = Depends(get_db),
+    clock: Clock = Depends(get_clock),
+) -> DoctorTodayDetailsResponse:
+    return doctor_today_details(db, clock, context, target_date=date_, view=view)
 
 
 @router.get("/patients/{patient_id}/operational-summary", response_model=PatientOperationalSummaryResponse)
