@@ -63,7 +63,7 @@ export default function OwnerDashboardScreen() {
 
           <View style={styles.metrics}>
             <MetricCard label="Appointments" value={data.appointments} />
-            <MetricCard label="Completed" value={data.completed} />
+            <MetricCard label="Completed visits" value={data.completed} />
             <MetricCard label="New patients" value={data.new_patients} />
             <MetricCard label="Unique patients" value={data.unique_patients} />
           </View>
@@ -73,8 +73,8 @@ export default function OwnerDashboardScreen() {
             <View style={styles.compactGrid}>
               <CompactMetric label="Cancelled" value={data.cancelled} />
               <CompactMetric label="No-shows" value={data.no_show} />
-              <CompactMetric label="Returning" value={data.returning_patient_visits} />
-              <CompactMetric label="Follow-ups" value={data.followup_appointments} />
+              <CompactMetric label="Returning visits" value={data.returning_patient_visits} />
+              <CompactMetric label="Follow-up appointments" value={data.followup_appointments} />
             </View>
           </View>
         </>
