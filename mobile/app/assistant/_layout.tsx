@@ -39,6 +39,7 @@ export default function AssistantLayout() {
           options={{
             title: 'Appointments',
             tabBarLabel: 'Appointments',
+            tabBarLabelStyle: { fontSize: 9, lineHeight: 11, fontWeight: '600', textAlign: 'center' },
             tabBarIcon: ({ color, size }) => <TabIcon name="appointments" color={color} size={size} />,
           }}
         />
