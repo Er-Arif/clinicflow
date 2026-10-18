@@ -59,7 +59,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   screen: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.xl },
-  shell: { gap: spacing.lg },
+  shell: { gap: spacing.md },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl, padding: spacing.lg, gap: 4, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2 },
   heading: { fontSize: 24, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, fontSize: 14 },
