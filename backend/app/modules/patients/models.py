@@ -59,8 +59,8 @@ class Patient(Base):
             name="dob_or_approximate_age",
         ),
         CheckConstraint(
-            "(whatsapp_same_as_mobile = TRUE AND whatsapp_e164 = mobile_e164) "
-            "OR (whatsapp_same_as_mobile = FALSE AND whatsapp_e164 IS NOT NULL)",
+            "whatsapp_same_as_mobile = FALSE OR "
+            "(mobile_e164 IS NOT NULL AND whatsapp_e164 = mobile_e164)",
             name="whatsapp_contact_consistency",
         ),
     )
@@ -71,7 +71,7 @@ class Patient(Base):
     )
     patient_code: Mapped[str] = mapped_column(String(32), nullable=False)
     full_name: Mapped[str] = mapped_column(String(160), nullable=False)
-    mobile_e164: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    mobile_e164: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     whatsapp_e164: Mapped[str | None] = mapped_column(String(16), nullable=True)
     whatsapp_same_as_mobile: Mapped[bool] = mapped_column(Boolean, nullable=False)
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
