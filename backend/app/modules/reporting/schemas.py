@@ -42,6 +42,25 @@ class DoctorTodayResponse(BaseModel):
     upcoming: list[OperationalAppointmentItem]
 
 
+class DoctorTodayDetailItem(BaseModel):
+    appointment_id: UUID
+    patient_id: UUID
+    patient_name: str
+    mobile_number: str
+    gender: str
+    age: int | None
+    appointment_time: time | None
+    appointment_type: str
+    status: str
+
+
+class DoctorTodayDetailsResponse(BaseModel):
+    date: date
+    view: str
+    total: int
+    items: list[DoctorTodayDetailItem]
+
+
 class PatientSummaryBase(BaseModel):
     patient_id: UUID
     patient_code: str
