@@ -9,6 +9,12 @@ import { Pressable, StyleSheet, Text, } from 'react-native';
 import { useSearchPatientsQuery } from '@/api/api';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function formatVisitSummary(completedVisits: number, lastVisitDate?: string | null) {
+  if (completedVisits === 0) return 'No completed visits yet';
+  const visits = `${completedVisits} completed ${completedVisits === 1 ? 'visit' : 'visits'}`;
+  return `${visits} · Last visit ${lastVisitDate ? formatClinicDate(lastVisitDate) : 'unavailable'}`;
+}
+
 export default function DoctorPatientSearchScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -40,7 +46,7 @@ export default function DoctorPatientSearchScreen() {
         <Pressable key={patient.patient_id} style={styles.card} onPress={() => router.push(`/doctor/patients/${patient.patient_id}`)}>
           <Text style={styles.name}>{patient.full_name}</Text>
           <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number}</Text>
-          <Text style={styles.meta}>{patient.previous_completed_visits} completed visit(s) · Last {patient.last_visit_date ? formatClinicDate(patient.last_visit_date) : '—'}</Text>
+          <Text style={styles.meta}>{formatVisitSummary(patient.previous_completed_visits, patient.last_visit_date)}</Text>
         </Pressable>
       ))}
     </KeyboardSafeFormScreen>
@@ -56,4 +62,3 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontWeight: '900', fontSize: 17 },
   meta: { color: colors.muted, fontSize: 13 },
 });
-
