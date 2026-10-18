@@ -11,36 +11,51 @@ def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 react {
     entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
     reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
-    hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')])"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
-    codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')])"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+    hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
+    codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
     enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
     // Use Expo CLI to bundle the app, this ensures the Metro config
     // works correctly with Expo projects.
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')])"].execute(null, rootDir).text.trim())
+    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
 
     /* Folders */
      //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
-    //   The react-native NPM package location. Default is ../../node_modules/react-native
+    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
     // reactNativeDir = file("../../node_modules/react-native")
-    //   The codegen package location. Default is ../../node_modules/@react-native/codegen
+    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
     // codegenDir = file("../../node_modules/@react-native/codegen")
 
     /* Variants */
-    // The default debuggable variant is debug. Staging intentionally remains
-    // non-debuggable so its JS/assets are bundled and it can run without Metro.
+    //   The list of variants to that are debuggable. For those we're going to
+    //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
+    //   Staging intentionally stays non-debuggable so JS/assets are embedded.
 
     /* Bundling */
+    //   A list containing the node command and its flags. Default is just 'node'.
     // nodeExecutableAndArgs = ["node"]
+
+    //
+    //   The path to the CLI configuration file. Default is empty.
     // bundleConfig = file(../rn-cli.config.js)
+    //
+    //   The name of the generated asset file containing the JS bundle
     // bundleAssetName = "MyApplication.android.bundle"
+    //
+    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
     // entryFile = file("../js/MyApplication.android.js")
+    //
+    //   A list of extra flags to pass to the 'bundle' commands.
+    //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
     // extraPackagerArgs = []
 
     /* Hermes Commands */
+    //   The hermes compiler command to run. By default it is 'hermesc'
     // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    //
+    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
 
     /* Autolinking */
@@ -55,8 +70,13 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
- * For example, to use the international variant:
+ * For example, to use the international variant, you can use:
  * `def jscFlavor = 'org.webkit:android-jsc-intl:+'`
+ *
+ * The international variant includes ICU i18n library and necessary data
+ * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
+ * give correct results when using with locales other than en-US. Note that
+ * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
@@ -148,10 +168,9 @@ android {
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
         }
-        // Standalone UAT build. It behaves like a packaged app: JS/assets are
-        // embedded in the APK, so the phone does not need Metro, adb reverse,
-        // or a USB cable after installation. Debug signing is intentional for
-        // staging only; production remains protected by validateProductionRelease.
+        // Standalone UAT build. JS/assets are embedded in the APK, so after
+        // installation the phone does not need Metro, adb reverse, or USB.
+        // It stays debug-signed and is never a production artifact.
         staging {
             initWith release
             signingConfig signingConfigs.debug
@@ -172,17 +191,27 @@ android {
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
+// Accepts values in comma delimited lists, example:
+// android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
 ["pickFirsts", "excludes", "merges", "doNotStrip"].each { prop ->
+    // Split option: 'foo,bar' -> ['foo', 'bar']
     def options = (findProperty("android.packagingOptions.$prop") ?: "").split(",");
+    // Trim all elements in place.
     for (i in 0..<options.size()) options[i] = options[i].trim();
+    // `[] - ""` is essentially `[""].filter(Boolean)` removing all empty strings.
     options -= ""
+
     if (options.length > 0) {
         println "android.packagingOptions.$prop += $options ($options.length)"
-        android.packagingOptions[prop] += options
+        // Ex: android.packagingOptions.pickFirsts += '**/SCCS/**'
+        options.each {
+            android.packagingOptions[prop] += it
+        }
     }
 }
 
 dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
@@ -190,12 +219,15 @@ dependencies {
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
 
     if (isGifEnabled) {
+        // For animated gif support
         implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
     }
 
     if (isWebpEnabled) {
+        // For WebP support
         implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
         if (isWebpAnimatedEnabled) {
+            // Animated WebP support
             implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
         }
     }
