@@ -1,3 +1,5 @@
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export function isIsoDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
@@ -14,8 +16,7 @@ export function pickerDate(value?: string) {
 export function formatClinicDate(value?: string | null) {
   if (!value || !isIsoDate(value)) return value || '—';
   const [year, month, day] = value.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(Date.UTC(year, month - 1, day, 12)));
+  return `${String(day).padStart(2, '0')} ${SHORT_MONTHS[month - 1]} ${year}`;
 }
 
 export function formatCompactClinicDate(value?: string | null) {
@@ -45,9 +46,12 @@ export function formatClinicTimestamp(value?: string | null, timeZone = 'Asia/Ko
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const datePart = new Intl.DateTimeFormat('en-IN', {
-    timeZone, day: '2-digit', month: 'short', year: 'numeric',
-  }).format(date);
+  const dateParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, day: '2-digit', month: '2-digit', year: 'numeric',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => dateParts.find(item => item.type === type)?.value ?? '';
+  const monthIndex = Number(part('month')) - 1;
+  const datePart = `${part('day')} ${SHORT_MONTHS[monthIndex] ?? part('month')} ${part('year')}`;
   const timePart = new Intl.DateTimeFormat('en-US', {
     timeZone, hour: '2-digit', minute: '2-digit', hour12: true,
   }).format(date);
