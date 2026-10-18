@@ -62,7 +62,7 @@ export default function ReportsScreen() {
               <ChartBarRow label="No-show" count={appointments.currentData.no_show} total={appointments.currentData.total_appointments} color={colors.warning} />
               <ChartBarRow label="Rescheduled" count={appointments.currentData.rescheduled} total={appointments.currentData.total_appointments} color={colors.muted} />
             </View>
-          ) : <Text style={styles.empty}>No appointments in this period.</Text>}
+          ) : <Text style={styles.empty}>No appointments recorded in this period.</Text>}
         </ReportSection>
       ) : null}
 
