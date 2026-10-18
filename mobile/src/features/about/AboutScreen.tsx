@@ -113,7 +113,7 @@ function compareVersions(a: string, b: string) {
 }
 
 const styles = StyleSheet.create({
-  brandHeader: { alignItems: 'center', marginBottom: spacing.sm },
+  brandHeader: { alignItems: 'center', marginBottom: spacing.xs },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.muted, flex: 1, fontSize: 13 },
