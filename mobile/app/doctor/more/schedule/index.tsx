@@ -55,19 +55,19 @@ export default function ScheduleHubScreen() {
         <QueryState query={scheduleQuery} label="weekly hours" />
         <View style={styles.scheduleSummary}>
           <Text style={styles.summaryLabel}>Working days</Text>
-          <Text style={styles.workingDays}>{scheduleQuery.data ? formatWorkingDays(activeDayIndices) : 'Unavailable'}</Text>
+          <Text style={styles.summaryValue}>{scheduleQuery.data ? formatWorkingDays(activeDayIndices) : 'Unavailable'}</Text>
         </View>
         <AppButton label="Edit weekly hours" tone="secondary" onPress={() => router.push('/doctor/more/schedule/weekly')} />
       </View>
 
       <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/more/schedule/exceptions')} style={styles.cardHeaderRow}>
           <View style={styles.headerCopy}>
             <Text style={styles.cardTitle}>Exceptions & Time Off</Text>
             <Text style={styles.cardHint}>Block a date or individual session</Text>
           </View>
           <View style={styles.countBadge}><Text style={styles.countBadgeText}>{exceptionsQuery.data ? exceptionCount : '—'}</Text></View>
-        </View>
+        </Pressable>
 
         <QueryState query={exceptionsQuery} label="exceptions" />
         {exceptionsQuery.data && exceptionCount === 0 ? (
@@ -87,10 +87,10 @@ export default function ScheduleHubScreen() {
           </Pressable>
         ))}
 
-        <AppButton label="Block a date" onPress={() => router.push('/doctor/more/schedule/exceptions/new')} />
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.viewAll, pressed && styles.pressed]} onPress={() => router.push('/doctor/more/schedule/exceptions')}>
-          <Text style={styles.viewAllText}>View all exceptions</Text><Text style={styles.viewAllArrow}>›</Text>
-        </Pressable>
+        <View style={styles.buttonRow}>
+          <AppButton label="+ Block a Date" onPress={() => router.push('/doctor/more/schedule/exceptions/new')} />
+          <AppButton label="View All Exceptions" tone="secondary" onPress={() => router.push('/doctor/more/schedule/exceptions')} />
+        </View>
       </View>
     </AppScreen>
   );
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   cardHint: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   scheduleSummary: { backgroundColor: colors.surfaceSoft, borderRadius: radius.md, padding: spacing.md, gap: 4 },
   summaryLabel: { color: colors.muted, fontWeight: '600', fontSize: 12 },
-  workingDays: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
+  summaryValue: { color: colors.primaryDark, fontWeight: '800', fontSize: 16, flex: 1, flexWrap: 'wrap' },
   countBadge: { minWidth: 32, height: 32, borderRadius: 16, backgroundColor: colors.softPrimary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   countBadgeText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
   emptyState: { backgroundColor: colors.surfaceSoft, borderRadius: radius.md, padding: spacing.md, gap: 3 },
@@ -122,8 +122,5 @@ const styles = StyleSheet.create({
   exceptionDate: { color: colors.text, fontWeight: '700', fontSize: 14 },
   retained: { color: colors.warning, fontSize: 11, fontWeight: '600' },
   blocked: { color: colors.danger, fontWeight: '700', fontSize: 12 },
-  viewAll: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  viewAllText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-  viewAllArrow: { color: colors.primary, fontSize: 20, lineHeight: 20 },
-  pressed: { opacity: 0.7 },
+  buttonRow: { gap: spacing.sm, marginTop: spacing.xs },
 });
