@@ -97,16 +97,22 @@ export default function NewPatientScreen() {
 }
 
 function toPayload(values: PatientFormValues, allowSharedMobile: boolean): PatientCreatePayload {
+  const mobile = values.mobile.trim();
+  const whatsapp = values.whatsapp.trim();
+  const hasMobile = mobile.length > 0;
+  const whatsappSameAsMobile = hasMobile && values.whatsappSame;
+  const messageContactAvailable = whatsappSameAsMobile || whatsapp.length >= 10;
+
   return {
     full_name: values.fullName.trim(),
-    mobile_number: values.mobile.trim(),
-    whatsapp_same_as_mobile: values.whatsappSame,
-    whatsapp_number: values.whatsappSame ? undefined : values.whatsapp.trim(),
+    mobile_number: hasMobile ? mobile : null,
+    whatsapp_same_as_mobile: whatsappSameAsMobile,
+    whatsapp_number: whatsappSameAsMobile ? undefined : whatsapp || undefined,
     date_of_birth: values.ageMode === 'DOB' ? values.dateOfBirth : undefined,
     approximate_age_years: values.ageMode === 'AGE' ? Number(values.approximateAge) : undefined,
     gender: values.gender as PatientCreatePayload['gender'],
     preferred_language: values.language,
-    reminders_enabled: values.remindersEnabled,
+    reminders_enabled: messageContactAvailable && values.remindersEnabled,
     allow_shared_mobile: allowSharedMobile,
   };
 }
