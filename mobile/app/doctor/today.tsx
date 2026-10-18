@@ -41,11 +41,13 @@ export default function DoctorToday() {
     if (doctor && clock) void schedule.refetch();
   };
 
+  const firstName = doctor?.display_name?.trim().split(/\s+/)[0];
+
   return (
     <AppScreen refreshing={today.isFetching} onRefresh={refresh}>
       <ClinicHeader
         title="Today"
-        subtitle={`${clock?.greeting ?? 'Welcome'}${doctor ? `, ${doctor.display_name}` : ''}`}
+        subtitle={`${clock?.greeting ?? 'Welcome'}${firstName ? `, ${firstName}` : ''}`}
         displayTime={clock?.displayTime}
         compactDate={clock?.compactDate}
       />
@@ -55,9 +57,9 @@ export default function DoctorToday() {
       {summary ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard label="Appointments" value={summary.appointments} />
-            <MetricCard label="Checked in" value={summary.checkedInCount} />
-            <MetricCard label="Upcoming" value={summary.upcomingCount} />
+            <MetricCard compact label="Appointments" value={summary.appointments} />
+            <MetricCard compact label="Checked in" value={summary.checkedInCount} />
+            <MetricCard compact label="Upcoming" value={summary.upcomingCount} />
           </View>
 
           {sessions.length > 0 ? (
@@ -117,15 +119,15 @@ function PatientCard({ item, onPress, active = false }: { item: { patient_name: 
 }
 
 const styles = StyleSheet.create({
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  metrics: { flexDirection: 'row', gap: spacing.sm },
   sessions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  sessionChip: { backgroundColor: colors.softPrimary, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, gap: 2, borderWidth: 1, borderColor: colors.border },
+  sessionChip: { backgroundColor: colors.softPrimary, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, gap: 2, borderWidth: 1, borderColor: colors.border },
   sessionName: { fontWeight: '700', color: colors.primaryDark, fontSize: 13 },
   sessionTime: { color: colors.muted, fontSize: 12 },
   section: { gap: spacing.sm, marginTop: spacing.xs },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
-  empty: { color: colors.muted, fontSize: 14, paddingVertical: spacing.sm },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 7, elevation: 1 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
+  empty: { color: colors.muted, fontSize: 13, paddingVertical: spacing.xs },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
   pressed: { opacity: 0.78 },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   patientCopy: { flex: 1, gap: 3 },
