@@ -1,23 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useLogoutMutation, useMeQuery } from '@/api/api';
-import { clearSessionTokens } from '@/auth/session';
+import { useMeQuery } from '@/api/api';
+import { useConfirmedSignOut } from '@/auth/useConfirmedSignOut';
 import { AppScreen } from '@/components/AppScreen';
-import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function MoreScreen() {
   const router = useRouter();
-  const [logoutMutation] = useLogoutMutation();
   const me = useMeQuery();
-
-  const handleLogout = async () => {
-    try { await logoutMutation().unwrap(); } catch { /* local logout still continues */ }
-    await clearSessionTokens();
-    resetApiCache();
-    router.replace('/(auth)/login');
-  };
+  const { confirmSignOut, isSigningOut } = useConfirmedSignOut();
 
   return (
     <AppScreen>
@@ -28,8 +20,9 @@ export default function MoreScreen() {
       </Section>
       <Section title="Account">
         <MenuItem label="Change Password" onPress={() => router.push('/(auth)/change-password')} />
-        <MenuItem label="Sign Out" onPress={handleLogout} danger />
+        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign Out'} onPress={confirmSignOut} danger />
       </Section>
+      <MenuCard label="About" onPress={() => router.push('/about')} />
       <Text style={styles.version}>ClinicFlow V1</Text>
     </AppScreen>
   );
@@ -37,6 +30,10 @@ export default function MoreScreen() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><View style={styles.sectionCard}>{children}</View></View>;
+}
+
+function MenuCard({ label, onPress }: { label: string; onPress: () => void }) {
+  return <View style={styles.sectionCard}><MenuItem label={label} onPress={onPress} /></View>;
 }
 
 function MenuItem({ label, onPress, danger = false }: { label: string; onPress: () => void; danger?: boolean }) {
