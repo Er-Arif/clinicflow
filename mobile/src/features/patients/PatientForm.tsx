@@ -44,7 +44,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         name="fullName"
         render={({ field }) => (
           <FormField
-            label="Full Name"
+            label="Full name"
             value={field.value}
             onBlur={field.onBlur}
             onChangeText={field.onChange}
@@ -58,7 +58,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         name="mobile"
         render={({ field }) => (
           <FormField
-            label="Mobile Number"
+            label="Mobile number"
             value={field.value}
             onBlur={field.onBlur}
             onChangeText={field.onChange}
@@ -81,7 +81,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           name="whatsapp"
           render={({ field }) => (
             <FormField
-              label="WhatsApp Number"
+              label="WhatsApp number"
               value={field.value}
               onChangeText={field.onChange}
               error={errors.whatsapp?.message}
@@ -100,8 +100,8 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
             value={field.value}
             onChange={field.onChange}
             options={[
-              ['DOB', 'Date of Birth'],
-              ['AGE', 'Approx. Age'],
+              ['DOB', 'Date of birth'],
+              ['AGE', 'Approx. age'],
             ]}
           />
         )}
@@ -113,7 +113,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           render={({ field }) => (
             <View style={{ marginBottom: spacing.md }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
-                Date of Birth
+                Date of birth
               </Text>
               <DatePicker
                 value={field.value ?? ''}
@@ -136,7 +136,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           name="approximateAge"
           render={({ field }) => (
             <FormField
-              label="Approximate Age"
+              label="Approximate age"
               value={field.value}
               onChangeText={field.onChange}
               error={errors.approximateAge?.message}
@@ -163,8 +163,9 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           />
         )}
       />
+      {errors.gender?.message ? <Text style={styles.errorText}>{errors.gender.message}</Text> : null}
 
-      <Text style={styles.sectionLabel}>Preferred Message Language</Text>
+      <Text style={styles.sectionLabel}>Preferred message language</Text>
       <Controller
         control={control}
         name="language"
@@ -184,7 +185,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         name="remindersEnabled"
         render={({ field }) => (
           <ToggleRow
-            label="Receive appointment/reminder messages"
+            label="Receive appointment and reminder messages"
             value={field.value}
             onChange={field.onChange}
           />
@@ -255,4 +256,5 @@ const styles = StyleSheet.create({
   choiceSelected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
   choiceText: { color: colors.text },
   choiceTextSelected: { color: colors.primary, fontWeight: '700' },
+  errorText: { color: colors.danger, fontSize: 12 },
 });
