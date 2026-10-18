@@ -23,7 +23,13 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
     formState: { errors },
   } = useForm<PatientFormValues>({ defaultValues: initialValues });
   const whatsappSame = watch('whatsappSame');
+  const mobile = watch('mobile');
+  const whatsapp = watch('whatsapp');
   const ageMode = watch('ageMode');
+  const hasMobile = mobile.trim().length > 0;
+  const whatsappSameEffective = hasMobile && whatsappSame;
+  const hasSeparateWhatsApp = !whatsappSame && whatsapp.trim().length >= 10;
+  const hasMessagingContact = whatsappSameEffective || hasSeparateWhatsApp;
 
   const validateAndSubmit = handleSubmit((values) => {
     const result = patientFormSchema.safeParse(values);
@@ -58,7 +64,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         name="mobile"
         render={({ field }) => (
           <FormField
-            label="Mobile number"
+            label="Mobile number (optional)"
             value={field.value}
             onBlur={field.onBlur}
             onChangeText={field.onChange}
@@ -72,7 +78,12 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         control={control}
         name="whatsappSame"
         render={({ field }) => (
-          <ToggleRow label="WhatsApp on same number" value={field.value} onChange={field.onChange} />
+          <ToggleRow
+            label="WhatsApp on same number"
+            value={hasMobile && field.value}
+            onChange={field.onChange}
+            disabled={!hasMobile}
+          />
         )}
       />
       {!whatsappSame ? (
@@ -81,7 +92,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           name="whatsapp"
           render={({ field }) => (
             <FormField
-              label="WhatsApp number"
+              label="WhatsApp number (optional)"
               value={field.value}
               onChangeText={field.onChange}
               error={errors.whatsapp?.message}
@@ -184,8 +195,9 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
         render={({ field }) => (
           <ToggleRow
             label="Receive appointment and reminder messages"
-            value={field.value}
+            value={hasMessagingContact && field.value}
             onChange={field.onChange}
+            disabled={!hasMessagingContact}
           />
         )}
       />
@@ -194,11 +206,21 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
   );
 }
 
-function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({
+  label,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
-    <View style={styles.toggleRow}>
-      <Text style={styles.toggleLabel}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} />
+    <View style={[styles.toggleRow, disabled && styles.toggleRowDisabled]}>
+      <Text style={[styles.toggleLabel, disabled && styles.toggleLabelDisabled]}>{label}</Text>
+      <Switch value={value} onValueChange={onChange} disabled={disabled} />
     </View>
   );
 }
@@ -241,7 +263,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 14,
   },
+  toggleRowDisabled: { opacity: 0.65 },
   toggleLabel: { color: colors.text, flex: 1, paddingRight: 12 },
+  toggleLabelDisabled: { color: colors.muted },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
     paddingHorizontal: 14,
