@@ -48,8 +48,8 @@ export default function PatientProfileScreen() {
       </View>
 
       <InfoCard title="Contact">
-        <InfoRow label="Mobile" value={formatPhone(patient.mobile_number)} />
-        <InfoRow label="WhatsApp" value={formatPhone(patient.whatsapp_number)} />
+        <InfoRow label="Mobile" value={patient.mobile_number ? formatPhone(patient.mobile_number) : 'Not provided'} />
+        <InfoRow label="WhatsApp" value={patient.whatsapp_number ? formatPhone(patient.whatsapp_number) : 'Not provided'} />
         <InfoRow label="Language" value={patient.preferred_language === 'HI' ? 'Hindi' : 'English'} />
         <InfoRow label="Reminders" value={patient.reminders_enabled ? 'Enabled' : 'Disabled'} />
       </InfoCard>
