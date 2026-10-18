@@ -78,7 +78,7 @@ export default function PatientSearchScreen() {
       ) : null}
 
       <AppButton
-        label="Register New Patient"
+        label="Register new patient"
         onPress={() =>
           router.push({ pathname: '/assistant/patients/new', params: { mobile: mobilePrefill } })
         }
