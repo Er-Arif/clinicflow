@@ -1,15 +1,39 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme/tokens';
 
-export function MetricCard({ label, value, hint, compact = false }: { label: string; value: string | number; hint?: string; compact?: boolean }) {
-  return (
-    <View style={[styles.card, compact && styles.compactCard]}>
+type Props = {
+  label: string;
+  value: string | number;
+  hint?: string;
+  compact?: boolean;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+};
+
+export function MetricCard({ label, value, hint, compact = false, onPress, accessibilityLabel }: Props) {
+  const content = (
+    <>
       <Text style={[styles.value, compact && styles.compactValue]}>{value}</Text>
       <Text numberOfLines={compact ? 2 : undefined} style={[styles.label, compact && styles.compactLabel]}>{label}</Text>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
+        style={({ pressed }) => [styles.card, compact && styles.compactCard, pressed && styles.pressed]}
+        onPress={onPress}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={[styles.card, compact && styles.compactCard]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -34,4 +58,5 @@ const styles = StyleSheet.create({
   label: { color: colors.text, fontWeight: '600', fontSize: 14 },
   compactLabel: { fontSize: 12, lineHeight: 16 },
   hint: { color: colors.muted, fontSize: 12, lineHeight: 16 },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
 });
