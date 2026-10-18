@@ -73,16 +73,20 @@ class PatientService:
 
     def create(self, request: PatientCreateRequest) -> PatientResponse:
         full_name = _clean_name(request.full_name)
-        mobile = normalize_indian_mobile(request.mobile_number)
+        mobile = normalize_indian_mobile(request.mobile_number) if request.mobile_number else None
+        whatsapp_same_as_mobile = bool(request.whatsapp_same_as_mobile and mobile)
         whatsapp = (
             mobile
-            if request.whatsapp_same_as_mobile
-            else normalize_indian_mobile(request.whatsapp_number or "")
+            if whatsapp_same_as_mobile
+            else normalize_indian_mobile(request.whatsapp_number)
+            if request.whatsapp_number
+            else None
         )
 
-        duplicates = self._mobile_duplicates(mobile)
-        if duplicates and not request.allow_shared_mobile:
-            self._raise_duplicate(duplicates)
+        if mobile:
+            duplicates = self._mobile_duplicates(mobile)
+            if duplicates and not request.allow_shared_mobile:
+                self._raise_duplicate(duplicates)
 
         today = self.clock.clinic_date()
         if request.date_of_birth is not None and request.date_of_birth > today:
@@ -98,13 +102,13 @@ class PatientService:
             full_name=full_name,
             mobile_e164=mobile,
             whatsapp_e164=whatsapp,
-            whatsapp_same_as_mobile=request.whatsapp_same_as_mobile,
+            whatsapp_same_as_mobile=whatsapp_same_as_mobile,
             date_of_birth=request.date_of_birth,
             approximate_age_years=request.approximate_age_years,
             age_as_of_date=today if request.approximate_age_years is not None else None,
             gender=request.gender,
             preferred_language=request.preferred_language,
-            reminders_enabled=request.reminders_enabled,
+            reminders_enabled=bool(request.reminders_enabled and whatsapp),
             created_by=self.context.user_id,
             version=1,
         )
@@ -148,42 +152,33 @@ class PatientService:
         if "full_name" in changed and request.full_name is not None:
             patient.full_name = _clean_name(request.full_name)
 
-        mobile_changed = "mobile_number" in changed and request.mobile_number is not None
+        mobile_changed = "mobile_number" in changed
         if mobile_changed:
-            new_mobile = normalize_indian_mobile(request.mobile_number or "")
-            duplicates = self._mobile_duplicates(new_mobile, exclude_patient_id=patient.patient_id)
-            if duplicates and not request.allow_shared_mobile:
-                self._raise_duplicate(duplicates)
+            new_mobile = (
+                normalize_indian_mobile(request.mobile_number) if request.mobile_number else None
+            )
+            if new_mobile:
+                duplicates = self._mobile_duplicates(
+                    new_mobile, exclude_patient_id=patient.patient_id
+                )
+                if duplicates and not request.allow_shared_mobile:
+                    self._raise_duplicate(duplicates)
             patient.mobile_e164 = new_mobile
 
         if "whatsapp_same_as_mobile" in changed and request.whatsapp_same_as_mobile is not None:
             patient.whatsapp_same_as_mobile = request.whatsapp_same_as_mobile
 
         if patient.whatsapp_same_as_mobile:
-            patient.whatsapp_e164 = patient.mobile_e164
-        elif (
-            "whatsapp_same_as_mobile" in changed
-            and request.whatsapp_same_as_mobile is False
-            and "whatsapp_number" not in changed
-        ):
-            raise AppError(
-                code="WHATSAPP_NUMBER_REQUIRED",
-                message="Enter the patient's WhatsApp number.",
-                status_code=422,
-            )
+            if patient.mobile_e164:
+                patient.whatsapp_e164 = patient.mobile_e164
+            else:
+                patient.whatsapp_same_as_mobile = False
+                patient.whatsapp_e164 = None
         elif "whatsapp_number" in changed:
-            if not request.whatsapp_number:
-                raise AppError(
-                    code="WHATSAPP_NUMBER_REQUIRED",
-                    message="Enter the patient's WhatsApp number.",
-                    status_code=422,
-                )
-            patient.whatsapp_e164 = normalize_indian_mobile(request.whatsapp_number)
-        elif patient.whatsapp_e164 is None:
-            raise AppError(
-                code="WHATSAPP_NUMBER_REQUIRED",
-                message="Enter the patient's WhatsApp number.",
-                status_code=422,
+            patient.whatsapp_e164 = (
+                normalize_indian_mobile(request.whatsapp_number)
+                if request.whatsapp_number
+                else None
             )
 
         dob_touched = "date_of_birth" in changed
@@ -220,7 +215,9 @@ class PatientService:
         if "preferred_language" in changed and request.preferred_language is not None:
             patient.preferred_language = request.preferred_language
         if "reminders_enabled" in changed and request.reminders_enabled is not None:
-            patient.reminders_enabled = request.reminders_enabled
+            patient.reminders_enabled = bool(request.reminders_enabled and patient.whatsapp_e164)
+        elif not patient.whatsapp_e164:
+            patient.reminders_enabled = False
 
         patient.version += 1
         self.db.flush()
@@ -276,7 +273,7 @@ class PatientService:
                 patient_id=item.patient_id,
                 patient_code=item.patient_code,
                 full_name=item.full_name,
-                mobile_number=item.mobile_e164,
+                mobile_number=item.mobile_e164 or "",
                 gender=item.gender,
                 age=self._age(item),
             ).model_dump(mode="json")
@@ -305,8 +302,8 @@ class PatientService:
             patient_id=patient.patient_id,
             patient_code=patient.patient_code,
             full_name=patient.full_name,
-            mobile_number=patient.mobile_e164,
-            whatsapp_number=patient.whatsapp_e164 or patient.mobile_e164,
+            mobile_number=patient.mobile_e164 or "",
+            whatsapp_number=patient.whatsapp_e164 or "",
             whatsapp_same_as_mobile=patient.whatsapp_same_as_mobile,
             date_of_birth=patient.date_of_birth,
             approximate_age_years=patient.approximate_age_years,
