@@ -1,7 +1,7 @@
 import { QueryState } from '@/components/QueryState';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useListAppointmentsQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
@@ -10,17 +10,30 @@ import { AppScreen } from '@/components/AppScreen';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicTime } from '@/utils/dates';
 
+const FILTER_STATUSES = ['BOOKED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'] as const;
+type AppointmentStatusFilter = (typeof FILTER_STATUSES)[number];
+
 function statusLabel(value: string) {
   return value === 'CHECKED_IN' ? 'Checked in' : value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ');
+}
+
+function routeStatus(value?: string): AppointmentStatusFilter | undefined {
+  return FILTER_STATUSES.includes(value as AppointmentStatusFilter) ? value as AppointmentStatusFilter : undefined;
 }
 
 export default function AppointmentsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const params = useLocalSearchParams<{ status?: string }>();
   const clinicTime = useClinicTimeQuery();
+  const requestedStatus = routeStatus(params.status);
   const [dateInput, setDate] = useState('');
-  const [status, setStatus] = useState<string | undefined>();
+  const [status, setStatus] = useState<AppointmentStatusFilter | undefined>(requestedStatus);
   const date = dateInput || clinicTime.data?.clinic_date || '';
+
+  useEffect(() => {
+    setStatus(requestedStatus);
+  }, [requestedStatus]);
 
   useEffect(() => {
     const unsub = navigation.getParent()?.addListener('blur', () => {
@@ -40,7 +53,7 @@ export default function AppointmentsScreen() {
       </View>
       <DatePicker value={date} onChange={setDate} placeholder="Select date" />
       <View style={styles.chips}>
-        {[undefined, 'BOOKED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'].map(value => (
+        {([undefined, ...FILTER_STATUSES] as const).map(value => (
           <Pressable accessibilityRole="button" accessibilityState={{ selected: status === value }} key={value ?? 'ALL'} onPress={() => setStatus(value)} style={[styles.chip, status === value && styles.chipActive]}>
             <Text style={status === value ? styles.chipTextActive : styles.chipText}>{value ? statusLabel(value) : 'All'}</Text>
           </Pressable>
@@ -64,7 +77,7 @@ export default function AppointmentsScreen() {
           </Pressable>
         ))}
       </View>
-      <AppButton label="New Appointment" onPress={() => router.push('/assistant/patients')} />
+      <AppButton label="New appointment" onPress={() => router.push('/assistant/patients')} />
     </AppScreen>
   );
 }
