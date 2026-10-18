@@ -157,8 +157,6 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
             options={[
               ['MALE', 'Male'],
               ['FEMALE', 'Female'],
-              ['OTHER', 'Other'],
-              ['PREFER_NOT_TO_SAY', 'Prefer not to say'],
             ]}
           />
         )}
