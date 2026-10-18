@@ -67,11 +67,13 @@ export default function DoctorToday() {
           </View>
 
           {sessions.length > 0 ? (
-            <View style={styles.sessions}>
-              {sessions.map(session => (
-                <View key={session.session_definition_id} style={styles.sessionChip}>
-                  <Text style={styles.sessionName}>{session.session_name}</Text>
+            <View style={styles.sessionCard}>
+              <Text style={styles.sessionHeading}>Today’s clinic hours</Text>
+              {sessions.map((session, index) => (
+                <View key={session.session_definition_id} style={styles.sessionRow}>
+                  {sessions.length > 1 ? <Text style={styles.sessionName}>{session.session_name}</Text> : null}
                   <Text style={styles.sessionTime}>{formatClinicTimeRange(session.start_time, session.end_time)}</Text>
+                  {sessions.length > 1 && index < sessions.length - 1 ? <View style={styles.sessionDivider} /> : null}
                 </View>
               ))}
             </View>
@@ -124,10 +126,12 @@ function PatientCard({ item, onPress, active = false }: { item: { patient_name: 
 
 const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', gap: spacing.sm },
-  sessions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  sessionChip: { backgroundColor: colors.softPrimary, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, gap: 2, borderWidth: 1, borderColor: colors.border },
-  sessionName: { fontWeight: '700', color: colors.primaryDark, fontSize: 13 },
-  sessionTime: { color: colors.muted, fontSize: 12 },
+  sessionCard: { width: '100%', backgroundColor: colors.softPrimary, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 12, gap: spacing.xs, borderWidth: 1, borderColor: colors.border },
+  sessionHeading: { fontWeight: '800', color: colors.primaryDark, fontSize: 14 },
+  sessionRow: { gap: 3 },
+  sessionName: { fontWeight: '700', color: colors.text, fontSize: 12 },
+  sessionTime: { color: colors.muted, fontSize: 13 },
+  sessionDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginTop: spacing.xs },
   section: { gap: spacing.sm, marginTop: spacing.xs },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
   empty: { color: colors.muted, fontSize: 13, paddingVertical: spacing.xs },
