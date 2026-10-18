@@ -20,7 +20,7 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <StatusBar style="dark" backgroundColor={colors.background} translucent={false} />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
     </Provider>
   );
