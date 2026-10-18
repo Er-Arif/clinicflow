@@ -34,7 +34,6 @@ export default function DoctorLayout() {
             tabBarIcon: ({ color, size }) => <TabIcon name="today" color={color} size={size} />,
           }}
         />
-        <Tabs.Screen name="today-details" options={{ href: null }} />
         <Tabs.Screen
           name="patients"
           options={{
