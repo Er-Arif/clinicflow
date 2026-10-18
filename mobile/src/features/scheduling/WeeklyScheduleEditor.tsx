@@ -35,10 +35,10 @@ function SessionCard({ session, index, count, errors, busy, onChange, onRemove, 
         keyboardType="number-pad" value={session.capacity} editable={!busy}
         onChangeText={capacity => onChange({ capacity })} error={error('capacity')} />
       <View style={styles.row}>
-        <AppButton label="Move up" tone="secondary" disabled={busy || index === 0} onPress={() => onMove(-1)} />
-        <AppButton label="Move down" tone="secondary" disabled={busy || index === count - 1} onPress={() => onMove(1)} />
+        <AppButton compact label="Move up" tone="secondary" disabled={busy || index === 0} onPress={() => onMove(-1)} />
+        <AppButton compact label="Move down" tone="secondary" disabled={busy || index === count - 1} onPress={() => onMove(1)} />
       </View>
-      <AppButton label={`Remove session ${index + 1}`} tone="danger" disabled={busy} onPress={onRemove} />
+      <AppButton compact label={`Remove session ${index + 1}`} tone="danger" disabled={busy} onPress={onRemove} />
     </View>
   );
 }
@@ -65,13 +65,12 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       {state.message ? <Text accessibilityRole="alert" style={styles.error}>{state.message}</Text> : null}
       <AppButton label="Preview changes" loading={state.phase === 'previewing'} disabled={busy}
         onPress={() => { Keyboard.dismiss(); void editor.preview(); }} />
-      {Object.keys(state.errors).length ? <Text accessibilityRole="alert" style={styles.error}>Check the highlighted fields above before previewing.</Text> : null}
-      <AppButton label="Cancel" tone="secondary" disabled={busy} onPress={onBack} />
+      {Object.keys(state.errors).length ? <Text accessibilityRole="alert" style={styles.error}>Check the highlighted fields above.</Text> : null}
+      <AppButton compact label="Cancel" tone="secondary" disabled={busy} onPress={onBack} />
     </View>}>
       {!busy ? <BackButton onPress={onBack} /> : null}
       <Text accessibilityRole="header" style={styles.title}>Edit weekly hours</Text>
-      <Text style={styles.hint}>Started from {loadedFrom}. Changes apply only after review and confirmation.</Text>
-      <Text style={styles.hint}>Choose weekdays that should share these hours. Selecting another day keeps the sessions below.</Text>
+      <Text style={styles.hint}>Based on {loadedFrom}. Select the days that should share this schedule, then review before saving.</Text>
       <View style={styles.row}>
         {weekdays.map((name, day) => {
           const selected = state.draft.weekdays.includes(day);
@@ -86,7 +85,7 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       </View>
       {state.errors.weekdays ? <Text style={styles.error}>{state.errors.weekdays}</Text> : null}
       {overview.days.filter(day => state.draft.weekdays.includes(day.weekday)).map(day => (
-        <Text key={day.weekday} style={styles.hint}>{day.weekday_name}: {daySummary(day)}</Text>
+        <Text key={day.weekday} style={styles.daySummary}>{day.weekday_name}: {daySummary(day)}</Text>
       ))}
       <View style={styles.row}>
         {[true, false].map(working => <Pressable key={String(working)} accessibilityRole="radio"
@@ -114,8 +113,8 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
             return { ...draft, sessions };
           })} />)}
         {state.errors.sessions ? <Text style={styles.error}>{state.errors.sessions}</Text> : null}
-        <AppButton label="Add session" tone="secondary" disabled={busy || state.draft.sessions.length >= 12} onPress={add} />
-      </> : <Text style={styles.hint}>No working sessions will be proposed. Existing appointments and history remain protected.</Text>}
+        <AppButton compact label="Add session" tone="secondary" disabled={busy || state.draft.sessions.length >= 12} onPress={add} />
+      </> : <Text style={styles.hint}>No sessions will be proposed for these days.</Text>}
       {state.review ? <ScheduleReview review={state.review} applying={state.phase === 'applying'}
         onEdit={() => editor.edit(state.draft)} onApply={() => { void editor.apply(); }} /> : null}
     </KeyboardSafeFormScreen>
@@ -123,16 +122,17 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '700', color: colors.text },
-  heading: { fontSize: 17, fontWeight: '700', color: colors.text },
-  text: { color: colors.text, fontSize: 15 },
-  hint: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 21 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
+  heading: { fontSize: 16, fontWeight: '800', color: colors.primaryDark },
+  text: { color: colors.text, fontSize: 14 },
+  hint: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  daySummary: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  label: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface },
+  chip: { minHeight: 42, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface },
   selected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  selectedText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  selectedText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   card: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
-  footer: { padding: spacing.md, gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  footer: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });
