@@ -12,6 +12,8 @@ import { useClinicClock } from '@/features/reporting/useClinicClock';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicTime } from '@/utils/dates';
 
+type AppointmentFilter = 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED';
+
 export default function AssistantHome() {
   const router = useRouter();
   const home = useGetAssistantHomeQuery();
@@ -20,6 +22,13 @@ export default function AssistantHome() {
   const data = home.data;
   const refresh = () => { void home.refetch(); void clinicTime.refetch(); };
   const firstName = me.data?.display_name?.trim().split(/\s+/)[0];
+  const openAppointments = (status?: AppointmentFilter) => {
+    if (status) {
+      router.push({ pathname: '/assistant/appointments', params: { status } });
+      return;
+    }
+    router.push('/assistant/appointments');
+  };
 
   return (
     <AppScreen refreshing={home.isFetching} onRefresh={refresh}>
@@ -35,15 +44,15 @@ export default function AssistantHome() {
       {data ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard label="Appointments" value={data.appointments} />
-            <MetricCard label="Checked in" value={data.checked_in} />
-            <MetricCard label="Completed" value={data.completed} />
-            <MetricCard label="Cancelled" value={data.cancelled} />
+            <MetricCard label="Appointments" value={data.appointments} onPress={() => openAppointments()} accessibilityLabel={`View all ${data.appointments} appointments`} />
+            <MetricCard label="Checked in" value={data.checked_in} onPress={() => openAppointments('CHECKED_IN')} accessibilityLabel={`View ${data.checked_in} checked-in appointments`} />
+            <MetricCard label="Completed" value={data.completed} onPress={() => openAppointments('COMPLETED')} accessibilityLabel={`View ${data.completed} completed appointments`} />
+            <MetricCard label="Cancelled" value={data.cancelled} onPress={() => openAppointments('CANCELLED')} accessibilityLabel={`View ${data.cancelled} cancelled appointments`} />
           </View>
 
           <View style={styles.primaryActions}>
-            <AppButton style={styles.actionButton} label="New Appointment" onPress={() => router.push('/assistant/patients')} />
-            <AppButton style={styles.actionButton} label="Add Walk-in" tone="secondary" onPress={() => router.push('/assistant/walk-in')} />
+            <AppButton style={styles.actionButton} label="New appointment" onPress={() => router.push('/assistant/patients')} />
+            <AppButton style={styles.actionButton} label="Add walk-in" tone="secondary" onPress={() => router.push('/assistant/walk-in')} />
           </View>
 
           <View style={styles.attention}>
