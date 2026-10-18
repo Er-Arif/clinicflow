@@ -28,7 +28,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
   const ageMode = watch('ageMode');
   const hasMobile = mobile.trim().length > 0;
   const whatsappSameEffective = hasMobile && whatsappSame;
-  const hasSeparateWhatsApp = !whatsappSame && whatsapp.trim().length >= 10;
+  const hasSeparateWhatsApp = (!hasMobile || !whatsappSame) && whatsapp.trim().length >= 10;
   const hasMessagingContact = whatsappSameEffective || hasSeparateWhatsApp;
 
   const validateAndSubmit = handleSubmit((values) => {
@@ -86,7 +86,7 @@ export function PatientForm({ initialValues, submitLabel, loading, onSubmit }: P
           />
         )}
       />
-      {!whatsappSame ? (
+      {!hasMobile || !whatsappSame ? (
         <Controller
           control={control}
           name="whatsapp"
