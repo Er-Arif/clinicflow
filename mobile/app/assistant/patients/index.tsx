@@ -61,7 +61,7 @@ export default function PatientSearchScreen() {
             >
               <Text style={styles.patientName}>{patient.full_name}</Text>
               <Text style={styles.meta}>{patient.patient_code} · Age {patient.age} · {patient.gender.replaceAll('_', ' ')}</Text>
-              <Text style={styles.meta}>{formatPhone(patient.mobile_number)}</Text>
+              <Text style={styles.meta}>{patient.mobile_number ? formatPhone(patient.mobile_number) : 'No mobile number'}</Text>
               <Text style={styles.meta}>
                 {patient.previous_completed_visits > 0
                   ? `${patient.previous_completed_visits} completed visit${patient.previous_completed_visits === 1 ? '' : 's'}`
