@@ -57,7 +57,7 @@ export default function DoctorToday() {
       {summary ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard compact label="Appointments" value={summary.appointments} />
+            <MetricCard compact label="Total" value={summary.appointments} />
             <MetricCard compact label="Checked in" value={summary.checkedInCount} />
             <MetricCard compact label="Upcoming" value={summary.upcomingCount} />
           </View>
