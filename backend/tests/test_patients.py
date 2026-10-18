@@ -44,16 +44,39 @@ def test_patient_requires_exactly_one_age_source() -> None:
         )
 
 
-def test_whatsapp_required_when_different_number_selected() -> None:
-    with pytest.raises(ValidationError):
-        PatientCreateRequest(
-            full_name="Rahman Ali",
-            mobile_number="9876543210",
-            approximate_age_years=42,
-            whatsapp_same_as_mobile=False,
-            gender="MALE",
-            preferred_language="HI",
-        )
+def test_patient_can_be_registered_without_phone_contact() -> None:
+    request = PatientCreateRequest(
+        full_name="Rahman Ali",
+        mobile_number=None,
+        approximate_age_years=42,
+        whatsapp_same_as_mobile=True,
+        reminders_enabled=True,
+        gender="MALE",
+        preferred_language="HI",
+    )
+
+    assert request.mobile_number is None
+    assert request.whatsapp_same_as_mobile is False
+    assert request.whatsapp_number is None
+    assert request.reminders_enabled is False
+
+
+def test_patient_can_have_mobile_without_whatsapp() -> None:
+    request = PatientCreateRequest(
+        full_name="Rahman Ali",
+        mobile_number="9876543210",
+        approximate_age_years=42,
+        whatsapp_same_as_mobile=False,
+        whatsapp_number=None,
+        reminders_enabled=True,
+        gender="MALE",
+        preferred_language="HI",
+    )
+
+    assert request.mobile_number == "9876543210"
+    assert request.whatsapp_same_as_mobile is False
+    assert request.whatsapp_number is None
+    assert request.reminders_enabled is False
 
 
 def test_age_math() -> None:
