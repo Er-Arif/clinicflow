@@ -54,7 +54,7 @@ test('Doctor Today renders compact 12-hour clinic clock, session chips and patie
     '@/api/api': { useGetDoctorTodayQuery: () => ready({ date: clock.date, total_appointments: 3, checked_in_count: 0, upcoming_count: 1, upcoming: [row], checked_in: [] }), useListDoctorsQuery: () => ready([{ doctor_id: 'd1', display_name: 'Dr. Rao' }]), useGetScheduleQuery: () => ready({ days: [{ weekday: 3, active: true, sessions: [{ active: true, session_definition_id: 's1', session_name: 'Evening', start_time: '15:00:00', end_time: '18:00:00' }] }] }) },
     'expo-router': { useRouter: () => ({ push: value => { destination = value; } }) },
   });
-  const output = runtime.render(runtime.load('app/doctor/today.tsx').default);
+  const output = runtime.render(runtime.load('app/doctor/today/index.tsx').default);
   assert.match(output.markup, /02:26 PM/); assert.match(output.markup, /Thu, 15 Oct/); assert.match(output.markup, /Evening/); assert.match(output.markup, /03:00 PM/); assert.doesNotMatch(output.markup, /Asia\/Kolkata|14:26:42/);
   output.controls.find(c => c.label === 'View Asha').onPress(); assert.equal(destination, '/doctor/patients/p1');
 });
