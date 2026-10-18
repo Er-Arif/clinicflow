@@ -85,13 +85,13 @@ export function AboutScreen() {
 function UpdateMessage({ state, latestVersion }: { state: UpdateState; latestVersion: string | null }) {
   if (state === 'idle' || state === 'checking') return null;
   if (state === 'available') {
-    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update available</Text><Text style={styles.updateText}>ClinicFlow {latestVersion} is available. Installation will be enabled when the update delivery service is connected.</Text></View>;
+    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update available</Text><Text style={styles.updateText}>ClinicFlow {latestVersion} is available. Update installation is not enabled in this build yet.</Text></View>;
   }
   if (state === 'current') {
     return <View style={styles.updateCard}><Text style={styles.updateTitle}>You’re up to date</Text><Text style={styles.updateText}>This is the latest version reported by ClinicFlow.</Text></View>;
   }
   if (state === 'unavailable') {
-    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update checking isn’t connected yet</Text><Text style={styles.updateText}>This screen is ready for the app update service when delivery is enabled.</Text></View>;
+    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update information unavailable</Text><Text style={styles.updateText}>ClinicFlow couldn’t retrieve update information right now. Please try again later.</Text></View>;
   }
   return <Text style={styles.warning}>Unable to check for updates right now.</Text>;
 }
