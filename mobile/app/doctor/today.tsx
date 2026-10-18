@@ -42,6 +42,10 @@ export default function DoctorToday() {
   };
 
   const firstName = doctor?.display_name?.trim().split(/\s+/)[0];
+  const openDetails = (view: 'all' | 'checked_in' | 'upcoming') => {
+    if (!clock) return;
+    router.push({ pathname: '/doctor/today-details', params: { date: clock.date, view } });
+  };
 
   return (
     <AppScreen refreshing={today.isFetching} onRefresh={refresh}>
@@ -57,9 +61,9 @@ export default function DoctorToday() {
       {summary ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard compact label="Total" value={summary.appointments} />
-            <MetricCard compact label="Checked in" value={summary.checkedInCount} />
-            <MetricCard compact label="Upcoming" value={summary.upcomingCount} />
+            <MetricCard compact label="Total" value={summary.appointments} onPress={() => openDetails('all')} accessibilityLabel={`View all ${summary.appointments} appointments today`} />
+            <MetricCard compact label="Checked in" value={summary.checkedInCount} onPress={() => openDetails('checked_in')} accessibilityLabel={`View ${summary.checkedInCount} checked-in patients`} />
+            <MetricCard compact label="Upcoming" value={summary.upcomingCount} onPress={() => openDetails('upcoming')} accessibilityLabel={`View ${summary.upcomingCount} upcoming appointments`} />
           </View>
 
           {sessions.length > 0 ? (
