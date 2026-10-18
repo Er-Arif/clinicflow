@@ -19,12 +19,13 @@ export default function AssistantHome() {
   const { clock, query: clinicTime } = useClinicClock();
   const data = home.data;
   const refresh = () => { void home.refetch(); void clinicTime.refetch(); };
+  const firstName = me.data?.display_name?.trim().split(/\s+/)[0];
 
   return (
     <AppScreen refreshing={home.isFetching} onRefresh={refresh}>
       <ClinicHeader
-        title="Front Desk"
-        subtitle={`${clock?.greeting ?? 'Welcome'}${me.data?.display_name ? `, ${me.data.display_name}` : ''}`}
+        title="Today"
+        subtitle={`${clock?.greeting ?? 'Welcome'}${firstName ? `, ${firstName}` : ''}`}
         displayTime={clock?.displayTime}
         compactDate={clock?.compactDate}
       />
@@ -121,19 +122,19 @@ const styles = StyleSheet.create({
   primaryActions: { flexDirection: 'row', gap: spacing.sm },
   actionButton: { flex: 1 },
   section: { gap: spacing.sm, marginTop: spacing.xs },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md },
   rowCopy: { flex: 1, gap: 3 },
   name: { fontWeight: '700', color: colors.text, fontSize: 15 },
   meta: { color: colors.muted, fontSize: 12 },
   time: { fontWeight: '800', color: colors.primaryDark, fontSize: 14 },
   checkedIn: { fontWeight: '700', color: colors.success, fontSize: 13 },
-  attention: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: 2 },
-  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, paddingVertical: 5 },
-  count: { minWidth: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
+  attention: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: 0 },
+  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40, paddingVertical: 3 },
+  count: { minWidth: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
   countAlert: { backgroundColor: colors.softWarning },
-  countText: { color: colors.muted, fontWeight: '800', fontSize: 14 },
+  countText: { color: colors.muted, fontWeight: '800', fontSize: 13 },
   countAlertText: { color: colors.warning },
-  empty: { color: colors.muted, fontSize: 14, paddingVertical: spacing.sm },
+  empty: { color: colors.muted, fontSize: 13, paddingVertical: spacing.xs },
   pressed: { opacity: 0.78 },
 });
