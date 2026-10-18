@@ -14,15 +14,23 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function UpiPaymentScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ paymentId: string }>();
+  const params = useLocalSearchParams<{ paymentId: string; appointmentId?: string; visitId?: string }>();
   const paymentId = String(params.paymentId ?? '');
+  const appointmentId = params.appointmentId ? String(params.appointmentId) : undefined;
+  const visitId = params.visitId ? String(params.visitId) : undefined;
   const intent = useGetUpiIntentQuery(paymentId, { skip: !paymentId });
   const [confirmPayment, confirmState] = useConfirmPaymentMutation();
   const [idempotencyKey] = useState(() => newIdempotencyKey('pay-upi'));
 
   async function confirm() {
     try {
-      const result = await confirmPayment({ paymentId, paymentMethod: 'UPI', idempotencyKey }).unwrap();
+      const result = await confirmPayment({
+        paymentId,
+        paymentMethod: 'UPI',
+        idempotencyKey,
+        appointmentId,
+        visitId,
+      }).unwrap();
       router.replace({ pathname: '/assistant/payments/receipt', params: { paymentId: result.payment.payment_id } });
     } catch {
       // Error rendered below.
@@ -67,4 +75,3 @@ const styles = StyleSheet.create({
   warning: { color: colors.warning, backgroundColor: '#FFF7ED', borderRadius: radius.md, padding: spacing.md, lineHeight: 20 },
   error: { color: colors.danger },
 });
-
