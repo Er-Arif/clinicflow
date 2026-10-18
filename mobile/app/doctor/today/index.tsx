@@ -44,7 +44,7 @@ export default function DoctorToday() {
   const firstName = doctor?.display_name?.trim().split(/\s+/)[0];
   const openDetails = (view: 'all' | 'checked_in' | 'upcoming') => {
     if (!clock) return;
-    router.push({ pathname: '/doctor/patients/today-details', params: { date: clock.date, view } });
+    router.push({ pathname: '/doctor/today/details', params: { date: clock.date, view } });
   };
 
   return (

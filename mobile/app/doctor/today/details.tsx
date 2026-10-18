@@ -83,7 +83,7 @@ function statusStyle(value: string) {
 
 const styles = StyleSheet.create({
   header: { gap: 3 },
-  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  title: { fontSize: 24, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, fontSize: 13 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: 5 },
   topRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
