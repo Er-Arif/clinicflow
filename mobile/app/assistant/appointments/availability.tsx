@@ -1,9 +1,9 @@
 import { QueryState } from '@/components/QueryState';
+import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
+import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useClinicTimeQuery, useGetAvailabilityQuery, useListDoctorsQuery } from '@/api/api';
-import { DatePicker } from '@/components/DatePicker';
-import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicTime, formatClinicTimeRange } from '@/utils/dates';
@@ -18,7 +18,7 @@ export default function AvailabilityScreen() {
   const availability = useGetAvailabilityQuery({ doctorId, date }, { skip: !doctorId || !/^\d{4}-\d{2}-\d{2}$/.test(date) });
 
   return (
-    <AppScreen>
+    <KeyboardSafeFormScreen>
       <QueryState query={clinicTime} label="clinic date" />
       <QueryState query={availability} label="availability" />
       <BackButton />
@@ -37,7 +37,14 @@ export default function AvailabilityScreen() {
       </View>
 
       <Text style={styles.label}>Date</Text>
-      <DatePicker value={date} onChange={setDate} placeholder="Select date" />
+      <KeyboardSafeTextInput
+        value={date}
+        onChangeText={setDate}
+        placeholder="YYYY-MM-DD"
+        autoCapitalize="none"
+        keyboardType="numbers-and-punctuation"
+        style={styles.input}
+      />
 
       {!availability.isFetching && !availability.isError && availability.data?.sessions.length === 0 ? (
         <View style={styles.emptyCard}>
@@ -65,7 +72,7 @@ export default function AvailabilityScreen() {
           </View>
         </View>
       ))}
-    </AppScreen>
+    </KeyboardSafeFormScreen>
   );
 }
 
@@ -76,6 +83,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
   label: { fontWeight: '700', color: colors.text },
+  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.text },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.surface },
   chipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' },
