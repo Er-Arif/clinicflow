@@ -1,5 +1,5 @@
 import { Tabs, Redirect } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
 import { useMeQuery } from '@/api/api';
@@ -38,8 +38,9 @@ export default function AssistantLayout() {
           name="appointments"
           options={{
             title: 'Appointments',
-            tabBarLabel: 'Appointments',
-            tabBarLabelStyle: { fontSize: 9, lineHeight: 11, fontWeight: '600', textAlign: 'center' },
+            tabBarLabel: ({ color }) => (
+              <Text allowFontScaling={false} numberOfLines={1} style={[styles.appointmentsTabLabel, { color }]}>Appointments</Text>
+            ),
             tabBarIcon: ({ color, size }) => <TabIcon name="appointments" color={color} size={size} />,
           }}
         />
@@ -76,3 +77,14 @@ export default function AssistantLayout() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  appointmentsTabLabel: {
+    width: 76,
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+});
