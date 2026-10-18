@@ -70,7 +70,7 @@ export default function EditPatientScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>Edit Patient</Text>
+      <Text style={styles.title}>Edit patient</Text>
       {duplicateCandidates.length ? (
         <View style={styles.warning}>
           <Text style={styles.warningTitle}>This mobile number is already used by another patient.</Text>
@@ -78,7 +78,7 @@ export default function EditPatientScreen() {
             <Text key={item.patient_id} style={styles.meta}>{item.full_name} · {item.patient_code} · Age {item.age}</Text>
           ))}
           <AppButton
-            label="Save Anyway (Shared Number)"
+            label="Save anyway (shared number)"
             onPress={() => void saveSharedNumber()}
             loading={mutation.isLoading}
           />
@@ -87,7 +87,7 @@ export default function EditPatientScreen() {
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <PatientForm
         initialValues={initial}
-        submitLabel="Save Changes"
+        submitLabel="Save changes"
         loading={mutation.isLoading}
         onSubmit={(values) => void submit(values)}
       />
@@ -123,7 +123,7 @@ function toUpdatePayload(
     whatsapp_number: values.whatsappSame ? undefined : values.whatsapp.trim(),
     date_of_birth: values.ageMode === 'DOB' ? values.dateOfBirth : null,
     approximate_age_years: values.ageMode === 'AGE' ? Number(values.approximateAge) : null,
-    gender: values.gender,
+    gender: values.gender as PatientUpdatePayload['gender'],
     preferred_language: values.language,
     reminders_enabled: values.remindersEnabled,
     allow_shared_mobile: allowSharedMobile,
@@ -144,4 +144,3 @@ const styles = StyleSheet.create({
   warningTitle: { color: colors.warning, fontWeight: '800' },
   meta: { color: colors.muted },
 });
-
