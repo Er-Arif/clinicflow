@@ -9,7 +9,7 @@ export const patientFormSchema = z
     ageMode: z.enum(['DOB', 'AGE']),
     dateOfBirth: z.string().trim(),
     approximateAge: z.string().trim(),
-    gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']),
+    gender: z.union([z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']), z.literal('')]),
     language: z.enum(['EN', 'HI']),
     remindersEnabled: z.boolean(),
   })
@@ -42,6 +42,9 @@ export const patientFormSchema = z
         });
       }
     }
+    if (!value.gender) {
+      ctx.addIssue({ code: 'custom', path: ['gender'], message: 'Select the patient gender.' });
+    }
   });
 
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
@@ -54,7 +57,7 @@ export const patientFormDefaults: PatientFormValues = {
   ageMode: 'AGE',
   dateOfBirth: '',
   approximateAge: '',
-  gender: 'MALE',
+  gender: '',
   language: 'EN',
-  remindersEnabled: true,
+  remindersEnabled: false,
 };
