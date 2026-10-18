@@ -9,7 +9,7 @@ import { TimePicker } from '@/components/TimePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { ScheduleReview } from './ScheduleReview';
 import type { ScheduleOverview } from './types';
-import { daySummary, defaultSession, weekdays } from './weeklyEditor';
+import { applySessionPatch, calculatedSlots, daySummary, defaultSession, weekdays } from './weeklyEditor';
 import type { EditorErrors, SessionDraft, WeeklyDraft, WeeklyEditor } from './weeklyEditor';
 
 function SessionCard({ session, index, count, errors, busy, onChange, onRemove, onMove }: {
@@ -17,6 +17,9 @@ function SessionCard({ session, index, count, errors, busy, onChange, onRemove, 
   onChange: (patch: Partial<SessionDraft>) => void; onRemove: () => void; onMove: (offset: number) => void;
 }) {
   const error = (field: string) => errors[session.key + '.' + field];
+  const slots = calculatedSlots(session.start, session.end, session.interval);
+  const capacity = Number(session.capacity);
+  const lowerLimit = slots != null && Number.isFinite(capacity) && capacity > 0 && capacity < slots;
   return (
     <View style={styles.card}>
       <Text style={styles.heading}>Session {index + 1}</Text>
@@ -31,9 +34,19 @@ function SessionCard({ session, index, count, errors, busy, onChange, onRemove, 
       <FormField label="Slot interval (minutes)" accessibilityLabel={`Session ${index + 1} slot interval`}
         keyboardType="number-pad" value={session.interval} editable={!busy}
         onChangeText={interval => onChange({ interval })} error={error('interval')} />
-      <FormField label="Maximum capacity" accessibilityLabel={`Session ${index + 1} maximum capacity`}
-        keyboardType="number-pad" value={session.capacity} editable={!busy}
-        onChangeText={capacity => onChange({ capacity })} error={error('capacity')} />
+      <FormField label="Booking capacity" accessibilityLabel={`Session ${index + 1} booking capacity`}
+        keyboardType="number-pad" value={session.capacity} editable={!busy} maxLength={3}
+        onChangeText={capacityValue => onChange({ capacity: capacityValue })} error={error('capacity')} />
+      <View style={styles.capacityInfo}>
+        <Text style={styles.capacityTitle}>{slots == null ? 'Capacity will calculate automatically' : `${slots} complete slot${slots === 1 ? '' : 's'} available`}</Text>
+        <Text style={styles.capacityHint}>
+          {slots == null
+            ? 'Set valid start/end times and a slot interval.'
+            : lowerLimit
+              ? `Booking limit is lowered to ${session.capacity}.`
+              : 'Capacity follows the session automatically. Lower it only if you want booking buffer.'}
+        </Text>
+      </View>
       <View style={styles.row}>
         <AppButton compact label="Move up" tone="secondary" disabled={busy || index === 0} onPress={() => onMove(-1)} />
         <AppButton compact label="Move down" tone="secondary" disabled={busy || index === count - 1} onPress={() => onMove(1)} />
@@ -102,7 +115,7 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       {state.draft.working ? <>
         {state.draft.sessions.map((session, index) => <SessionCard key={session.key} session={session}
           index={index} count={state.draft.sessions.length} errors={state.errors} busy={busy}
-          onChange={patch => change(draft => ({ ...draft, sessions: draft.sessions.map(s => s.key === session.key ? { ...s, ...patch } : s) }))}
+          onChange={patch => change(draft => ({ ...draft, sessions: draft.sessions.map(s => s.key === session.key ? applySessionPatch(s, patch) : s) }))}
           onRemove={() => change(draft => ({ ...draft, sessions: draft.sessions.filter(s => s.key !== session.key) }))}
           onMove={offset => change(draft => {
             const sessions = [...draft.sessions];
@@ -134,5 +147,8 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
   selectedText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   card: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
+  capacityInfo: { backgroundColor: colors.surfaceSoft, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 9, gap: 2 },
+  capacityTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: '700' },
+  capacityHint: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   footer: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });
