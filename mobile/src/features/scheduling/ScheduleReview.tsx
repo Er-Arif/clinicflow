@@ -30,8 +30,8 @@ export function ScheduleReview({ review, applying, onEdit, onApply }: {
                 <Text style={styles.time}>{formatClinicTimeRange(session.start_time, session.end_time)}</Text>
                 <Text style={styles.text}>
                   {session.slot_interval_minutes} min slots
-                  {slots != null ? ` · ${slots} available` : ''}
-                  {hasLowerLimit ? ` · Booking limit ${session.maximum_capacity}` : ` · Capacity ${session.maximum_capacity}`}
+                  {slots != null ? ` · ${slots} total slots` : ''}
+                  {hasLowerLimit ? ` · Booking limit ${session.maximum_capacity}` : ` · Booking capacity ${session.maximum_capacity}`}
                 </Text>
               </View>
             );
