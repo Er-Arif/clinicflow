@@ -113,7 +113,14 @@ export default function AppointmentDetailsScreen() {
       {item.payment_id && ['PENDING', 'CONFIRMED'].includes(item.payment_status ?? '') ? (
         <AppButton
           label={item.payment_status === 'CONFIRMED' ? 'View Payment / Receipt' : 'Collect Payment'}
-          onPress={() => router.push({ pathname: '/assistant/payments/[paymentId]', params: { paymentId: item.payment_id! } })}
+          onPress={() => router.push({
+            pathname: '/assistant/payments/[paymentId]',
+            params: {
+              paymentId: item.payment_id!,
+              appointmentId,
+              ...(item.visit_id ? { visitId: item.visit_id } : {}),
+            },
+          })}
         />
       ) : null}
 
