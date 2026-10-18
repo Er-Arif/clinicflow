@@ -42,9 +42,9 @@ export type DuplicateCandidate = {
 
 export type PatientCreatePayload = {
   full_name: string;
-  mobile_number: string;
+  mobile_number: string | null;
   whatsapp_same_as_mobile: boolean;
-  whatsapp_number?: string;
+  whatsapp_number?: string | null;
   date_of_birth?: string;
   approximate_age_years?: number;
   gender: Gender;
