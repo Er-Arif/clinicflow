@@ -59,14 +59,14 @@ export default function ExceptionsHubScreen() {
       <QueryState query={doctors} label="doctors" />
       <QueryState query={exceptionsQuery} label="exceptions" />
       <View style={styles.header}>
-        <Text style={styles.title}>Exceptions & Time Off</Text>
+        <Text style={styles.title}>Exceptions & time off</Text>
         <Text style={styles.subtitle}>
           Chronological list of all upcoming blocked dates and session-specific time off.
         </Text>
       </View>
 
       <AppButton
-        label="+ Block a Date"
+        label="+ Block a date"
         tone="primary"
         onPress={() => router.push('/doctor/more/schedule/exceptions/new')}
       />
@@ -83,7 +83,7 @@ export default function ExceptionsHubScreen() {
         <Text style={styles.loadingText}>Loading exceptions...</Text>
       ) : !exceptionsQuery.data || (exceptionsQuery.isError && exceptions.length === 0) ? null : exceptions.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No Upcoming Exceptions</Text>
+          <Text style={styles.emptyTitle}>No upcoming exceptions</Text>
           <Text style={styles.emptySubtitle}>
             No dates or sessions are currently blocked. Your recurring weekly schedule applies normally.
           </Text>
@@ -97,7 +97,7 @@ export default function ExceptionsHubScreen() {
                 <View style={styles.cardHeader}>
                   <Text style={styles.dateText}>{formatClinicDate(item.date)}</Text>
                   <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>BLOCKED</Text>
+                    <Text style={styles.statusBadgeText}>Blocked</Text>
                   </View>
                 </View>
 
@@ -105,8 +105,8 @@ export default function ExceptionsHubScreen() {
                   <View style={styles.scopeBadge}>
                     <Text style={styles.scopeBadgeText}>
                       {item.scope === 'FULL_DAY'
-                        ? 'Full Day'
-                        : `Session: ${item.session_name ?? 'Specific Session'}`}
+                        ? 'Full day'
+                        : `Session: ${item.session_name ?? 'Specific session'}`}
                     </Text>
                   </View>
                   {item.start_time && item.end_time && (
