@@ -45,7 +45,7 @@ export default function UpiSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>Payment Settings</Text>
+      <Text style={styles.title}>Payment settings</Text>
       <Text style={styles.subtitle}>{missing ? 'Add the clinic UPI details before enabling UPI payments.' : 'Clinic payment details used to generate UPI QR codes.'}</Text>
 
       <Text style={styles.label}>UPI ID</Text>
