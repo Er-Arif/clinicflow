@@ -63,7 +63,7 @@ export default function CompleteVisitScreen() {
   if (completed) {
     return (
       <AppScreen>
-        <Text style={styles.title}>Visit Completed</Text>
+        <Text style={styles.title}>Visit completed</Text>
         <Text style={styles.subtitle}>{item.patient.full_name}</Text>
         <View style={styles.card}>
           <Text style={styles.strong}>Payment: {item.payment_status ?? 'Pending'}</Text>
@@ -73,7 +73,7 @@ export default function CompleteVisitScreen() {
         </View>
         {resultFollowupId ? (
           <AppButton
-            label="Book Follow-up Now"
+            label="Book follow-up now"
             onPress={() => router.replace({ pathname: '/assistant/appointments/new', params: { patientId: item.patient.patient_id, appointmentType: 'FOLLOW_UP' } })}
           />
         ) : null}
@@ -86,7 +86,7 @@ export default function CompleteVisitScreen() {
     <KeyboardSafeFormScreen>
       <QueryState query={appointment} label="appointment" />
       <BackButton />
-      <Text style={styles.title}>Complete Visit</Text>
+      <Text style={styles.title}>Complete visit</Text>
       <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>
 
       <View style={styles.card}>
@@ -101,8 +101,8 @@ export default function CompleteVisitScreen() {
         <View style={styles.card}>
           <Text style={styles.strong}>Follow-up timing</Text>
           <View style={styles.actions}>
-            <AppButton label="After N Days" tone={mode === 'INTERVAL' ? 'primary' : 'secondary'} onPress={() => setMode('INTERVAL')} />
-            <AppButton label="Specific Date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
+            <AppButton label="After N days" tone={mode === 'INTERVAL' ? 'primary' : 'secondary'} onPress={() => setMode('INTERVAL')} />
+            <AppButton label="Specific date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
           </View>
           {mode === 'INTERVAL' ? (
             <KeyboardSafeTextInput
@@ -120,7 +120,7 @@ export default function CompleteVisitScreen() {
 
       {completeState.error ? <Text style={styles.error}>{apiError(completeState.error)?.message ?? 'Unable to complete visit.'}</Text> : null}
       <AppButton
-        label="Complete Visit"
+        label="Complete visit"
         loading={completeState.isLoading}
         disabled={
           !item.visit_id ||
