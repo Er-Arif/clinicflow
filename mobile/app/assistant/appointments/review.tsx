@@ -71,7 +71,7 @@ export default function AppointmentReviewScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <View style={styles.header}><Text style={styles.title}>Review Appointment</Text><Text style={styles.subtitle}>Confirm the booking details</Text></View>
+      <View style={styles.header}><Text style={styles.title}>Review appointment</Text><Text style={styles.subtitle}>Confirm the booking details</Text></View>
       <View style={styles.card}>
         <Row label="Patient" value={patient.data?.full_name ?? '—'} />
         <Row label="Doctor" value={doctor?.display_name ?? '—'} />
@@ -98,11 +98,11 @@ export default function AppointmentReviewScreen() {
           <Text style={styles.cardTitle}>Active appointment already exists</Text>
           <Text style={styles.subtitle}>{patient.data?.full_name ?? 'This patient'} already has an active appointment with {doctor?.display_name ?? 'this doctor'} on {formatClinicDate(String(duplicateDetails?.date ?? params.appointmentDate))}.</Text>
           {duplicateDetails?.time ? <Text style={styles.conflictMeta}>{formatClinicTime(duplicateDetails.time)}</Text> : null}
-          {duplicateDetails?.appointment_id ? <AppButton compact label="View Existing Appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: String(duplicateDetails.appointment_id) } })} /> : null}
+          {duplicateDetails?.appointment_id ? <AppButton compact label="View existing appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: String(duplicateDetails.appointment_id) } })} /> : null}
         </View>
       ) : activeError ? <Text style={styles.error}>{activeError.message ?? 'Unable to book appointment.'}</Text> : null}
 
-      <AppButton label="Book Appointment" loading={createState.isLoading || bookState.isLoading} disabled={adjustFee && (!adjustedAmount || adjustmentReason.trim().length < 2)} onPress={() => void confirm()} />
+      <AppButton label="Book appointment" loading={createState.isLoading || bookState.isLoading} disabled={adjustFee && (!adjustedAmount || adjustmentReason.trim().length < 2)} onPress={() => void confirm()} />
       <AppButton compact label="Edit details" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
