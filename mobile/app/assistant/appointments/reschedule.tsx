@@ -66,7 +66,7 @@ export default function RescheduleAppointmentScreen() {
       })}</View><AppButton label="Close" tone="secondary" onPress={() => setSlotModalVisible(false)} /></View></View></Modal>
       {isOwner ? <View style={styles.card}><Pressable onPress={() => setOverrideEnabled(value => !value)}><Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Capacity override</Text></Pressable>{overrideEnabled ? <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} style={styles.input} placeholder="Required reason" /> : null}</View> : null}
       {rescheduleState.error ? <Text style={styles.error}>{apiError(rescheduleState.error)?.message ?? 'Unable to reschedule appointment.'}</Text> : null}
-      <AppButton label="Confirm Reschedule" loading={rescheduleState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => void confirm()} /><AppButton compact label="Cancel" tone="secondary" onPress={() => router.back()} />
+      <AppButton label="Confirm reschedule" loading={rescheduleState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => void confirm()} /><AppButton compact label="Cancel" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
 }
