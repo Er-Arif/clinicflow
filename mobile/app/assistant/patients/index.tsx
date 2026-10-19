@@ -60,7 +60,7 @@ export default function PatientSearchScreen() {
               onPress={() => router.push(`/assistant/patients/${patient.patient_id}`)}
             >
               <Text style={styles.patientName}>{patient.full_name}</Text>
-              <Text style={styles.meta}>{patient.patient_code} · Age {patient.age} · {patient.gender.replaceAll('_', ' ')}</Text>
+              <Text style={styles.meta}>{patient.patient_code} · Age {patient.age} · {formatGender(patient.gender)}</Text>
               <Text style={styles.meta}>{patient.mobile_number ? formatPhone(patient.mobile_number) : 'No mobile number'}</Text>
               <Text style={styles.meta}>
                 {patient.previous_completed_visits > 0
@@ -85,6 +85,11 @@ export default function PatientSearchScreen() {
       />
     </KeyboardSafeFormScreen>
   );
+}
+
+function formatGender(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
 }
 
 function formatPhone(value: string) {
@@ -128,4 +133,3 @@ const styles = StyleSheet.create({
   },
   stateTitle: { fontWeight: '700', fontSize: 17, color: colors.text },
 });
-
