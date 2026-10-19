@@ -54,7 +54,7 @@ export default function FeeSettingsScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>Consultation Fees</Text>
+      <Text style={styles.title}>Consultation fees</Text>
       <Text style={styles.subtitle}>Changes apply to new bookings only.</Text>
 
       {current.data ? (
