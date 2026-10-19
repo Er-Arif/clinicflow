@@ -8,7 +8,9 @@ from app.core.clock import Clock, get_clock
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.modules.appointments.availability import AppointmentAvailabilityService
-from app.modules.appointments.cancellation_guard import require_payment_correction_before_cancellation
+from app.modules.appointments.cancellation_guard import (
+    require_payment_correction_before_cancellation,
+)
 from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
     AppointmentCancelRequest,
