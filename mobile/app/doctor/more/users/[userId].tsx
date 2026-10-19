@@ -71,7 +71,7 @@ export default function EditUserScreen() {
   return (
     <KeyboardSafeFormScreen refreshing={user.isFetching} onRefresh={() => void user.refetch()}>
       <BackButton />
-      <Text style={styles.title}>Edit User</Text>
+      <Text style={styles.title}>Edit user</Text>
       <Text style={styles.subtitle}>Update this account’s identity, access roles, and sign-in status.</Text>
       {user.isLoading ? <ActivityIndicator /> : null}
 
