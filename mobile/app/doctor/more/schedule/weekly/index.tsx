@@ -33,7 +33,7 @@ export default function WeeklyScheduleIndexScreen() {
     <AppScreen refreshing={overview.isFetching} onRefresh={retry}>
       <BackButton />
       <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>Weekly Hours</Text>
+        <Text accessibilityRole="header" style={styles.title}>Weekly hours</Text>
         {doctor ? <Text style={styles.hint}>{doctor.display_name}</Text> : null}
       </View>
       {saved === '1' ? <Text accessibilityRole="alert" style={styles.success}>Weekly schedule updated</Text> : null}
