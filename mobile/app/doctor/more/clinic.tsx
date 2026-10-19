@@ -45,7 +45,7 @@ export default function ClinicSettingsScreen() {
     <KeyboardSafeFormScreen>
       <BackButton />
       <QueryState query={query} label="clinic settings" />
-      <Text style={styles.title}>Clinic Settings</Text>
+      <Text style={styles.title}>Clinic settings</Text>
       <Text style={styles.subtitle}>Clinic identity and contact details used across ClinicFlow.</Text>
 
       <FormField label="Clinic name" value={name} onChangeText={setName} placeholder="Clinic name" />
