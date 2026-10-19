@@ -39,7 +39,7 @@ export default function ChangePasswordScreen() {
     <KeyboardSafeFormScreen>
       {!mustChangePassword ? <BackButton /> : null}
       {mustChangePassword ? <Text style={styles.brand}>ClinicFlow</Text> : null}
-      <Text style={styles.title}>Change Password</Text>
+      <Text style={styles.title}>Change password</Text>
       <Text style={styles.subtitle}>
         {mustChangePassword
           ? 'Your administrator issued a temporary password. Choose a new password before continuing.'
