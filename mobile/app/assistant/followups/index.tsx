@@ -10,11 +10,16 @@ import { WorklistControls } from '@/components/WorklistControls';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 const FILTERS = [
-  ['DUE_TODAY', 'Due Today'],
+  ['DUE_TODAY', 'Due today'],
   ['UPCOMING', 'Upcoming'],
   ['OVERDUE', 'Overdue'],
   ['BOOKED', 'Booked'],
 ] as const;
+
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
 
 export default function FollowUpsScreen() {
   const router = useRouter();
@@ -25,7 +30,7 @@ export default function FollowUpsScreen() {
   const overdue = useFollowUpWorklistInfiniteQuery({ state: 'OVERDUE' }, { refetchOnMountOrArgChange: true });
   const booked = useFollowUpWorklistInfiniteQuery({ state: 'BOOKED' }, { refetchOnMountOrArgChange: true });
   const groups = [
-    ['Due Today', due],
+    ['Due today', due],
     ['Overdue', overdue],
     ['Upcoming', upcoming],
     ['Booked', booked],
@@ -44,7 +49,7 @@ export default function FollowUpsScreen() {
             {items.map((item) => (
               <View key={item.followup_id} style={styles.card}>
                 <Text style={styles.patient}>{item.patient.full_name}</Text>
-                <Text style={styles.subtitle}>Due {formatClinicDate(item.due_date)} · {item.status}{item.overdue ? ' · OVERDUE' : ''}</Text>
+                <Text style={styles.subtitle}>Due {formatClinicDate(item.due_date)} · {humanize(item.status)}{item.overdue ? ' · Overdue' : ''}</Text>
                 {item.linked_appointment ? <Text style={styles.subtitle}>Booked {formatClinicDate(item.linked_appointment.date)} {item.linked_appointment.time?.slice(0, 5) ?? ''}</Text> : null}
                 <AppButton label="Open" tone="secondary" onPress={() => router.push({ pathname: '/assistant/followups/[followupId]', params: { followupId: item.followup_id } })} />
               </View>
