@@ -41,9 +41,10 @@ export default function AppointmentDetailsScreen() {
   }
   async function cancel() { try { await cancelAppointment({ appointmentId, reason, note: note || undefined }).unwrap(); setShowCancel(false); } catch {} }
 
-  const canCancel = item.status === 'BOOKED' || item.status === 'CHECKED_IN';
-  const cancellationReasons = item.status === 'CHECKED_IN' ? ['PATIENT_CANCELLED', 'DOCTOR_UNAVAILABLE', 'OTHER'] : ['PATIENT_CANCELLED', 'NO_SHOW', 'DOCTOR_UNAVAILABLE', 'OTHER'];
   const paymentConfirmed = item.payment_status === 'CONFIRMED';
+  const paymentCorrectionRequired = item.status === 'CHECKED_IN' && paymentConfirmed;
+  const canCancel = (item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired;
+  const cancellationReasons = item.status === 'CHECKED_IN' ? ['PATIENT_CANCELLED', 'DOCTOR_UNAVAILABLE', 'OTHER'] : ['PATIENT_CANCELLED', 'NO_SHOW', 'DOCTOR_UNAVAILABLE', 'OTHER'];
 
   return (
     <KeyboardSafeFormScreen>
@@ -61,8 +62,9 @@ export default function AppointmentDetailsScreen() {
       {item.status === 'CHECKED_IN' && item.visit_id ? <AppButton label="Complete visit" onPress={() => router.push({ pathname: '/assistant/appointments/complete', params: { appointmentId } })} /> : null}
       <View style={styles.secondaryActions}>
         {item.payment_id && ['PENDING', 'CONFIRMED'].includes(item.payment_status ?? '') ? <AppButton compact style={styles.flexButton} label={paymentConfirmed ? 'View receipt' : 'Collect payment'} tone={paymentConfirmed ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/assistant/payments/[paymentId]', params: { paymentId: item.payment_id!, appointmentId, ...(item.visit_id ? { visitId: item.visit_id } : {}) } })} /> : null}
-        {item.status === 'BOOKED' || item.status === 'CHECKED_IN' ? <AppButton compact style={styles.flexButton} label="Reschedule" tone="secondary" onPress={() => router.push({ pathname: '/assistant/appointments/reschedule', params: { appointmentId } })} /> : null}
+        {(item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired ? <AppButton compact style={styles.flexButton} label="Reschedule" tone="secondary" onPress={() => router.push({ pathname: '/assistant/appointments/reschedule', params: { appointmentId } })} /> : null}
       </View>
+      {paymentCorrectionRequired ? <Text style={styles.financialNotice}>A confirmed payment must be voided or corrected before cancelling or rescheduling this appointment.</Text> : null}
       {(item.status === 'BOOKED' || (item.status === 'CANCELLED' && item.cancellation_reason !== 'RESCHEDULED')) ? <AppButton compact label={item.status === 'CANCELLED' ? 'Send cancellation' : item.rescheduled_from_appointment_id ? 'Send reschedule' : 'Send confirmation'} tone="secondary" loading={messageState.isLoading} onPress={() => void sendAppointmentMessage()} /> : null}
       {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare message.'}</Text> : null}
       {canCancel ? <AppButton compact label={showCancel ? 'Hide cancellation' : 'Cancel appointment'} tone="danger" onPress={() => setShowCancel(value => !value)} /> : null}
@@ -75,6 +77,6 @@ const styles = StyleSheet.create({
   headingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }, headingCopy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, fontSize: 13 },
   statusPill: { backgroundColor: colors.softSuccess, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, statusText: { color: colors.success, fontWeight: '700', fontSize: 11 }, statusChecked: { backgroundColor: colors.softPrimary }, statusCheckedText: { color: colors.primary }, statusCancelled: { backgroundColor: colors.surfaceSoft }, statusCancelledText: { color: colors.muted },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, correctionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: '#F0C5C5', borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning }, financialNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 },
   secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, flexButton: { flexGrow: 1, flexBasis: '46%' }, reasonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, reasonButton: { flexGrow: 1, flexBasis: '46%' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background }, error: { color: colors.danger },
 });
