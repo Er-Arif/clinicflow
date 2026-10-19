@@ -33,7 +33,7 @@ export default function ScheduleHubScreen() {
       <QueryState query={clinicTime} label="clinic date" />
       <QueryState query={doctors} label="doctors" />
       <View style={styles.header}>
-        <Text style={styles.title}>Schedule & Sessions</Text>
+        <Text style={styles.title}>Schedule & sessions</Text>
         <Text style={styles.subtitle}>Weekly clinic hours and time off</Text>
       </View>
 
@@ -63,7 +63,7 @@ export default function ScheduleHubScreen() {
       <View style={styles.card}>
         <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/more/schedule/exceptions')} style={styles.cardHeaderRow}>
           <View style={styles.headerCopy}>
-            <Text style={styles.cardTitle}>Exceptions & Time Off</Text>
+            <Text style={styles.cardTitle}>Exceptions & time off</Text>
             <Text style={styles.cardHint}>Block a date or individual session</Text>
           </View>
           <View style={styles.countBadge}><Text style={styles.countBadgeText}>{exceptionsQuery.data ? exceptionCount : '—'}</Text></View>
@@ -88,8 +88,8 @@ export default function ScheduleHubScreen() {
         ))}
 
         <View style={styles.buttonRow}>
-          <AppButton label="+ Block a Date" onPress={() => router.push('/doctor/more/schedule/exceptions/new')} />
-          <AppButton label="View All Exceptions" tone="secondary" onPress={() => router.push('/doctor/more/schedule/exceptions')} />
+          <AppButton label="+ Block a date" onPress={() => router.push('/doctor/more/schedule/exceptions/new')} />
+          <AppButton label="View all exceptions" tone="secondary" onPress={() => router.push('/doctor/more/schedule/exceptions')} />
         </View>
       </View>
     </AppScreen>
