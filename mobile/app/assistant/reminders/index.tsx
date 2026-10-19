@@ -12,6 +12,12 @@ import { BackButton } from '@/components/BackButton';
 import { WorklistControls } from '@/components/WorklistControls';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function humanize(value?: string | null) {
+  if (!value) return '';
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
+
 export default function RemindersScreen() {
   const router = useRouter();
   const clinicTime = useClinicTimeQuery();
@@ -26,7 +32,7 @@ export default function RemindersScreen() {
   async function skip(reminderId: string) {
     setError(null);
     try {
-      await skipReminder({ reminderId, reason: 'Skipped by Assistant' }).unwrap();
+      await skipReminder({ reminderId, reason: 'Skipped by assistant' }).unwrap();
     } catch (e) {
       setError(apiError(e)?.message ?? 'Unable to skip reminder.');
     }
@@ -47,8 +53,8 @@ export default function RemindersScreen() {
       {items.map((item) => (
         <View key={item.reminder_id} style={styles.card}>
           <Text style={styles.patient}>{item.patient_name}</Text>
-          <Text style={styles.subtitle}>{item.reminder_type.replaceAll('_', ' ')} · Due {formatClinicDate(item.due_on)} · {item.language}</Text>
-          {!item.sendable ? <Text style={styles.warning}>Temporarily suppressed: {item.suppression_reason?.replaceAll('_', ' ')}</Text> : null}
+          <Text style={styles.subtitle}>{humanize(item.reminder_type)} · Due {formatClinicDate(item.due_on)} · {item.language}</Text>
+          {!item.sendable ? <Text style={styles.warning}>Temporarily suppressed: {humanize(item.suppression_reason)}</Text> : null}
           <AppButton
             label="Send WhatsApp"
             disabled={!item.sendable}
@@ -70,4 +76,3 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   patient: { fontSize: 17, fontWeight: '800', color: colors.text },
 });
-
