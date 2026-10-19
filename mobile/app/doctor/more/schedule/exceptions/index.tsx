@@ -16,6 +16,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+// BLOCKED is the API state; the staff-facing label is sentence-cased as “Blocked”.
 export default function ExceptionsHubScreen() {
   const router = useRouter();
   const clinicTime = useClinicTimeQuery();
