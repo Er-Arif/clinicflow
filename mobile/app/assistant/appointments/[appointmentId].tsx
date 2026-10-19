@@ -11,7 +11,7 @@ import { useCancelAppointmentMutation, useCheckInAppointmentMutation, useGetAppo
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
-import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 function humanize(value?: string | null) { if (!value) return ''; return value.toLowerCase().replaceAll('_', ' ').replace(/^\w/, char => char.toUpperCase()); }
@@ -22,29 +22,57 @@ export default function AppointmentDetailsScreen() {
   const appointmentId = String(params.appointmentId ?? '');
   const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
   const [checkIn, checkInState] = useCheckInAppointmentMutation();
-  const [checkInIdempotencyKey] = useState(() => newIdempotencyKey('checkin'));
+  const checkInRequest = useIntentIdempotencyKey('checkin', appointmentId);
   const [cancelAppointment, cancelState] = useCancelAppointmentMutation();
   const [createMessage, messageState] = useCreateAppointmentMessageMutation();
   const [showCancel, setShowCancel] = useState(false);
   const [reason, setReason] = useState('PATIENT_CANCELLED');
   const [note, setNote] = useState('');
+  const [submittedCancelIntent, setSubmittedCancelIntent] = useState<string | null>(null);
+  const cancelIntent = JSON.stringify({ appointment_id: appointmentId, reason, note: note || null });
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
   if (!appointment.data) return <AppScreen><BackButton /><Text style={styles.title}>Unable to load appointment</Text><QueryState query={appointment} label="appointment" /></AppScreen>;
   const item = appointment.data;
 
-  async function doCheckIn() { try { await checkIn({ appointmentId, idempotencyKey: checkInIdempotencyKey }).unwrap(); } catch {} }
-  async function sendAppointmentMessage() {
-    const current = appointment.data; if (!current) return;
-    const messageType = current.status === 'CANCELLED' ? 'APPOINTMENT_CANCELLED' as const : current.rescheduled_from_appointment_id ? 'APPOINTMENT_RESCHEDULED' as const : 'APPOINTMENT_CONFIRMATION' as const;
-    try { const prepared = await createMessage({ appointmentId, messageType }).unwrap(); router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: prepared.reminder.reminder_id } }); } catch {}
+  async function doCheckIn() {
+    try {
+      await checkIn({ appointmentId, idempotencyKey: checkInRequest.getKey() }).unwrap();
+    } catch {
+      // The current request error is rendered below.
+    }
   }
-  async function cancel() { try { await cancelAppointment({ appointmentId, reason, note: note || undefined }).unwrap(); setShowCancel(false); } catch {} }
+
+  async function sendAppointmentMessage() {
+    const current = appointment.data;
+    if (!current) return;
+    const messageType = current.status === 'CANCELLED'
+      ? 'APPOINTMENT_CANCELLED' as const
+      : current.rescheduled_from_appointment_id
+        ? 'APPOINTMENT_RESCHEDULED' as const
+        : 'APPOINTMENT_CONFIRMATION' as const;
+    try {
+      const prepared = await createMessage({ appointmentId, messageType }).unwrap();
+      router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: prepared.reminder.reminder_id } });
+    } catch {}
+  }
+
+  async function cancel() {
+    setSubmittedCancelIntent(cancelIntent);
+    try {
+      await cancelAppointment({ appointmentId, reason, note: note || undefined }).unwrap();
+      setShowCancel(false);
+    } catch {
+      // The current cancellation error is rendered below.
+    }
+  }
 
   const paymentConfirmed = item.payment_status === 'CONFIRMED';
   const paymentCorrectionRequired = item.status === 'CHECKED_IN' && paymentConfirmed;
   const canCancel = (item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired;
   const cancellationReasons = item.status === 'CHECKED_IN' ? ['PATIENT_CANCELLED', 'DOCTOR_UNAVAILABLE', 'OTHER'] : ['PATIENT_CANCELLED', 'NO_SHOW', 'DOCTOR_UNAVAILABLE', 'OTHER'];
+  const checkInError = checkInRequest.resultMatchesIntent ? apiError(checkInState.error) : null;
+  const cancelError = submittedCancelIntent === cancelIntent ? apiError(cancelState.error) : null;
 
   return (
     <KeyboardSafeFormScreen>
@@ -58,7 +86,7 @@ export default function AppointmentDetailsScreen() {
         {item.cancellation_reason ? <Row label="Cancellation" value={humanize(item.cancellation_reason)} /> : null}
       </View>
       {item.status === 'BOOKED' ? <AppButton label="Check in" loading={checkInState.isLoading} onPress={() => void doCheckIn()} /> : null}
-      {checkInState.error ? <Text style={styles.error}>{apiError(checkInState.error)?.message ?? 'Unable to check in patient.'}</Text> : null}
+      {checkInError ? <Text style={styles.error}>{checkInError.message ?? 'Unable to check in patient.'}</Text> : null}
       {item.status === 'CHECKED_IN' && item.visit_id ? <AppButton label="Complete visit" onPress={() => router.push({ pathname: '/assistant/appointments/complete', params: { appointmentId } })} /> : null}
       <View style={styles.secondaryActions}>
         {item.payment_id && ['PENDING', 'CONFIRMED'].includes(item.payment_status ?? '') ? <AppButton compact style={styles.flexButton} label={paymentConfirmed ? 'View receipt' : 'Collect payment'} tone={paymentConfirmed ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/assistant/payments/[paymentId]', params: { paymentId: item.payment_id!, appointmentId, ...(item.visit_id ? { visitId: item.visit_id } : {}) } })} /> : null}
@@ -67,11 +95,12 @@ export default function AppointmentDetailsScreen() {
       {paymentCorrectionRequired ? <Text style={styles.financialNotice}>A confirmed payment must be voided or corrected before cancelling or rescheduling this appointment.</Text> : null}
       {(item.status === 'BOOKED' || (item.status === 'CANCELLED' && item.cancellation_reason !== 'RESCHEDULED')) ? <AppButton compact label={item.status === 'CANCELLED' ? 'Send cancellation' : item.rescheduled_from_appointment_id ? 'Send reschedule' : 'Send confirmation'} tone="secondary" loading={messageState.isLoading} onPress={() => void sendAppointmentMessage()} /> : null}
       {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare message.'}</Text> : null}
-      {canCancel ? <AppButton compact label={showCancel ? 'Hide cancellation' : 'Cancel appointment'} tone="danger" onPress={() => setShowCancel(value => !value)} /> : null}
-      {showCancel ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Cancellation</Text><View style={styles.reasonGrid}>{cancellationReasons.map(value => <AppButton key={value} compact label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} style={styles.reasonButton} />)}</View>{reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}{cancelState.error ? <Text style={styles.error}>{apiError(cancelState.error)?.message ?? 'Unable to cancel appointment.'}</Text> : null}<AppButton label="Confirm cancellation" tone="danger" loading={cancelState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void cancel()} /></View> : null}
+      {canCancel ? <AppButton compact label={showCancel ? 'Hide cancellation' : 'Cancel appointment'} tone="danger" onPress={() => { setSubmittedCancelIntent(null); setShowCancel(value => !value); }} /> : null}
+      {showCancel ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Cancellation</Text><View style={styles.reasonGrid}>{cancellationReasons.map(value => <AppButton key={value} compact label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} style={styles.reasonButton} />)}</View>{reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}{cancelError ? <Text style={styles.error}>{cancelError.message ?? 'Unable to cancel appointment.'}</Text> : null}<AppButton label="Confirm cancellation" tone="danger" loading={cancelState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void cancel()} /></View> : null}
     </KeyboardSafeFormScreen>
   );
 }
+
 function Row({ label, value, emphasis }: { label: string; value: string; emphasis?: 'success' | 'warning' }) { return <View style={styles.row}><Text style={styles.label}>{label}</Text><Text style={[styles.value, emphasis === 'success' && styles.success, emphasis === 'warning' && styles.warning]}>{value}</Text></View>; }
 const styles = StyleSheet.create({
   headingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }, headingCopy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, fontSize: 13 },

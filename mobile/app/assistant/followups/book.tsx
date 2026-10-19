@@ -11,7 +11,7 @@ import { useBookFollowUpMutation, useClinicTimeQuery, useGetAvailabilityQuery, u
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
-import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function BookFollowUpScreen() {
@@ -27,7 +27,6 @@ export default function BookFollowUpScreen() {
   const [override, setOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [bookFollowUp, bookState] = useBookFollowUpMutation();
-  const [idempotencyKey] = useState(() => newIdempotencyKey('followup-book'));
 
   useEffect(() => {
     if (!date && followup.data && clinicTime.data?.clinic_date) {
@@ -44,13 +43,21 @@ export default function BookFollowUpScreen() {
     [availability.data?.sessions, sessionDefinitionId],
   );
   const canOverride = me.data?.permissions.includes('appointment.capacity_override') ?? false;
+  const bookingIntent = JSON.stringify({
+    followup_id: followupId,
+    session_definition_id: sessionDefinitionId,
+    appointment_date: date,
+    appointment_time: appointmentTime,
+    capacity_override: override ? { enabled: true, reason: overrideReason } : null,
+  });
+  const bookingRequest = useIntentIdempotencyKey('followup-book', bookingIntent);
 
   async function submit() {
     if (!sessionDefinitionId || !appointmentTime) return;
     try {
       const result = await bookFollowUp({
         followupId,
-        idempotencyKey,
+        idempotencyKey: bookingRequest.getKey(),
         body: {
           session_definition_id: sessionDefinitionId,
           appointment_date: date,
@@ -60,12 +67,13 @@ export default function BookFollowUpScreen() {
       }).unwrap();
       router.replace({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: result.appointment.appointment_id } });
     } catch {
-      // Stable API error below.
+      // The current request error is rendered below.
     }
   }
 
   if (followup.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
   if (!followup.data) return <AppScreen><Text style={styles.title}>Unable to load follow-up</Text><QueryState query={followup} label="follow-up" /></AppScreen>;
+  const currentError = bookingRequest.resultMatchesIntent ? apiError(bookState.error) : null;
 
   return (
     <KeyboardSafeFormScreen>
@@ -79,7 +87,7 @@ export default function BookFollowUpScreen() {
       {availability.data?.sessions.map((session) => (
         <View key={session.session_definition_id} style={styles.card}>
           <Text style={styles.session}>{session.name}</Text>
-          <Text style={styles.subtitle}>{session.start_time.slice(0,5)}–{session.end_time.slice(0,5)} · {session.used_capacity}/{session.maximum_capacity} booked {session.status === 'BLOCKED' ? '· Blocked' : ''}</Text>
+          <Text style={styles.subtitle}>{session.start_time.slice(0, 5)}–{session.end_time.slice(0, 5)} · {session.used_capacity}/{session.maximum_capacity} booked {session.status === 'BLOCKED' ? '· Blocked' : ''}</Text>
           <AppButton label={sessionDefinitionId === session.session_definition_id ? 'Selected session' : 'Select session'} tone={sessionDefinitionId === session.session_definition_id ? 'primary' : 'secondary'} disabled={session.status === 'BLOCKED'} onPress={() => { setSessionDefinitionId(session.session_definition_id); setAppointmentTime(''); }} />
         </View>
       ))}
@@ -89,7 +97,7 @@ export default function BookFollowUpScreen() {
           {selectedSession.slots.map((slot) => (
             <AppButton
               key={slot.time}
-              label={`${slot.time.slice(0,5)}${slot.available ? '' : ' · Occupied'}`}
+              label={`${slot.time.slice(0, 5)}${slot.available ? '' : ' · Occupied'}`}
               tone={appointmentTime === slot.time ? 'primary' : 'secondary'}
               disabled={!slot.normal_booking_allowed && !canOverride}
               onPress={() => { setAppointmentTime(slot.time); if (!slot.normal_booking_allowed) setOverride(true); else setOverride(false); }}
@@ -104,7 +112,7 @@ export default function BookFollowUpScreen() {
           <AppButton label="Cancel override" tone="secondary" onPress={() => setOverride(false)} />
         </View>
       ) : null}
-      {bookState.error ? <Text style={styles.error}>{apiError(bookState.error)?.message ?? 'Unable to book follow-up.'}</Text> : null}
+      {currentError ? <Text style={styles.error}>{currentError.message ?? 'Unable to book follow-up.'}</Text> : null}
       <AppButton label="Book follow-up" loading={bookState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (override && overrideReason.trim().length < 2)} onPress={() => void submit()} />
       <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
@@ -119,4 +127,3 @@ const styles = StyleSheet.create({
   session: { fontWeight: '800', color: colors.text, fontSize: 17 },
   error: { color: colors.danger },
 });
-

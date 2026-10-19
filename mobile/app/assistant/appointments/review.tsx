@@ -10,7 +10,7 @@ import { useCreateAppointmentMutation, useBookFollowUpMutation, useGetCurrentFee
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
-import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function AppointmentReviewScreen() {
@@ -23,7 +23,6 @@ export default function AppointmentReviewScreen() {
   const me = useMeQuery();
   const [createAppointment, createState] = useCreateAppointmentMutation();
   const [bookFollowup, bookState] = useBookFollowUpMutation();
-  const [idempotencyKey] = useState(() => newIdempotencyKey('book'));
   const [adjustFee, setAdjustFee] = useState(false);
   const [adjustedAmount, setAdjustedAmount] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
@@ -32,11 +31,29 @@ export default function AppointmentReviewScreen() {
   const followupId = params.followupId;
   const canAdjustFee = Boolean(me.data?.roles.includes('OWNER_ADMIN') || fee.data?.assistant_adjustment_allowed);
   const feeAmount = useMemo(() => appointmentType === 'REGULAR' ? fee.data?.regular_fee : fee.data?.followup_fee, [appointmentType, fee.data]);
+  const bookingIntent = JSON.stringify({
+    mode: followupId ? 'followup' : 'appointment',
+    followup_id: followupId ?? null,
+    patient_id: patientId,
+    doctor_id: String(params.doctorId ?? ''),
+    session_definition_id: String(params.sessionDefinitionId ?? ''),
+    appointment_date: String(params.appointmentDate ?? ''),
+    appointment_time: String(params.appointmentTime ?? ''),
+    appointment_type: appointmentType,
+    fee_adjustment: !followupId && adjustFee
+      ? { amount: adjustedAmount, reason: adjustmentReason }
+      : null,
+    capacity_override: params.overrideEnabled === '1'
+      ? { enabled: true, reason: String(params.overrideReason ?? '') }
+      : null,
+  });
+  const bookingRequest = useIntentIdempotencyKey('book', bookingIntent);
 
   if (patient.isLoading || doctors.isLoading || fee.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
 
   async function confirm() {
     try {
+      const idempotencyKey = bookingRequest.getKey();
       const body = {
         patient_id: patientId,
         doctor_id: String(params.doctorId),
@@ -50,21 +67,27 @@ export default function AppointmentReviewScreen() {
 
       let result;
       if (followupId) {
-        const bookRes = await bookFollowup({ followupId, idempotencyKey, body: {
-          session_definition_id: String(params.sessionDefinitionId),
-          appointment_date: String(params.appointmentDate),
-          appointment_time: String(params.appointmentTime),
-          ...(params.overrideEnabled === '1' ? { capacity_override: { enabled: true as const, reason: String(params.overrideReason ?? '') } } : {}),
-        } }).unwrap();
+        const bookRes = await bookFollowup({
+          followupId,
+          idempotencyKey,
+          body: {
+            session_definition_id: String(params.sessionDefinitionId),
+            appointment_date: String(params.appointmentDate),
+            appointment_time: String(params.appointmentTime),
+            ...(params.overrideEnabled === '1' ? { capacity_override: { enabled: true as const, reason: String(params.overrideReason ?? '') } } : {}),
+          },
+        }).unwrap();
         result = bookRes.appointment;
       } else {
         result = await createAppointment({ idempotencyKey, body }).unwrap();
       }
       router.replace({ pathname: '/assistant/appointments/booked', params: { appointmentId: result.appointment_id } });
-    } catch { /* rendered below */ }
+    } catch {
+      // The current request error is rendered below.
+    }
   }
 
-  const activeError = apiError(createState.error || bookState.error);
+  const activeError = bookingRequest.resultMatchesIntent ? apiError(createState.error || bookState.error) : null;
   const isDuplicateActive = activeError?.code === 'APPOINTMENT_DUPLICATE_ACTIVE';
   const duplicateDetails = activeError?.details as { appointment_id?: string; date?: string; time?: string | null; status?: string; appointment_type?: string } | undefined;
 
