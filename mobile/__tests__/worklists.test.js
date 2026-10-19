@@ -238,9 +238,9 @@ for (const [mutation, arg, followupStatus, reminderStatus] of mutations) {
     await h.dispatch('getFollowUp', 'f1');
     await h.dispatch('listReminders', { status: 'DUE', followupId: 'f1' });
     if (['cancelAppointment', 'rescheduleAppointment'].includes(mutation)) {
-      assert.match(h.render('detail').markup, /BOOKED/);
+      assert.match(h.render('detail').markup, /Booked/);
       assert.match(h.render('detail').markup, /20 Oct 2026/);
-      assert.doesNotMatch(h.render('detail').markup, /Send WhatsApp Reminder/);
+      assert.doesNotMatch(h.render('detail').markup, /Send WhatsApp reminder/);
     }
     h.server.mutate = () => {
       h.server.followups[0].status = followupStatus;
@@ -258,9 +258,10 @@ for (const [mutation, arg, followupStatus, reminderStatus] of mutations) {
       assert.equal(h.state('followUpWorklist', followArg).data.pages.length, 1);
       assert.equal(h.state('getFollowUp', 'f1').data.status, followupStatus);
       const detail = h.render('detail').markup;
-      assert.match(detail, new RegExp(followupStatus));
+      const visibleFollowupStatus = followupStatus.charAt(0) + followupStatus.slice(1).toLowerCase();
+      assert.match(detail, new RegExp(visibleFollowupStatus));
       if (mutation === 'cancelAppointment') {
-        assert.match(detail, /Send WhatsApp Reminder/);
+        assert.match(detail, /Send WhatsApp reminder/);
         assert.equal(h.state('listReminders', { status: 'DUE', followupId: 'f1' }).data.items[0].status, 'DUE');
       }
       if (mutation === 'rescheduleAppointment') assert.match(detail, /22 Oct 2026/);
@@ -310,7 +311,7 @@ for (const mutation of ['cancelAppointment', 'rescheduleAppointment']) {
     const h = harness(t);
     h.server.followups[0].status = 'BOOKED';
     const subscription = h.dispatch('getFollowUp', 'f1'); await subscription;
-    assert.match(h.render('detail').markup, /BOOKED/);
+    assert.match(h.render('detail').markup, /Booked/);
     subscription.unsubscribe();
     // Allow RTK to process the unsubscribe before invalidating the inactive entry.
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -324,6 +325,6 @@ for (const mutation of ['cancelAppointment', 'rescheduleAppointment']) {
     await h.settle();
     assert.ok(h.state('getFollowUp', 'f1').isUninitialized);
     await h.dispatch('getFollowUp', 'f1');
-    assert.match(h.render('detail').markup, mutation === 'cancelAppointment' ? /OPEN/ : /22 Oct 2026/);
+    assert.match(h.render('detail').markup, mutation === 'cancelAppointment' ? /Open/ : /22 Oct 2026/);
   });
 }
