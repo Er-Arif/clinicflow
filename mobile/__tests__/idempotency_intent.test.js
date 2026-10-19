@@ -24,6 +24,7 @@ test('mutable submission screens bind idempotency results to the current request
     'app/assistant/walk-in.tsx',
     'app/assistant/appointments/reschedule.tsx',
     'app/assistant/appointments/review.tsx',
+    'app/assistant/appointments/complete.tsx',
     'app/assistant/followups/book.tsx',
     'app/assistant/payments/[paymentId].tsx',
     'app/assistant/payments/upi.tsx',
@@ -39,4 +40,8 @@ test('mutable submission screens bind idempotency results to the current request
   const walkIn = fs.readFileSync(path.join(root, 'app/assistant/walk-in.tsx'), 'utf8');
   assert.match(walkIn, /resultMatchesIntent \? apiError\(addState\.error\) : null/);
   assert.match(walkIn, /walkInRequest\.reset\(\)/);
+
+  const completeVisit = fs.readFileSync(path.join(root, 'app/assistant/appointments/complete.tsx'), 'utf8');
+  assert.match(completeVisit, /resultMatchesIntent \? apiError\(completeState\.error\) : null/);
+  assert.match(completeVisit, /Payment \{paymentStatus\(item\.payment_status\)\}/);
 });
