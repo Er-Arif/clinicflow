@@ -44,4 +44,5 @@ test('mutable submission screens bind idempotency results to the current request
   const completeVisit = fs.readFileSync(path.join(root, 'app/assistant/appointments/complete.tsx'), 'utf8');
   assert.match(completeVisit, /resultMatchesIntent \? apiError\(completeState\.error\) : null/);
   assert.match(completeVisit, /Payment \{paymentStatus\(item\.payment_status\)\}/);
+  assert.match(completeVisit, /await appointment\.refetch\(\)/);
 });
