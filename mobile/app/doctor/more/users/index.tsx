@@ -8,11 +8,10 @@ import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
-const roleLabel = (role: string) => role
-  .toLowerCase()
-  .split('_')
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const roleLabel = (role: string) => {
+  const normalized = role.toLowerCase().replaceAll('_', ' ');
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
 
 export default function UsersScreen() {
   const router = useRouter();
