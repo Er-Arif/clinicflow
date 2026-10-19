@@ -63,6 +63,7 @@ export default function CompleteVisitScreen() {
         body: { follow_up: followUpPayload },
         idempotencyKey: completionRequest.getKey(),
       }).unwrap();
+      await appointment.refetch();
       setResultFollowupId(result.followup?.followup_id ?? null);
       setCompleted(true);
     } catch {
