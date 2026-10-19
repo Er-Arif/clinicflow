@@ -39,7 +39,7 @@ export default function NewUserScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>Add User</Text>
+      <Text style={styles.title}>Add user</Text>
       <Text style={styles.subtitle}>Create an account and choose what this user can access in ClinicFlow.</Text>
 
       <FormField
