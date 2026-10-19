@@ -13,6 +13,11 @@ import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
+
 export default function FollowUpDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ followupId: string }>();
@@ -50,20 +55,20 @@ export default function FollowUpDetailsScreen() {
       <QueryState query={query} label="follow-up" />
       <BackButton />
       <Text style={styles.title}>{item.patient.full_name}</Text>
-      <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'OVERDUE' : item.status}</Text>
+      <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'Overdue' : humanize(item.status)}</Text>
       <View style={styles.card}>
         <Row label="Due" value={formatClinicDate(item.due_date)} />
         <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
         <Row label="Patient ID" value={item.patient.patient_code} />
         {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
         {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)} ${item.linked_appointment.time?.slice(0, 5) ?? ''}`} /> : null}
-        {item.close_reason ? <Row label="Closed" value={item.close_reason.replaceAll('_', ' ')} /> : null}
+        {item.close_reason ? <Row label="Closed" value={humanize(item.close_reason)} /> : null}
       </View>
 
       {item.status === 'OPEN' ? (
         <>
           <AppButton
-            label="Book Appointment"
+            label="Book appointment"
             onPress={() =>
               router.push({
                 pathname: '/assistant/appointments/new',
@@ -78,23 +83,23 @@ export default function FollowUpDetailsScreen() {
             }
           />
           {reminderQuery.data?.items[0] ? (
-            <AppButton label="Send WhatsApp Reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
+            <AppButton label="Send WhatsApp reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
           ) : null}
-          <AppButton label="Close Follow-up" tone="danger" onPress={() => setShowClose((v) => !v)} />
+          <AppButton label="Close follow-up" tone="danger" onPress={() => setShowClose((v) => !v)} />
         </>
       ) : null}
       {item.status === 'BOOKED' && item.linked_appointment ? (
-        <AppButton label="Open Appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: item.linked_appointment!.appointment_id } })} />
+        <AppButton label="Open appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: item.linked_appointment!.appointment_id } })} />
       ) : null}
 
       {showClose ? (
         <View style={styles.card}>
           {['PATIENT_DECLINED', 'NO_LONGER_REQUIRED', 'CONTACTED', 'OTHER'].map((value) => (
-            <AppButton key={value} label={value.replaceAll('_', ' ')} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} />
+            <AppButton key={value} label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} />
           ))}
           {reason === 'OTHER' ? <KeyboardSafeTextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Reason" /> : null}
           {closeState.error ? <Text style={styles.error}>{apiError(closeState.error)?.message ?? 'Unable to close follow-up.'}</Text> : null}
-          <AppButton label="Confirm Close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
+          <AppButton label="Confirm close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
         </View>
       ) : null}
       <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
