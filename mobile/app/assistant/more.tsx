@@ -19,8 +19,8 @@ export default function MoreScreen() {
         <MenuItem label="Reminders" onPress={() => router.push('/assistant/reminders')} />
       </Section>
       <Section title="Account">
-        <MenuItem label="Change Password" onPress={() => router.push('/(auth)/change-password')} />
-        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign Out'} onPress={confirmSignOut} danger />
+        <MenuItem label="Change password" onPress={() => router.push('/(auth)/change-password')} />
+        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign out'} onPress={confirmSignOut} danger />
       </Section>
       <MenuCard label="About" onPress={() => router.push('/about')} />
       <Text style={styles.version}>ClinicFlow V1</Text>
