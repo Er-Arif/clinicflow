@@ -38,7 +38,7 @@ test('appointment payment navigation carries appointment and visit context', () 
   });
 
   const output = runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
-  output.controls.find(control => control.label === 'Collect Payment').onPress();
+  output.controls.find(control => control.label === 'Collect payment').onPress();
 
   assert.deepEqual(destination, {
     pathname: '/assistant/payments/[paymentId]',
@@ -70,7 +70,7 @@ test('cash confirmation forwards appointment and visit ids so detail caches are 
   });
 
   const output = runtime.render(runtime.load('app/assistant/payments/[paymentId].tsx').default);
-  output.controls.find(control => control.label === 'Confirm ₹500.00 Cash').onPress();
+  output.controls.find(control => control.label === 'Confirm ₹500.00 cash').onPress();
   await new Promise(resolve => setImmediate(resolve));
 
   assert.equal(confirmationArg.appointmentId, 'a1');
