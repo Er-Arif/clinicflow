@@ -8,6 +8,7 @@ from app.core.clock import Clock, get_clock
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.modules.appointments.availability import AppointmentAvailabilityService
+from app.modules.appointments.cancellation_guard import require_payment_correction_before_cancellation
 from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
     AppointmentCancelRequest,
@@ -99,8 +100,6 @@ def get_appointment(
     return AppointmentService(db, clock, context).get(appointment_id)
 
 
-
-
 @router.post("/appointments/{appointment_id}/check-in", response_model=CheckInResponse)
 def check_in_appointment(
     appointment_id: UUID,
@@ -124,6 +123,7 @@ def cancel_appointment(
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
     with db.begin():
+        require_payment_correction_before_cancellation(db, context.clinic_id, appointment_id)
         return AppointmentService(db, clock, context).cancel(appointment_id, request)
 
 
