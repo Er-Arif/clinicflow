@@ -20,7 +20,7 @@ export default function UsersScreen() {
   return (
     <AppScreen refreshing={users.isFetching} onRefresh={() => void users.refetch()}>
       <BackButton />
-      <Text style={styles.title}>User Management</Text>
+      <Text style={styles.title}>User management</Text>
       <Text style={styles.subtitle}>Manage who can access ClinicFlow and the roles assigned to each account.</Text>
       <AppButton label="Add user" onPress={() => router.push('/doctor/more/users/new')} />
       <QueryState query={users} label="users" hasData={Boolean(users.currentData)} empty={users.currentData?.items.length === 0 ? 'No user accounts found.' : undefined} />
