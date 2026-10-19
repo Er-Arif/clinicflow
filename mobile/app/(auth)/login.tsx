@@ -49,7 +49,7 @@ export default function LoginScreen() {
             <KeyboardSafeTextInput autoCapitalize="none" autoCorrect={false} placeholder="Username, mobile or email" value={loginIdentifier} onChangeText={setLoginIdentifier} style={styles.input} />
             <KeyboardSafeTextInput placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} style={styles.input} />
             {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-            <AppButton label="Sign In" loading={state.isLoading} disabled={!loginIdentifier.trim() || !password} onPress={() => void submit()} />
+            <AppButton label="Sign in" loading={state.isLoading} disabled={!loginIdentifier.trim() || !password} onPress={() => void submit()} />
           </View>
         </View>
       </View>
