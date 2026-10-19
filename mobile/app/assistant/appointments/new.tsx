@@ -47,12 +47,12 @@ export default function NewAppointmentScreen() {
   const feeAmount = useMemo(() => !fee.data ? null : appointmentType === 'REGULAR' ? fee.data.regular_fee : fee.data.followup_fee, [appointmentType, fee.data]);
   useEffect(() => { setSessionDefinitionId(''); setAppointmentTime(''); setOverrideEnabled(false); setOverrideReason(''); }, [date, doctorId]);
 
-  if (!patientId) return <AppScreen><BackButton /><Text style={styles.title}>New Appointment</Text><Text style={styles.subtitle}>Choose a patient first.</Text><AppButton label="Search Patient" onPress={() => router.push('/assistant/patients')} /></AppScreen>;
+  if (!patientId) return <AppScreen><BackButton /><Text style={styles.title}>New appointment</Text><Text style={styles.subtitle}>Choose a patient first.</Text><AppButton label="Search patient" onPress={() => router.push('/assistant/patients')} /></AppScreen>;
 
   return (
     <KeyboardSafeFormScreen>
       <QueryState query={clinicTime} label="clinic date" /><QueryState query={availability} label="availability" /><BackButton />
-      <View style={styles.header}><Text style={styles.title}>New Appointment</Text><Text style={styles.subtitle}>{patient.data ? `${patient.data.full_name} · ${patient.data.patient_code}` : 'Loading patient…'}</Text></View>
+      <View style={styles.header}><Text style={styles.title}>New appointment</Text><Text style={styles.subtitle}>{patient.data ? `${patient.data.full_name} · ${patient.data.patient_code}` : 'Loading patient…'}</Text></View>
       <Text style={styles.label}>Type</Text>
       <View style={styles.chips}>{(['REGULAR', 'FOLLOW_UP'] as const).map(type => <Pressable key={type} onPress={() => setAppointmentType(type)} style={[styles.chip, appointmentType === type && styles.chipActive]}><Text style={appointmentType === type ? styles.chipTextActive : styles.chipText}>{type === 'REGULAR' ? 'Regular' : 'Follow-up'}</Text></Pressable>)}</View>
       <Text style={styles.label}>Doctor</Text>
@@ -76,7 +76,7 @@ export default function NewAppointmentScreen() {
       })}</View><AppButton label="Close" tone="secondary" onPress={() => setSlotModalVisible(false)} /></View></View></Modal>
       {isOwner && selectedSession?.status !== 'BLOCKED' ? <View style={styles.card}><Pressable onPress={() => setOverrideEnabled(value => !value)}><Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Capacity override</Text></Pressable>{overrideEnabled ? <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Required reason" style={styles.input} /> : null}</View> : null}
       <View style={styles.feeCard}><Text style={styles.feeLabel}>Fee</Text><Text style={styles.fee}>₹{feeAmount ?? '—'}</Text></View>
-      <AppButton label="Review Booking" disabled={!patient.data || !doctorId || !sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => router.push({ pathname: '/assistant/appointments/review', params: { patientId, doctorId, sessionDefinitionId, appointmentDate: date, appointmentTime, appointmentType, overrideEnabled: overrideEnabled ? '1' : '0', overrideReason, followupId: followupId ?? '' } })} />
+      <AppButton label="Review booking" disabled={!patient.data || !doctorId || !sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => router.push({ pathname: '/assistant/appointments/review', params: { patientId, doctorId, sessionDefinitionId, appointmentDate: date, appointmentTime, appointmentType, overrideEnabled: overrideEnabled ? '1' : '0', overrideReason, followupId: followupId ?? '' } })} />
     </KeyboardSafeFormScreen>
   );
 }
