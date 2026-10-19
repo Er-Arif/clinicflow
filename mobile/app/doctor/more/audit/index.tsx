@@ -59,7 +59,7 @@ export default function AuditHistoryScreen() {
   return (
     <KeyboardSafeFormScreen refreshing={events.isFetching} onRefresh={() => void events.refetch()}>
       <BackButton />
-      <Text style={styles.title}>Audit History</Text>
+      <Text style={styles.title}>Audit history</Text>
       <Text style={styles.subtitle}>Read-only history of important ClinicFlow activity.</Text>
 
       <View style={styles.filterCard}>
