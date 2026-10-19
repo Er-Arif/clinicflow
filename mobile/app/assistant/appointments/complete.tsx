@@ -11,8 +11,13 @@ import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
-import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
+
+function paymentStatus(value?: string | null) {
+  if (!value) return 'Pending';
+  return value.charAt(0) + value.slice(1).toLowerCase();
+}
 
 export default function CompleteVisitScreen() {
   const router = useRouter();
@@ -26,7 +31,17 @@ export default function CompleteVisitScreen() {
   const [dueDate, setDueDate] = useState('');
   const [resultFollowupId, setResultFollowupId] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
-  const [idempotencyKey] = useState(() => newIdempotencyKey('complete'));
+
+  const followUpPayload = !followUpRequired
+    ? null
+    : mode === 'INTERVAL'
+      ? { interval_days: Number(intervalDays) }
+      : { due_date: dueDate };
+  const completionIntent = JSON.stringify({
+    visit_id: appointment.data?.visit_id ?? null,
+    follow_up: followUpPayload,
+  });
+  const completionRequest = useIntentIdempotencyKey('complete', completionIntent);
 
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
   if (!appointment.data) {
@@ -42,23 +57,20 @@ export default function CompleteVisitScreen() {
 
   async function submit() {
     if (!item.visit_id) return;
-    const body = !followUpRequired
-      ? { follow_up: null }
-      : mode === 'INTERVAL'
-        ? { follow_up: { interval_days: Number(intervalDays) } }
-        : { follow_up: { due_date: dueDate } };
     try {
       const result = await completeVisit({
         visitId: item.visit_id,
-        body,
-        idempotencyKey,
+        body: { follow_up: followUpPayload },
+        idempotencyKey: completionRequest.getKey(),
       }).unwrap();
       setResultFollowupId(result.followup?.followup_id ?? null);
       setCompleted(true);
     } catch {
-      // Stable API error shown below.
+      // The current request error is rendered below.
     }
   }
+
+  const completionError = completionRequest.resultMatchesIntent ? apiError(completeState.error) : null;
 
   if (completed) {
     return (
@@ -66,7 +78,7 @@ export default function CompleteVisitScreen() {
         <Text style={styles.title}>Visit completed</Text>
         <Text style={styles.subtitle}>{item.patient.full_name}</Text>
         <View style={styles.card}>
-          <Text style={styles.strong}>Payment: {item.payment_status ?? 'Pending'}</Text>
+          <Text style={styles.strong}>Payment: {paymentStatus(item.payment_status)}</Text>
           <Text style={styles.subtitle}>
             {resultFollowupId ? 'Follow-up recommendation saved.' : 'No follow-up recommendation.'}
           </Text>
@@ -87,7 +99,7 @@ export default function CompleteVisitScreen() {
       <QueryState query={appointment} label="appointment" />
       <BackButton />
       <Text style={styles.title}>Complete visit</Text>
-      <Text style={styles.subtitle}>{item.patient.full_name} · Payment {item.payment_status ?? 'PENDING'}</Text>
+      <Text style={styles.subtitle}>{item.patient.full_name} · Payment {paymentStatus(item.payment_status)}</Text>
 
       <View style={styles.card}>
         <Text style={styles.strong}>Follow-up required?</Text>
@@ -118,7 +130,7 @@ export default function CompleteVisitScreen() {
         </View>
       ) : null}
 
-      {completeState.error ? <Text style={styles.error}>{apiError(completeState.error)?.message ?? 'Unable to complete visit.'}</Text> : null}
+      {completionError ? <Text style={styles.error}>{completionError.message ?? 'Unable to complete visit.'}</Text> : null}
       <AppButton
         label="Complete visit"
         loading={completeState.isLoading}
@@ -143,6 +155,3 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
   error: { color: colors.danger },
 });
-
-
-
