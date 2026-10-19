@@ -62,7 +62,7 @@ export default function DoctorSettingsScreen() {
       />
       <Text style={styles.helper}>Shown anywhere ClinicFlow displays the doctor’s professional identity.</Text>
       {message ? <Text style={message.includes('saved') ? styles.success : styles.error}>{message}</Text> : null}
-      <AppButton label="Save Profile" loading={saveState.isLoading} disabled={!settings.data || !name.trim()} onPress={submit} />
+      <AppButton label="Save profile" loading={saveState.isLoading} disabled={!settings.data || !name.trim()} onPress={submit} />
     </KeyboardSafeFormScreen>
   );
 }
