@@ -8,7 +8,7 @@ export type FollowUp = {
     patient_id: string;
     patient_code: string;
     full_name: string;
-    mobile_number: string;
+    mobile_number: string | null;
   };
   source_visit_id: string;
   source_visit_date: string;

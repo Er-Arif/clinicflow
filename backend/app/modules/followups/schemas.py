@@ -25,7 +25,7 @@ class FollowUpPatientSummary(BaseModel):
     patient_id: UUID
     patient_code: str
     full_name: str
-    mobile_number: str
+    mobile_number: str | None
 
 
 class FollowUpLinkedAppointmentSummary(BaseModel):
