@@ -38,25 +38,25 @@ export default function DoctorMoreScreen() {
     <AppScreen>
       <View style={styles.header}><Text style={styles.title}>Settings</Text><Text style={styles.subtitle}>{doctorDisplayName}</Text></View>
 
-      <AccordionSection title="Clinic & Practice" expanded={clinicExpanded} onToggle={() => setClinicExpanded(prev => !prev)}>
-        {owner ? <MenuItem label="Clinic Settings" onPress={() => router.push('/doctor/more/clinic')} /> : null}
-        <MenuItem label="Schedule & Sessions" onPress={() => router.push('/doctor/more/schedule')} />
+      <AccordionSection title="Clinic & practice" expanded={clinicExpanded} onToggle={() => setClinicExpanded(prev => !prev)}>
+        {owner ? <MenuItem label="Clinic settings" onPress={() => router.push('/doctor/more/clinic')} /> : null}
+        <MenuItem label="Schedule & sessions" onPress={() => router.push('/doctor/more/schedule')} />
       </AccordionSection>
 
       {owner ? (
-        <AccordionSection title="Billing & Payments" expanded={billingExpanded} onToggle={() => setBillingExpanded(prev => !prev)}>
-          <MenuItem label="Consultation Fees" onPress={() => router.push('/doctor/more/fees')} />
-          <MenuItem label="Payment Settings" onPress={() => router.push('/doctor/more/upi')} />
+        <AccordionSection title="Billing & payments" expanded={billingExpanded} onToggle={() => setBillingExpanded(prev => !prev)}>
+          <MenuItem label="Consultation fees" onPress={() => router.push('/doctor/more/fees')} />
+          <MenuItem label="Payment settings" onPress={() => router.push('/doctor/more/upi')} />
         </AccordionSection>
       ) : null}
 
-      {owner ? <AccordionSection title="Communication" expanded={communicationExpanded} onToggle={() => setCommunicationExpanded(prev => !prev)}><MenuItem label="Message Templates" onPress={() => router.push('/doctor/more/messages')} /></AccordionSection> : null}
-      {owner ? <AccordionSection title="Administration" expanded={adminExpanded} onToggle={() => setAdminExpanded(prev => !prev)}><MenuItem label="User Management" onPress={() => router.push('/doctor/more/users')} /><MenuItem label="Audit History" onPress={() => router.push('/doctor/more/audit')} /></AccordionSection> : null}
+      {owner ? <AccordionSection title="Communication" expanded={communicationExpanded} onToggle={() => setCommunicationExpanded(prev => !prev)}><MenuItem label="Message templates" onPress={() => router.push('/doctor/more/messages')} /></AccordionSection> : null}
+      {owner ? <AccordionSection title="Administration" expanded={adminExpanded} onToggle={() => setAdminExpanded(prev => !prev)}><MenuItem label="User management" onPress={() => router.push('/doctor/more/users')} /><MenuItem label="Audit history" onPress={() => router.push('/doctor/more/audit')} /></AccordionSection> : null}
 
       <AccordionSection title="Account" expanded={accountExpanded} onToggle={() => setAccountExpanded(prev => !prev)}>
         <MenuItem label="Profile" onPress={() => router.push('/doctor/more/doctor')} />
-        <MenuItem label="Change Password" onPress={() => router.push('/(auth)/change-password')} />
-        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign Out'} onPress={confirmSignOut} danger />
+        <MenuItem label="Change password" onPress={() => router.push('/(auth)/change-password')} />
+        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign out'} onPress={confirmSignOut} danger />
       </AccordionSection>
 
       <DirectItem label="About" onPress={() => router.push('/about')} />
