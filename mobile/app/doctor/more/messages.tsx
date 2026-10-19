@@ -94,7 +94,7 @@ export default function MessageTemplatesScreen() {
     <KeyboardSafeFormScreen>
       <BackButton />
       <QueryState query={query} label="message templates" />
-      <Text style={styles.title}>Message Templates</Text>
+      <Text style={styles.title}>Message templates</Text>
       <Text style={styles.subtitle}>Edit the WhatsApp messages used for appointments and follow-ups.</Text>
 
       <View style={styles.safetyCard}>
