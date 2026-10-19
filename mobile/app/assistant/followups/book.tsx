@@ -72,15 +72,15 @@ export default function BookFollowUpScreen() {
       <QueryState query={followup} label="follow-up" />
       <QueryState query={clinicTime} label="clinic date" />
       <QueryState query={availability} label="availability" />
-      <Text style={styles.title}>Book Follow-up</Text>
+      <Text style={styles.title}>Book follow-up</Text>
       <Text style={styles.subtitle}>{followup.data.patient.full_name} · Due {formatClinicDate(followup.data.due_date)}</Text>
       <DatePicker value={date} onChange={(value) => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} accessibilityLabel="Follow-up appointment date" />
 
       {availability.data?.sessions.map((session) => (
         <View key={session.session_definition_id} style={styles.card}>
           <Text style={styles.session}>{session.name}</Text>
-          <Text style={styles.subtitle}>{session.start_time.slice(0,5)}–{session.end_time.slice(0,5)} · {session.used_capacity}/{session.maximum_capacity} booked {session.status === 'BLOCKED' ? '· BLOCKED' : ''}</Text>
-          <AppButton label={sessionDefinitionId === session.session_definition_id ? 'Selected Session' : 'Select Session'} tone={sessionDefinitionId === session.session_definition_id ? 'primary' : 'secondary'} disabled={session.status === 'BLOCKED'} onPress={() => { setSessionDefinitionId(session.session_definition_id); setAppointmentTime(''); }} />
+          <Text style={styles.subtitle}>{session.start_time.slice(0,5)}–{session.end_time.slice(0,5)} · {session.used_capacity}/{session.maximum_capacity} booked {session.status === 'BLOCKED' ? '· Blocked' : ''}</Text>
+          <AppButton label={sessionDefinitionId === session.session_definition_id ? 'Selected session' : 'Select session'} tone={sessionDefinitionId === session.session_definition_id ? 'primary' : 'secondary'} disabled={session.status === 'BLOCKED'} onPress={() => { setSessionDefinitionId(session.session_definition_id); setAppointmentTime(''); }} />
         </View>
       ))}
       {selectedSession ? (
@@ -101,11 +101,11 @@ export default function BookFollowUpScreen() {
         <View style={styles.card}>
           <Text style={styles.session}>Owner override</Text>
           <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Reason for extra/double booking" style={styles.input} />
-          <AppButton label="Cancel Override" tone="secondary" onPress={() => setOverride(false)} />
+          <AppButton label="Cancel override" tone="secondary" onPress={() => setOverride(false)} />
         </View>
       ) : null}
       {bookState.error ? <Text style={styles.error}>{apiError(bookState.error)?.message ?? 'Unable to book follow-up.'}</Text> : null}
-      <AppButton label="Book Follow-up" loading={bookState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (override && overrideReason.trim().length < 2)} onPress={() => void submit()} />
+      <AppButton label="Book follow-up" loading={bookState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (override && overrideReason.trim().length < 2)} onPress={() => void submit()} />
       <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
