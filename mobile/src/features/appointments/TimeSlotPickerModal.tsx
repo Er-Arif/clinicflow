@@ -1,4 +1,5 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatClinicTime } from '@/utils/dates';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -17,6 +18,9 @@ type Props = {
 };
 
 export function TimeSlotPickerModal({ visible, slots, selectedTime, onSelect, onClose }: Props) {
+  const insets = useSafeAreaInsets();
+  const bottomClearance = insets.bottom + spacing.lg;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -28,7 +32,11 @@ export function TimeSlotPickerModal({ visible, slots, selectedTime, onSelect, on
               <Text style={styles.closeIconText}>×</Text>
             </Pressable>
           </View>
-          <ScrollView style={styles.slotScroll} contentContainerStyle={styles.slots} showsVerticalScrollIndicator>
+          <ScrollView
+            style={styles.slotScroll}
+            contentContainerStyle={[styles.slots, { paddingBottom: bottomClearance }]}
+            showsVerticalScrollIndicator
+          >
             {slots.map((slot) => (
               <Pressable
                 key={slot.time}
@@ -55,7 +63,7 @@ const styles = StyleSheet.create({
   closeIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
   closeIconText: { color: colors.primaryDark, fontSize: 30, lineHeight: 32, fontWeight: '500', includeFontPadding: false },
   slotScroll: { flexShrink: 1 },
-  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingBottom: spacing.xs },
+  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   slot: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSoft, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 10 },
   slotDisabled: { opacity: 0.35 },
   slotSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
