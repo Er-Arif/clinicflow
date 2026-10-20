@@ -109,3 +109,34 @@ test('dedicated follow-up booking locks type, doctor and upcoming recommendation
   assert.equal(output.controls.some(control => control.nativeType === 'DateTimePicker'), false);
   assert.match(output.markup, /12:00 PM/);
 });
+
+test('booked follow-up detail shows appointment date and time as separate readable rows', () => {
+  const booked = {
+    ...followup,
+    status: 'BOOKED',
+    linked_appointment: {
+      appointment_id: 'appointment-1',
+      date: '2026-10-27',
+      time: '08:15:00',
+      status: 'BOOKED',
+    },
+  };
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ followupId: 'followup-1' }),
+      useRouter: () => ({ push() {}, back() {} }),
+    },
+    '@/api/api': {
+      useGetFollowUpQuery: () => ready(booked),
+      useListRemindersQuery: () => ready({ items: [] }),
+      useCloseFollowUpMutation: () => [() => {}, {}],
+    },
+  });
+
+  const output = runtime.render(runtime.load('app/assistant/followups/[followupId].tsx').default);
+  assert.match(output.markup, /Appointment/);
+  assert.match(output.markup, /27 Oct 2026/);
+  assert.match(output.markup, />Time</);
+  assert.match(output.markup, /08:15 AM/);
+  assert.doesNotMatch(output.markup, /27 Oct 2026 · 08:15 AM/);
+});
