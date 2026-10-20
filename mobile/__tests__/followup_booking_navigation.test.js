@@ -111,7 +111,7 @@ test('dedicated follow-up booking locks type, doctor and upcoming recommendation
   assert.match(output.markup, /12:00 PM/);
 });
 
-test('booked follow-up detail shows appointment date and time as separate readable rows', () => {
+test('booked follow-up detail uses clear hierarchy and a green booked status', () => {
   const booked = {
     ...followup,
     status: 'BOOKED',
@@ -135,9 +135,19 @@ test('booked follow-up detail shows appointment date and time as separate readab
   });
 
   const output = runtime.render(runtime.load('app/assistant/followups/[followupId].tsx').default);
-  assert.match(output.markup, /Appointment/);
+  const { colors } = runtime.load('theme/tokens');
+  const bookedStatus = output.controls.find(control => control.nativeType === 'Text' && control.label === 'Booked');
+  const bookedStyles = [bookedStatus.style].flat(2).filter(Boolean);
+
+  assert.match(output.markup, /Follow-up details/);
+  assert.match(output.markup, />Patient</);
+  assert.match(output.markup, /Testing/);
+  assert.match(output.markup, /Patient ID/);
+  assert.match(output.markup, /PT-000004/);
+  assert.match(output.markup, /Appointment date/);
   assert.match(output.markup, /27 Oct 2026/);
-  assert.match(output.markup, />Time</);
+  assert.match(output.markup, /Appointment time/);
   assert.match(output.markup, /08:15 AM/);
-  assert.doesNotMatch(output.markup, /27 Oct 2026 · 08:15 AM/);
+  assert.ok(bookedStatus);
+  assert.ok(bookedStyles.some(style => style.color === colors.success));
 });
