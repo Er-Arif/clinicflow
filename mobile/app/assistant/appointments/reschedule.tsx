@@ -3,7 +3,7 @@ import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiError } from '@/api/errors';
@@ -12,6 +12,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
+import { TimeSlotPickerModal } from '@/features/appointments/TimeSlotPickerModal';
 import { DatePicker } from '@/components/DatePicker';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -52,6 +53,13 @@ export default function RescheduleAppointmentScreen() {
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
   if (!appointment.data) return <AppScreen><Text>Unable to load appointment.</Text><QueryState query={appointment} label="appointment" /></AppScreen>;
 
+  const item = appointment.data;
+  const isFollowUp = item.appointment_type === 'FOLLOW_UP';
+  const slotOptions = selectedSession?.slots.map(slot => ({
+    time: slot.time,
+    disabled: !(slot.normal_booking_allowed || (isOwner && overrideEnabled && selectedSession.status !== 'BLOCKED')),
+  })) ?? [];
+
   async function confirm() {
     try {
       const result = await reschedule({
@@ -79,13 +87,30 @@ export default function RescheduleAppointmentScreen() {
       <QueryState query={availability} label="availability" />
       <BackButton />
       <View style={styles.header}>
-        <Text style={styles.title}>Reschedule</Text>
-        <Text style={styles.subtitle}>{formatClinicDate(appointment.data.session.date)} · {appointment.data.appointment_time ? formatClinicTime(appointment.data.appointment_time) : 'Walk-in'}</Text>
+        <Text style={styles.title}>{isFollowUp ? 'Reschedule follow-up' : 'Reschedule appointment'}</Text>
+        <Text style={styles.patientContext}>{item.patient.full_name} · {item.patient.patient_code}</Text>
+        <Text style={styles.subtitle}>Current: {formatClinicDate(item.session.date)} · {item.appointment_time ? formatClinicTime(item.appointment_time) : 'Walk-in'}</Text>
       </View>
-      <DatePicker value={date} onChange={value => { setDate(value); setSessionDefinitionId(''); setAppointmentTime(''); }} minimumDate={clinicTime.data?.clinic_date ? pickerDate(clinicTime.data.clinic_date) : undefined} />
+      <DatePicker
+        value={date}
+        onChange={value => {
+          if (value === date) return;
+          setDate(value);
+          setSessionDefinitionId('');
+          setAppointmentTime('');
+        }}
+        minimumDate={clinicTime.data?.clinic_date ? pickerDate(clinicTime.data.clinic_date) : undefined}
+      />
       {availability.data?.sessions.map(session => (
         <View key={session.session_definition_id} style={[styles.card, sessionDefinitionId === session.session_definition_id && styles.cardSelected]}>
-          <Pressable disabled={session.status === 'BLOCKED'} onPress={() => { setSessionDefinitionId(session.session_definition_id); setAppointmentTime(''); }}>
+          <Pressable
+            disabled={session.status === 'BLOCKED'}
+            onPress={() => {
+              if (sessionDefinitionId === session.session_definition_id) return;
+              setSessionDefinitionId(session.session_definition_id);
+              setAppointmentTime('');
+            }}
+          >
             <View style={styles.row}>
               <View style={styles.copy}>
                 <Text style={styles.cardTitle}>{session.name}</Text>
@@ -96,16 +121,16 @@ export default function RescheduleAppointmentScreen() {
           {sessionDefinitionId === session.session_definition_id ? <AppButton compact label={appointmentTime ? formatClinicTime(appointmentTime) : 'Select time'} onPress={() => setSlotModalVisible(true)} tone={appointmentTime ? 'primary' : 'secondary'} /> : null}
         </View>
       ))}
-      <Modal visible={slotModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}><View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Select time</Text>
-          <View style={styles.slots}>{selectedSession?.slots.map(slot => {
-            const selectable = slot.normal_booking_allowed || (isOwner && overrideEnabled && selectedSession.status !== 'BLOCKED');
-            return <Pressable key={slot.time} disabled={!selectable} onPress={() => { setAppointmentTime(slot.time); setSlotModalVisible(false); }} style={[styles.slot, !selectable && styles.disabled, appointmentTime === slot.time && styles.selected]}><Text style={appointmentTime === slot.time ? styles.selectedText : styles.slotText}>{formatClinicTime(slot.time)}</Text></Pressable>;
-          })}</View>
-          <AppButton label="Close" tone="secondary" onPress={() => setSlotModalVisible(false)} />
-        </View></View>
-      </Modal>
+      <TimeSlotPickerModal
+        visible={slotModalVisible}
+        slots={slotOptions}
+        selectedTime={appointmentTime}
+        onSelect={(time) => {
+          setAppointmentTime(time);
+          setSlotModalVisible(false);
+        }}
+        onClose={() => setSlotModalVisible(false)}
+      />
       {isOwner ? (
         <View style={styles.card}>
           <Pressable onPress={() => setOverrideEnabled(value => !value)}><Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Capacity override</Text></Pressable>
@@ -114,13 +139,11 @@ export default function RescheduleAppointmentScreen() {
       ) : null}
       {currentError ? <Text style={styles.error}>{currentError.message ?? 'Unable to reschedule appointment.'}</Text> : null}
       <AppButton label="Confirm reschedule" loading={rescheduleState.isLoading} disabled={!sessionDefinitionId || !appointmentTime || (overrideEnabled && overrideReason.trim().length < 2)} onPress={() => void confirm()} />
-      <AppButton compact label="Cancel" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 3 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, copy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14 },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, cardSelected: { borderColor: colors.primary }, cardTitle: { color: colors.primaryDark, fontWeight: '800' }, slots: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, slot: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surfaceSoft, paddingHorizontal: 12, paddingVertical: 10 }, disabled: { opacity: 0.35 }, selected: { backgroundColor: colors.primary, borderColor: colors.primary }, slotText: { color: colors.text, fontSize: 12 }, selectedText: { color: colors.surface, fontWeight: '800', fontSize: 12 }, error: { color: colors.danger },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(10,45,98,0.28)', justifyContent: 'flex-end' }, modalContent: { backgroundColor: colors.background, padding: spacing.lg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '80%', gap: spacing.md }, modalTitle: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
+  header: { gap: 3 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, copy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, patientContext: { color: colors.text, fontSize: 14, fontWeight: '700' }, subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14 },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, cardSelected: { borderColor: colors.primary }, cardTitle: { color: colors.primaryDark, fontWeight: '800' }, error: { color: colors.danger },
 });
