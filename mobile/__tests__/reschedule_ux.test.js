@@ -52,6 +52,6 @@ test('follow-up reschedule keeps patient context and shared time picker without 
   assert.match(output.markup, /Current: 27 Oct 2026 · 08:15 AM/);
   assert.ok(output.controls.some(control => control.accessibilityLabel === 'Close time picker'));
   assert.ok(output.controls.some(control => control.accessibilityLabel === 'Dismiss time picker'));
-  assert.equal(output.controls.filter(control => control.label === 'Cancel').length, 0);
-  assert.equal(output.controls.filter(control => control.label === 'Back').length, 1);
+  assert.equal(output.controls.filter(control => control.nativeType === 'Pressable' && control.label === 'Cancel').length, 0);
+  assert.equal(output.controls.filter(control => control.nativeType === 'Pressable' && control.accessibilityLabel === 'Back').length, 1);
 });
