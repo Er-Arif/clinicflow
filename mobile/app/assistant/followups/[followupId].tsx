@@ -61,7 +61,8 @@ export default function FollowUpDetailsScreen() {
         <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
         <Row label="Patient ID" value={item.patient.patient_code} />
         {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
-        {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)}${item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}`} /> : null}
+        {item.linked_appointment ? <Row label="Appointment" value={formatClinicDate(item.linked_appointment.date)} /> : null}
+        {item.linked_appointment?.time ? <Row label="Time" value={formatClinicTime(item.linked_appointment.time)} /> : null}
         {item.close_reason ? <Row label="Closed" value={humanize(item.close_reason)} /> : null}
       </View>
 
