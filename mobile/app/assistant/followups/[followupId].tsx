@@ -92,7 +92,6 @@ export default function FollowUpDetailsScreen() {
           <AppButton label="Confirm close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
         </View>
       ) : null}
-      <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
 }
