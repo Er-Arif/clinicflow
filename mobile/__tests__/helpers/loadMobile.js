@@ -26,7 +26,10 @@ function mobileRuntime(overrides = {}) {
   const mocks = {
     '@/api/config': { getApiUrl: () => 'https://api.test.invalid' },
     'react-native': native,
-    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    'react-native-safe-area-context': {
+      SafeAreaView: host('SafeAreaView'),
+      useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+    },
     '@react-native-community/datetimepicker': host('DateTimePicker'),
     'expo-router': { useRouter: () => ({ back() {}, push() {}, dismissTo() {} }), useLocalSearchParams: () => ({}) },
     'expo-secure-store': { getItemAsync: async () => null },
