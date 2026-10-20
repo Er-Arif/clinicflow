@@ -12,6 +12,8 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
+import { followUpBookingParams } from '@/features/followups/navigation';
+import type { FollowUp } from '@/features/followups/types';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 function paymentStatus(value?: string | null) {
@@ -29,7 +31,7 @@ export default function CompleteVisitScreen() {
   const [mode, setMode] = useState<'INTERVAL' | 'DATE'>('INTERVAL');
   const [intervalDays, setIntervalDays] = useState('7');
   const [dueDate, setDueDate] = useState('');
-  const [resultFollowupId, setResultFollowupId] = useState<string | null>(null);
+  const [resultFollowup, setResultFollowup] = useState<FollowUp | null>(null);
   const [completed, setCompleted] = useState(false);
 
   const followUpPayload = !followUpRequired
@@ -64,7 +66,7 @@ export default function CompleteVisitScreen() {
         idempotencyKey: completionRequest.getKey(),
       }).unwrap();
       await appointment.refetch();
-      setResultFollowupId(result.followup?.followup_id ?? null);
+      setResultFollowup(result.followup ?? null);
       setCompleted(true);
     } catch {
       // The current request error is rendered below.
@@ -81,13 +83,13 @@ export default function CompleteVisitScreen() {
         <View style={styles.card}>
           <Text style={styles.strong}>Payment: {paymentStatus(item.payment_status)}</Text>
           <Text style={styles.subtitle}>
-            {resultFollowupId ? 'Follow-up recommendation saved.' : 'No follow-up recommendation.'}
+            {resultFollowup ? 'Follow-up recommendation saved.' : 'No follow-up recommendation.'}
           </Text>
         </View>
-        {resultFollowupId ? (
+        {resultFollowup ? (
           <AppButton
             label="Book follow-up now"
-            onPress={() => router.replace({ pathname: '/assistant/appointments/new', params: { patientId: item.patient.patient_id, appointmentType: 'FOLLOW_UP' } })}
+            onPress={() => router.replace({ pathname: '/assistant/appointments/new', params: followUpBookingParams(resultFollowup) })}
           />
         ) : null}
         <AppButton label="Done" tone="secondary" onPress={() => router.replace('/assistant/appointments')} />
