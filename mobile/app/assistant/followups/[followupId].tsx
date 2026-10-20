@@ -11,6 +11,7 @@ import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { followUpBookingParams } from '@/features/followups/navigation';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 function humanize(value: string) {
@@ -72,13 +73,7 @@ export default function FollowUpDetailsScreen() {
             onPress={() =>
               router.push({
                 pathname: '/assistant/appointments/new',
-                params: {
-                  patientId: item.patient.patient_id,
-                  appointmentType: 'FOLLOW_UP',
-                  followupId: item.followup_id,
-                  dueDate: item.due_date,
-                  doctorId: item.doctor_id,
-                },
+                params: followUpBookingParams(item),
               })
             }
           />
