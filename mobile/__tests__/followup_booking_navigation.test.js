@@ -34,7 +34,7 @@ const session = {
   slots: [{ time: '12:00:00', available: true, normal_booking_allowed: true }],
 };
 
-test('follow-up detail opens the dedicated follow-up booking route', () => {
+test('follow-up detail opens the dedicated follow-up booking route with a single Back action', () => {
   let destination;
   const runtime = mobileRuntime({
     'expo-router': {
@@ -49,6 +49,7 @@ test('follow-up detail opens the dedicated follow-up booking route', () => {
   });
 
   const output = runtime.render(runtime.load('app/assistant/followups/[followupId].tsx').default);
+  assert.equal(output.controls.filter(control => control.accessibilityLabel === 'Back').length, 1);
   output.controls.find(control => control.label === 'Book appointment').onPress();
   assert.deepEqual(destination, { pathname: '/assistant/followups/book', params: { followupId: 'followup-1' } });
 });
