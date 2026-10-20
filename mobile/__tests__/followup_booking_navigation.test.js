@@ -135,7 +135,7 @@ test('booked follow-up detail uses clear hierarchy and a green booked status', (
   });
 
   const output = runtime.render(runtime.load('app/assistant/followups/[followupId].tsx').default);
-  const { colors } = runtime.load('theme/tokens');
+  const { colors } = runtime.load('src/theme/tokens');
   const bookedStatus = output.controls.find(control => control.nativeType === 'Text' && control.label === 'Booked');
   const bookedStyles = [bookedStatus.style].flat(2).filter(Boolean);
 
