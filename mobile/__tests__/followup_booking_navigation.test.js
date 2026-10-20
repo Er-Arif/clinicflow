@@ -3,16 +3,13 @@ const assert = require('node:assert/strict');
 const React = require('react');
 const { mobileRuntime } = require('./helpers/loadMobile');
 
+const ready = data => ({ data, currentData: data, isLoading: false, isFetching: false, isError: false, isSuccess: true, refetch() {} });
+
 const followup = {
   followup_id: 'followup-1',
-  patient: {
-    patient_id: 'patient-1',
-    patient_code: 'PT-000004',
-    full_name: 'Testing',
-    mobile_number: null,
-  },
+  patient: { patient_id: 'patient-1', patient_code: 'PT-000004', full_name: 'Testing', mobile_number: null },
   source_visit_id: 'visit-1',
-  source_visit_date: '2026-10-19',
+  source_visit_date: '2026-10-20',
   doctor_id: 'doctor-1',
   due_date: '2026-10-27',
   interval_days: 7,
@@ -25,18 +22,38 @@ const followup = {
   closed_at: null,
 };
 
-test('follow-up booking params preserve the saved recommendation context', () => {
-  const { followUpBookingParams } = mobileRuntime().load('src/features/followups/navigation.ts');
-  assert.deepEqual(followUpBookingParams(followup), {
-    patientId: 'patient-1',
-    appointmentType: 'FOLLOW_UP',
-    followupId: 'followup-1',
-    dueDate: '2026-10-27',
-    doctorId: 'doctor-1',
+const session = {
+  session_definition_id: 'session-1',
+  name: 'Clinic session',
+  start_time: '12:00:00',
+  end_time: '15:00:00',
+  used_capacity: 0,
+  maximum_capacity: 12,
+  remaining_capacity: 12,
+  status: 'AVAILABLE',
+  slots: [{ time: '12:00:00', available: true, normal_booking_allowed: true }],
+};
+
+test('follow-up detail opens the dedicated follow-up booking route', () => {
+  let destination;
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ followupId: 'followup-1' }),
+      useRouter: () => ({ push: value => { destination = value; }, back() {} }),
+    },
+    '@/api/api': {
+      useGetFollowUpQuery: () => ready(followup),
+      useListRemindersQuery: () => ready({ items: [] }),
+      useCloseFollowUpMutation: () => [() => {}, {}],
+    },
   });
+
+  const output = runtime.render(runtime.load('app/assistant/followups/[followupId].tsx').default);
+  output.controls.find(control => control.label === 'Book appointment').onPress();
+  assert.deepEqual(destination, { pathname: '/assistant/followups/book', params: { followupId: 'followup-1' } });
 });
 
-test('Book follow-up now carries the saved due date and doctor into appointment booking', () => {
+test('completed visit shortcut stays inside Follow-ups and opens dedicated booking', () => {
   let stateIndex = 0;
   const seededState = [false, 'INTERVAL', '7', '', followup, true];
   let destination;
@@ -50,40 +67,45 @@ test('Book follow-up now carries the saved due date and doctor into appointment 
     },
     'expo-router': {
       useLocalSearchParams: () => ({ appointmentId: 'appointment-1' }),
-      useRouter: () => ({
-        back() {},
-        replace: value => { destination = value; },
-      }),
+      useRouter: () => ({ back() {}, replace: value => { destination = value; } }),
     },
     '@/api/api': {
-      useGetAppointmentQuery: () => ({
-        data: {
-          appointment_id: 'appointment-1',
-          visit_id: 'visit-1',
-          payment_status: 'PENDING',
-          patient: { patient_id: 'patient-1', full_name: 'Testing' },
-        },
-        isLoading: false,
-        refetch: async () => {},
-      }),
+      useGetAppointmentQuery: () => ({ data: { appointment_id: 'appointment-1', visit_id: 'visit-1', payment_status: 'PENDING', patient: { patient_id: 'patient-1', full_name: 'Testing' } }, isLoading: false, refetch: async () => {} }),
       useCompleteVisitMutation: () => [() => {}, {}],
     },
-    '@/features/appointments/idempotency': {
-      useIntentIdempotencyKey: () => ({ getKey: () => 'key', reset() {}, resultMatchesIntent: false }),
-    },
+    '@/features/appointments/idempotency': { useIntentIdempotencyKey: () => ({ getKey: () => 'key', reset() {}, resultMatchesIntent: false }) },
   });
 
   const output = runtime.render(runtime.load('app/assistant/appointments/complete.tsx').default);
   output.controls.find(control => control.label === 'Book follow-up now').onPress();
+  assert.deepEqual(destination, { pathname: '/assistant/followups/book', params: { followupId: 'followup-1' } });
+});
 
-  assert.deepEqual(destination, {
-    pathname: '/assistant/appointments/new',
-    params: {
-      patientId: 'patient-1',
-      appointmentType: 'FOLLOW_UP',
-      followupId: 'followup-1',
-      dueDate: '2026-10-27',
-      doctorId: 'doctor-1',
+test('dedicated follow-up booking locks type, doctor and upcoming recommendation date', () => {
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ followupId: 'followup-1' }),
+      useRouter: () => ({ back() {}, replace() {} }),
     },
+    '@/api/api': {
+      useGetFollowUpQuery: () => ready(followup),
+      useClinicTimeQuery: () => ready({ clinic_date: '2026-10-20' }),
+      useListDoctorsQuery: () => ready([{ doctor_id: 'doctor-1', display_name: 'Arif Ali' }]),
+      useGetCurrentFeeQuery: () => ready({ regular_fee: '500.00', followup_fee: '300.00' }),
+      useMeQuery: () => ready({ permissions: [] }),
+      useGetAvailabilityQuery: args => { assert.deepEqual(args, { doctorId: 'doctor-1', date: '2026-10-27' }); return ready({ sessions: [session] }); },
+      useBookFollowUpMutation: () => [() => {}, {}],
+    },
+    '@/features/appointments/idempotency': { useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false }) },
   });
+
+  const output = runtime.render(runtime.load('app/assistant/followups/book.tsx').default);
+  assert.match(output.markup, /Book follow-up/);
+  assert.match(output.markup, /27 Oct 2026/);
+  assert.match(output.markup, /Arif Ali/);
+  assert.match(output.markup, /₹300\.00/);
+  assert.doesNotMatch(output.markup, />Regular</);
+  assert.equal(output.controls.some(control => control.accessibilityLabel === 'Follow-up appointment date'), false);
+  assert.equal(output.controls.some(control => control.nativeType === 'DateTimePicker'), false);
+  assert.match(output.markup, /12:00 PM/);
 });

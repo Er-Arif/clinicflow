@@ -1,4 +1,4 @@
-import { formatClinicDate } from '@/utils/dates';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
@@ -11,7 +11,6 @@ import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
-import { followUpBookingParams } from '@/features/followups/navigation';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 function humanize(value: string) {
@@ -62,7 +61,7 @@ export default function FollowUpDetailsScreen() {
         <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
         <Row label="Patient ID" value={item.patient.patient_code} />
         {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
-        {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)} ${item.linked_appointment.time?.slice(0, 5) ?? ''}`} /> : null}
+        {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)}${item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}`} /> : null}
         {item.close_reason ? <Row label="Closed" value={humanize(item.close_reason)} /> : null}
       </View>
 
@@ -70,12 +69,7 @@ export default function FollowUpDetailsScreen() {
         <>
           <AppButton
             label="Book appointment"
-            onPress={() =>
-              router.push({
-                pathname: '/assistant/appointments/new',
-                params: followUpBookingParams(item),
-              })
-            }
+            onPress={() => router.push({ pathname: '/assistant/followups/book', params: { followupId: item.followup_id } })}
           />
           {reminderQuery.data?.items[0] ? (
             <AppButton label="Send WhatsApp reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />

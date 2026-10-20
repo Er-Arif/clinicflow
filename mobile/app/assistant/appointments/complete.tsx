@@ -12,7 +12,6 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
-import { followUpBookingParams } from '@/features/followups/navigation';
 import type { FollowUp } from '@/features/followups/types';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -89,7 +88,7 @@ export default function CompleteVisitScreen() {
         {resultFollowup ? (
           <AppButton
             label="Book follow-up now"
-            onPress={() => router.replace({ pathname: '/assistant/appointments/new', params: followUpBookingParams(resultFollowup) })}
+            onPress={() => router.replace({ pathname: '/assistant/followups/book', params: { followupId: resultFollowup.followup_id } })}
           />
         ) : null}
         <AppButton label="Done" tone="secondary" onPress={() => router.replace('/assistant/appointments')} />
