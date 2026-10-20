@@ -40,6 +40,13 @@ export default function FollowUpDetailsScreen() {
     );
   }
   const item = query.data;
+  const statusColor = item.overdue
+    ? colors.danger
+    : item.status === 'BOOKED'
+      ? colors.success
+      : item.status === 'OPEN'
+        ? colors.primary
+        : colors.muted;
 
   async function close() {
     try {
@@ -54,15 +61,16 @@ export default function FollowUpDetailsScreen() {
     <KeyboardSafeFormScreen>
       <QueryState query={query} label="follow-up" />
       <BackButton />
-      <Text style={styles.title}>{item.patient.full_name}</Text>
-      <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'Overdue' : humanize(item.status)}</Text>
+      <Text style={styles.title}>Follow-up details</Text>
+      <Text style={[styles.status, { color: statusColor }]}>{item.overdue ? 'Overdue' : humanize(item.status)}</Text>
       <View style={styles.card}>
+        <Row label="Patient" value={item.patient.full_name} />
+        <Row label="Patient ID" value={item.patient.patient_code} />
         <Row label="Due" value={formatClinicDate(item.due_date)} />
         <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
-        <Row label="Patient ID" value={item.patient.patient_code} />
         {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
-        {item.linked_appointment ? <Row label="Appointment" value={formatClinicDate(item.linked_appointment.date)} /> : null}
-        {item.linked_appointment?.time ? <Row label="Time" value={formatClinicTime(item.linked_appointment.time)} /> : null}
+        {item.linked_appointment ? <Row label="Appointment date" value={formatClinicDate(item.linked_appointment.date)} /> : null}
+        {item.linked_appointment?.time ? <Row label="Appointment time" value={formatClinicTime(item.linked_appointment.time)} /> : null}
         {item.close_reason ? <Row label="Closed" value={humanize(item.close_reason)} /> : null}
       </View>
 
@@ -102,7 +110,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
-  status: { color: colors.primary, fontWeight: '900' },
+  status: { fontWeight: '900' },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.muted },
