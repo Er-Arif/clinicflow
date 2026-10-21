@@ -9,7 +9,8 @@ const followup = {
   followup_id: 'followup-1',
   patient: { patient_id: 'patient-1', patient_code: 'PT-000004', full_name: 'Testing', mobile_number: null },
   source_visit_id: 'visit-1',
-  source_visit_date: '2026-10-20',
+  source_visit_date: '2026-10-19',
+  source_visit_completed_at: '2026-10-20T06:30:00Z',
   doctor_id: 'doctor-1',
   due_date: '2026-10-27',
   interval_days: 7,
@@ -111,7 +112,7 @@ test('dedicated follow-up booking locks type, doctor and upcoming recommendation
   assert.match(output.markup, /12:00 PM/);
 });
 
-test('booked follow-up detail uses clear hierarchy and a green booked status', () => {
+test('booked follow-up detail explains completion-based interval before the due date', () => {
   const booked = {
     ...followup,
     status: 'BOOKED',
@@ -144,8 +145,15 @@ test('booked follow-up detail uses clear hierarchy and a green booked status', (
   assert.match(output.markup, /Testing/);
   assert.match(output.markup, /Patient ID/);
   assert.match(output.markup, /PT-000004/);
-  assert.match(output.markup, /Appointment date/);
+  assert.match(output.markup, /Source visit/);
+  assert.match(output.markup, /19 Oct 2026/);
+  assert.match(output.markup, /Visit completed/);
+  assert.match(output.markup, /20 Oct 2026, 12:00 PM/);
+  assert.match(output.markup, /Follow-up interval/);
+  assert.match(output.markup, />7 days</);
+  assert.match(output.markup, />Due</);
   assert.match(output.markup, /27 Oct 2026/);
+  assert.match(output.markup, /Appointment date/);
   assert.match(output.markup, /Appointment time/);
   assert.match(output.markup, /08:15 AM/);
   assert.ok(bookedStatus);
