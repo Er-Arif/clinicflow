@@ -283,6 +283,22 @@ class VisitService:
                 409,
             )
 
+        occurrence = self.db.get(SessionOccurrence, appointment.session_occurrence_id)
+        if occurrence is None or occurrence.clinic_id != self.context.clinic_id:
+            raise RuntimeError("Appointment session occurrence integrity failure")
+        today = self.clock.clinic_date()
+        service_date = occurrence.occurrence_date
+        if service_date > today:  # pragma: no cover - integrity guard
+            raise RuntimeError("Active visit belongs to a future clinic date")
+        is_late_completion = service_date < today
+        late_completion_reason = (request.late_completion_reason or "").strip()
+        if is_late_completion and len(late_completion_reason) < 2:
+            raise AppError(
+                "VISIT_LATE_COMPLETION_REASON_REQUIRED",
+                "This previous-day OPD visit needs a reason before it can be closed as completed.",
+                409,
+            )
+
         payment = self.db.scalar(
             select(Payment)
             .where(
@@ -294,7 +310,6 @@ class VisitService:
             .execution_options(populate_existing=True)
         )
         now = self.clock.now_utc()
-        today = self.clock.clinic_date()
 
         previous_followup = self.db.scalar(
             select(FollowUpRecommendation)
@@ -328,17 +343,17 @@ class VisitService:
         new_followup: FollowUpRecommendation | None = None
         if request.follow_up is not None:
             if request.follow_up.interval_days is not None:
-                due_date = today + timedelta(days=request.follow_up.interval_days)
+                due_date = service_date + timedelta(days=request.follow_up.interval_days)
                 interval_days = request.follow_up.interval_days
             else:
                 due_date = request.follow_up.due_date
                 interval_days = None
                 if due_date is None:  # pragma: no cover - pydantic invariant
                     raise RuntimeError("Follow-up due date missing")
-                if due_date < today:
+                if due_date < service_date:
                     raise AppError(
-                        "FOLLOWUP_DUE_DATE_PAST",
-                        "Follow-up due date cannot be in the past.",
+                        "FOLLOWUP_DUE_DATE_BEFORE_VISIT",
+                        "Follow-up due date cannot be before the source visit date.",
                         422,
                     )
             new_followup = FollowUpRecommendation(
@@ -364,6 +379,7 @@ class VisitService:
                 new_values={
                     "status": "OPEN",
                     "source_visit_id": str(visit.visit_id),
+                    "source_visit_date": service_date.isoformat(),
                     "due_date": due_date.isoformat(),
                     "interval_days": interval_days,
                 },
@@ -382,10 +398,13 @@ class VisitService:
             entity_type="VISIT",
             entity_id=visit.visit_id,
             request_id=_request_id(),
+            reason=late_completion_reason if is_late_completion else None,
             previous_values={"status": "ACTIVE"},
             new_values={
                 "status": "COMPLETED",
                 "appointment_id": str(appointment.appointment_id),
+                "service_date": service_date.isoformat(),
+                "late_completion": is_late_completion,
                 "payment_status": payment.status if payment else None,
                 "followup_id": str(new_followup.followup_id) if new_followup else None,
             },
