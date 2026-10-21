@@ -12,6 +12,7 @@ export type FollowUp = {
   };
   source_visit_id: string;
   source_visit_date: string;
+  source_visit_completed_at: string | null;
   doctor_id: string;
   due_date: string;
   interval_days: number | null;
