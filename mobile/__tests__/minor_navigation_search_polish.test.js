@@ -26,6 +26,24 @@ test('patient search fields expose a visible clear action', () => {
   }
 });
 
+test('patient search accepts a single numeric patient number', () => {
+  for (const file of [
+    'app/assistant/patients/index.tsx',
+    'app/assistant/walk-in.tsx',
+    'app/doctor/patients/index.tsx',
+  ]) {
+    const content = source(file);
+    assert.ok(content.includes("const isPatientNumberQuery = /^\\d+$/.test(normalizedQuery);"));
+    assert.ok(content.includes('isPatientNumberQuery || normalizedQuery.length >= 2'));
+    assert.match(content, /patient number/);
+  }
+});
+
+test('short patient-number searches are not reused as mobile prefills', () => {
+  const patients = source('app/assistant/patients/index.tsx');
+  assert.ok(patients.includes("return digits.length >= 10 ? digits : '';"));
+});
+
 test('Follow-up uses the singular visible tab and page heading', () => {
   const layout = source('app/assistant/_layout.tsx');
   const followups = source('app/assistant/followups/index.tsx');

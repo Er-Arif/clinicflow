@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 from uuid import UUID
 
@@ -23,6 +24,8 @@ from app.modules.patients.schemas import (
     PatientUpdateRequest,
 )
 
+_LEGACY_PATIENT_CODE = re.compile(r"^PT-(\d+)$", re.IGNORECASE)
+
 
 class PatientService:
     def __init__(self, db: Session, clock: Clock, context: AuthContext):
@@ -36,15 +39,23 @@ class PatientService:
             return PatientListResponse(items=[], total=0, limit=limit, offset=offset)
 
         phone = try_normalize_indian_mobile(cleaned)
+        code_candidate = _patient_code_search_candidate(cleaned)
         like = f"%{cleaned}%"
-        criteria = [Patient.patient_code.ilike(cleaned), Patient.full_name.ilike(like)]
+        criteria = [Patient.full_name.ilike(like)]
+        if code_candidate:
+            criteria.insert(0, Patient.patient_code == code_candidate)
+        if cleaned != code_candidate:
+            criteria.append(Patient.patient_code == cleaned)
         if phone:
             criteria.insert(0, Patient.mobile_e164 == phone)
 
         ranking_whens = []
         if phone:
             ranking_whens.append((Patient.mobile_e164 == phone, 0))
-        ranking_whens.append((func.lower(Patient.patient_code) == cleaned.lower(), 1))
+        if code_candidate:
+            ranking_whens.append((Patient.patient_code == code_candidate, 1))
+        else:
+            ranking_whens.append((func.lower(Patient.patient_code) == cleaned.lower(), 1))
         ranking = case(*ranking_whens, else_=2)
         base = select(Patient).where(
             Patient.clinic_id == self.context.clinic_id,
@@ -254,7 +265,7 @@ class PatientService:
             raise RuntimeError("Patient number counter could not be initialized")
         counter.last_value += 1
         self.db.flush()
-        return f"PT-{counter.last_value:06d}"
+        return _format_patient_code(counter.last_value)
 
     def _mobile_duplicates(
         self, mobile: str, *, exclude_patient_id: UUID | None = None
@@ -350,6 +361,22 @@ class PatientService:
             message="Patient not found.",
             status_code=404,
         )
+
+
+def _format_patient_code(value: int) -> str:
+    if value < 1:
+        raise ValueError("Patient number must be positive.")
+    return f"{value:04d}"
+
+
+def _patient_code_search_candidate(value: str) -> str | None:
+    cleaned = value.strip()
+    legacy_match = _LEGACY_PATIENT_CODE.fullmatch(cleaned)
+    digits = legacy_match.group(1) if legacy_match else cleaned if cleaned.isdigit() else None
+    if digits is None:
+        return None
+    number = int(digits)
+    return _format_patient_code(number) if number > 0 else None
 
 
 def _clean_name(value: str) -> str:

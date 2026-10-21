@@ -22,7 +22,8 @@ export default function PatientSearchScreen() {
   }, [navigation]);
 
   const normalizedQuery = query.trim();
-  const shouldSearch = normalizedQuery.length >= 2;
+  const isPatientNumberQuery = /^\d+$/.test(normalizedQuery);
+  const shouldSearch = isPatientNumberQuery || normalizedQuery.length >= 2;
   const patients = useSearchPatientsQuery(
     { q: normalizedQuery },
     { skip: !shouldSearch },
@@ -30,7 +31,10 @@ export default function PatientSearchScreen() {
 
   const data = patients.currentData;
 
-  const mobilePrefill = useMemo(() => query.replace(/\D/g, ''), [query]);
+  const mobilePrefill = useMemo(() => {
+    const digits = query.replace(/\D/g, '');
+    return digits.length >= 10 ? digits : '';
+  }, [query]);
 
   return (
     <KeyboardSafeFormScreen>
@@ -42,7 +46,7 @@ export default function PatientSearchScreen() {
       <View style={styles.searchField}>
         <KeyboardSafeTextInput
           autoFocus
-          placeholder="Mobile, patient name or patient ID"
+          placeholder="Mobile, patient name or patient number"
           value={query}
           onChangeText={setQuery}
           style={[styles.search, query.length > 0 && styles.searchWithClear]}
@@ -63,7 +67,7 @@ export default function PatientSearchScreen() {
 
       {shouldSearch ? <QueryState query={patients} label="patients" hasData={Boolean(data)} /> : null}
       {!shouldSearch ? (
-        <Text style={styles.helper}>Enter at least 2 characters to search.</Text>
+        <Text style={styles.helper}>Enter a patient number or at least 2 characters to search.</Text>
       ) : data?.items.length ? (
         <View style={styles.list}>
           {data.items.map((patient) => (

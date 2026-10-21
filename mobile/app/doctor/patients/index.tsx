@@ -27,8 +27,10 @@ export default function DoctorPatientSearchScreen() {
     return unsub;
   }, [navigation]);
 
-  const shouldSearch = query.trim().length >= 2;
-  const patients = useSearchPatientsQuery({ q: query.trim() }, { skip: !shouldSearch });
+  const normalizedQuery = query.trim();
+  const isPatientNumberQuery = /^\d+$/.test(normalizedQuery);
+  const shouldSearch = isPatientNumberQuery || normalizedQuery.length >= 2;
+  const patients = useSearchPatientsQuery({ q: normalizedQuery }, { skip: !shouldSearch });
 
   return (
     <KeyboardSafeFormScreen>
@@ -38,7 +40,7 @@ export default function DoctorPatientSearchScreen() {
         <KeyboardSafeTextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Mobile, patient name or patient ID"
+          placeholder="Mobile, patient name or patient number"
           style={[styles.input, query.length > 0 && styles.searchWithClear]}
           autoCapitalize="words"
         />
@@ -54,7 +56,7 @@ export default function DoctorPatientSearchScreen() {
           </Pressable>
         ) : null}
       </View>
-      {!shouldSearch ? <Text style={styles.subtitle}>Enter at least 2 characters to search.</Text> :
+      {!shouldSearch ? <Text style={styles.subtitle}>Enter a patient number or at least 2 characters to search.</Text> :
         <QueryState query={patients} label="patients" hasData={Boolean(patients.currentData)} empty={patients.currentData?.items.length === 0 ? 'No patients match this search.' : undefined} />}
       {shouldSearch ? patients.currentData?.items.map((patient) => (
         <Pressable key={patient.patient_id} style={styles.card} onPress={() => router.push(`/doctor/patients/${patient.patient_id}`)}>

@@ -35,7 +35,8 @@ export default function WalkInScreen() {
   const [addWalkIn, addState] = useAddWalkInMutation();
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim();
-  const shouldSearch = normalizedQuery.length >= 2 && !initialPatientId;
+  const isPatientNumberQuery = /^\d+$/.test(normalizedQuery);
+  const shouldSearch = (isPatientNumberQuery || normalizedQuery.length >= 2) && !initialPatientId;
   const search = useSearchPatientsQuery(
     { q: normalizedQuery },
     { skip: !shouldSearch },
@@ -162,7 +163,7 @@ export default function WalkInScreen() {
             <KeyboardSafeTextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search name, mobile or patient ID"
+              placeholder="Search name, mobile or patient number"
               style={[styles.input, query.length > 0 && styles.searchWithClear]}
             />
             {query.length > 0 ? (
