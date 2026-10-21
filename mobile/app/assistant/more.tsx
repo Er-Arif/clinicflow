@@ -13,7 +13,10 @@ export default function MoreScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.header}><Text style={styles.title}>More</Text><Text style={styles.subtitle}>{me.data?.display_name ?? 'Assistant'}</Text></View>
+      <View style={styles.header}>
+        <Text style={styles.title}>{me.data?.display_name ?? 'Assistant'}</Text>
+        <Text style={styles.subtitle}>Assistant workspace</Text>
+      </View>
       <Section title="Operations">
         <MenuItem label="Payments" onPress={() => router.push('/assistant/payments')} />
         <MenuItem label="Reminders" onPress={() => router.push('/assistant/reminders')} />
