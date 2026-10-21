@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useFollowUpWorklistInfiniteQuery } from '@/api/api';
@@ -51,35 +51,35 @@ export default function FollowUpsScreen() {
         <Text style={styles.subtitle}>Work queue for recommended and booked follow-up visits</Text>
       </View>
 
-      <View style={styles.filterBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterBar}
+        accessibilityRole="tablist"
+      >
         {groups.map(([state, label, query]) => {
           const active = activeState === state;
           const total = query.currentData?.pages[0]?.total;
           return (
             <Pressable
               key={state}
-              accessibilityRole="button"
+              accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${label} follow-ups${typeof total === 'number' ? `, ${total}` : ''}`}
               onPress={() => setSelected(state)}
               style={({ pressed }) => [styles.filterChip, active && styles.filterChipActive, pressed && styles.pressed]}
             >
               <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>{label}</Text>
-              <View style={[styles.filterCount, active && styles.filterCountActive]}>
-                <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>
-                  {total ?? (query.isError ? '!' : '…')}
-                </Text>
-              </View>
+              <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>
+                {total ?? (query.isError ? '!' : '…')}
+              </Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.queueHeader}>
         <Text style={styles.queueTitle}>{activeLabel}</Text>
-        {typeof activeQuery.currentData?.pages[0]?.total === 'number' ? (
-          <Text style={styles.queueCount}>{activeQuery.currentData.pages[0].total}</Text>
-        ) : null}
       </View>
 
       <View style={styles.list}>
@@ -96,7 +96,7 @@ export default function FollowUpsScreen() {
               <Text style={styles.meta}>Due {formatClinicDate(item.due_date)}</Text>
               {item.linked_appointment ? (
                 <Text style={styles.appointmentMeta}>
-                  {formatClinicDate(item.linked_appointment.date)}{item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}
+                  Booked for {formatClinicDate(item.linked_appointment.date)}{item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}
                 </Text>
               ) : null}
             </View>
@@ -118,18 +118,15 @@ const styles = StyleSheet.create({
   header: { gap: 3 },
   title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
-  filterBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 999, backgroundColor: colors.surface, paddingLeft: 12, paddingRight: 8, paddingVertical: 8 },
+  filterBar: { flexDirection: 'row', gap: spacing.xs, paddingRight: spacing.md },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 999, backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8 },
   filterChipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' },
   filterLabel: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   filterLabelActive: { color: colors.primaryDark },
-  filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
-  filterCountActive: { backgroundColor: colors.surface },
   filterCountText: { color: colors.muted, fontSize: 12, fontWeight: '800' },
   filterCountTextActive: { color: colors.primary },
-  queueHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  queueHeader: { marginTop: spacing.xs },
   queueTitle: { color: colors.primaryDark, fontSize: 18, fontWeight: '800' },
-  queueCount: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   list: { gap: spacing.sm },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 14 },
   rowCopy: { flex: 1, gap: 3 },

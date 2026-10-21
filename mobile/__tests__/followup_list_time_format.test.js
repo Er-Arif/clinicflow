@@ -13,10 +13,11 @@ test('follow-up worklist formats linked appointment times in 12-hour display', (
 
 test('follow-up worklist is queue-first rather than a dashboard clone', () => {
   const text = source();
-  assert.match(text, /filterBar/);
-  assert.match(text, /filterChip/);
+  assert.match(text, /horizontal/);
+  assert.match(text, /showsHorizontalScrollIndicator=\{false\}/);
+  assert.match(text, /contentContainerStyle=\{styles\.filterBar\}/);
   assert.match(text, /setSelected\(state\)/);
-  assert.doesNotMatch(text, /summaryGrid|summaryCard/);
+  assert.doesNotMatch(text, /summaryGrid|summaryCard|flexWrap/);
   assert.match(text, /const activeState = selected \?\? preferredState/);
   assert.match(text, /WorklistControls\s*\n\s*query=\{activeQuery\}/);
 });
@@ -33,7 +34,7 @@ test('follow-up rows are compact tappable records without duplicate status chrom
   const text = source();
   assert.match(text, /accessibilityLabel={`Open follow-up for \$\{item\.patient\.full_name\}`}/);
   assert.match(text, /<Text style=\{styles\.chevron\}>›<\/Text>/);
-  assert.doesNotMatch(text, /View details ›/);
-  assert.doesNotMatch(text, /statusPill|summaryCount/);
+  assert.match(text, /Booked for \{formatClinicDate\(item\.linked_appointment\.date\)\}/);
+  assert.doesNotMatch(text, /View details ›|queueCount|statusPill|summaryCount/);
   assert.doesNotMatch(text, /<AppButton label="Open"/);
 });
