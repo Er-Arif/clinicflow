@@ -70,7 +70,7 @@ export default function FollowUpDetailsScreen() {
         <Row label="Due" value={formatClinicDate(item.due_date)} />
         {item.linked_appointment ? <Row label="Appointment date" value={formatClinicDate(item.linked_appointment.date)} /> : null}
         {item.linked_appointment?.time ? <Row label="Appointment time" value={formatClinicTime(item.linked_appointment.time)} /> : null}
-        {item.close_reason ? <Row label="Closed" value={humanize(item.close_reason)} /> : null}
+        {item.close_reason ? <Row label="Closure reason" value={humanize(item.close_reason)} /> : null}
       </View>
 
       {item.status === 'OPEN' ? (
