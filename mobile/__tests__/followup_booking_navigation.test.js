@@ -9,8 +9,7 @@ const followup = {
   followup_id: 'followup-1',
   patient: { patient_id: 'patient-1', patient_code: 'PT-000004', full_name: 'Testing', mobile_number: null },
   source_visit_id: 'visit-1',
-  source_visit_date: '2026-10-19',
-  source_visit_completed_at: '2026-10-20T06:30:00Z',
+  source_visit_date: '2026-10-20',
   doctor_id: 'doctor-1',
   due_date: '2026-10-27',
   interval_days: 7,
@@ -57,7 +56,7 @@ test('follow-up detail opens the dedicated follow-up booking route with a single
 
 test('completed visit shortcut stays inside Follow-ups and opens dedicated booking', () => {
   let stateIndex = 0;
-  const seededState = [false, 'INTERVAL', '7', '', followup, true];
+  const seededState = [false, 'INTERVAL', '7', '', '', followup, true];
   let destination;
   const runtime = mobileRuntime({
     react: {
@@ -72,7 +71,8 @@ test('completed visit shortcut stays inside Follow-ups and opens dedicated booki
       useRouter: () => ({ back() {}, replace: value => { destination = value; } }),
     },
     '@/api/api': {
-      useGetAppointmentQuery: () => ({ data: { appointment_id: 'appointment-1', visit_id: 'visit-1', payment_status: 'PENDING', patient: { patient_id: 'patient-1', full_name: 'Testing' } }, isLoading: false, refetch: async () => {} }),
+      useGetAppointmentQuery: () => ({ data: { appointment_id: 'appointment-1', visit_id: 'visit-1', payment_status: 'PENDING', patient: { patient_id: 'patient-1', full_name: 'Testing' }, session: { date: '2026-10-20' } }, isLoading: false, refetch: async () => {} }),
+      useClinicTimeQuery: () => ready({ clinic_date: '2026-10-20' }),
       useCompleteVisitMutation: () => [() => {}, {}],
     },
     '@/features/appointments/idempotency': { useIntentIdempotencyKey: () => ({ getKey: () => 'key', reset() {}, resultMatchesIntent: false }) },
@@ -112,7 +112,7 @@ test('dedicated follow-up booking locks type, doctor and upcoming recommendation
   assert.match(output.markup, /12:00 PM/);
 });
 
-test('booked follow-up detail explains completion-based interval before the due date', () => {
+test('booked follow-up detail shows service date, interval and due date without administrative completion time', () => {
   const booked = {
     ...followup,
     status: 'BOOKED',
@@ -146,9 +146,8 @@ test('booked follow-up detail explains completion-based interval before the due 
   assert.match(output.markup, /Patient ID/);
   assert.match(output.markup, /PT-000004/);
   assert.match(output.markup, /Source visit/);
-  assert.match(output.markup, /19 Oct 2026/);
-  assert.match(output.markup, /Visit completed/);
-  assert.match(output.markup, /20 Oct 2026, 12:00 PM/);
+  assert.match(output.markup, /20 Oct 2026/);
+  assert.doesNotMatch(output.markup, /Visit completed/);
   assert.match(output.markup, /Follow-up interval/);
   assert.match(output.markup, />7 days</);
   assert.match(output.markup, />Due</);
