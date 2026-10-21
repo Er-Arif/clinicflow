@@ -1,4 +1,4 @@
-import { formatClinicDate, formatClinicTime } from '@/utils/dates';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -7,95 +7,109 @@ import { worklistItems } from '@/api/worklists';
 import { AppScreen } from '@/components/AppScreen';
 import { WorklistControls } from '@/components/WorklistControls';
 import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
+
+type FollowUpState = 'DUE_TODAY' | 'OVERDUE' | 'UPCOMING' | 'BOOKED';
 
 export default function FollowUpsScreen() {
   const router = useRouter();
+  const [selected, setSelected] = useState<FollowUpState | null>(null);
   const due = useFollowUpWorklistInfiniteQuery({ state: 'DUE_TODAY' }, { refetchOnMountOrArgChange: true });
-  const upcoming = useFollowUpWorklistInfiniteQuery({ state: 'UPCOMING' }, { refetchOnMountOrArgChange: true });
   const overdue = useFollowUpWorklistInfiniteQuery({ state: 'OVERDUE' }, { refetchOnMountOrArgChange: true });
+  const upcoming = useFollowUpWorklistInfiniteQuery({ state: 'UPCOMING' }, { refetchOnMountOrArgChange: true });
   const booked = useFollowUpWorklistInfiniteQuery({ state: 'BOOKED' }, { refetchOnMountOrArgChange: true });
+
   const groups = [
-    ['Due today', due],
-    ['Overdue', overdue],
-    ['Upcoming', upcoming],
-    ['Booked', booked],
+    ['DUE_TODAY', 'Due today', due],
+    ['OVERDUE', 'Overdue', overdue],
+    ['UPCOMING', 'Upcoming', upcoming],
+    ['BOOKED', 'Booked', booked],
   ] as const;
-  const settled = groups.every(([, query]) => query.isSuccess || query.isError);
-  const anyItems = groups.some(([, query]) => worklistItems(query.currentData, item => item.followup_id).length > 0);
+
+  const totalFor = (query: typeof due) => query.currentData?.pages[0]?.total ?? 0;
+  const preferredState: FollowUpState = totalFor(overdue) > 0
+    ? 'OVERDUE'
+    : totalFor(due) > 0
+      ? 'DUE_TODAY'
+      : totalFor(upcoming) > 0
+        ? 'UPCOMING'
+        : totalFor(booked) > 0
+          ? 'BOOKED'
+          : 'DUE_TODAY';
+  const activeState = selected ?? preferredState;
+  const activeGroup = groups.find(([state]) => state === activeState) ?? groups[0];
+  const [, activeLabel, activeQuery] = activeGroup;
+  const items = worklistItems(activeQuery.currentData, item => item.followup_id);
 
   return (
-    <AppScreen refreshing={groups.some(([, query]) => query.isFetching && !query.isFetchingNextPage)}
-      onRefresh={() => { for (const [, query] of groups) void query.refetch(); }}>
+    <AppScreen
+      refreshing={groups.some(([, , query]) => query.isFetching && !query.isFetchingNextPage)}
+      onRefresh={() => { for (const [, , query] of groups) void query.refetch(); }}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Follow-ups</Text>
-        <Text style={styles.subtitle}>Recommendations and booked follow-up visits</Text>
+        <Text style={styles.subtitle}>Work queue for recommended and booked follow-up visits</Text>
       </View>
 
-      <View style={styles.summaryGrid}>
-        {groups.map(([title, query]) => {
+      <View style={styles.filterBar}>
+        {groups.map(([state, label, query]) => {
+          const active = activeState === state;
           const total = query.currentData?.pages[0]?.total;
           return (
-            <View key={title} style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>{title}</Text>
-              <Text style={styles.summaryCount}>{total ?? (query.isError ? '—' : '…')}</Text>
-            </View>
+            <Pressable
+              key={state}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${label} follow-ups${typeof total === 'number' ? `, ${total}` : ''}`}
+              onPress={() => setSelected(state)}
+              style={({ pressed }) => [styles.filterChip, active && styles.filterChipActive, pressed && styles.pressed]}
+            >
+              <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>{label}</Text>
+              <View style={[styles.filterCount, active && styles.filterCountActive]}>
+                <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>
+                  {total ?? (query.isError ? '!' : '…')}
+                </Text>
+              </View>
+            </Pressable>
           );
         })}
       </View>
 
-      {groups.map(([title, query]) => {
-        const items = worklistItems(query.currentData, item => item.followup_id);
-        if (items.length === 0 && !query.isError) return null;
-        return (
-          <View key={title} style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{title}</Text>
-              {items.length > 0 ? <Text style={styles.sectionCount}>{items.length}</Text> : null}
-            </View>
-            {items.map((item) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open follow-up for ${item.patient.full_name}`}
-                key={item.followup_id}
-                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-                onPress={() => router.push({ pathname: '/assistant/followups/[followupId]', params: { followupId: item.followup_id } })}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.patient}>{item.patient.full_name}</Text>
-                  <View style={[
-                    styles.statusPill,
-                    title === 'Booked' && styles.statusBooked,
-                    title === 'Overdue' && styles.statusOverdue,
-                    title === 'Due today' && styles.statusDue,
-                  ]}>
-                    <Text style={[
-                      styles.statusText,
-                      title === 'Booked' && styles.statusBookedText,
-                      title === 'Overdue' && styles.statusOverdueText,
-                      title === 'Due today' && styles.statusDueText,
-                    ]}>{title}</Text>
-                  </View>
-                </View>
-                <Text style={styles.meta}>Due {formatClinicDate(item.due_date)}</Text>
-                {item.linked_appointment ? (
-                  <Text style={styles.appointmentMeta}>
-                    Appointment · {formatClinicDate(item.linked_appointment.date)}{item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}
-                  </Text>
-                ) : null}
-                <Text style={styles.viewDetails}>View details ›</Text>
-              </Pressable>
-            ))}
-            <WorklistControls query={query} count={items.length} emptyText="" />
-          </View>
-        );
-      })}
+      <View style={styles.queueHeader}>
+        <Text style={styles.queueTitle}>{activeLabel}</Text>
+        {typeof activeQuery.currentData?.pages[0]?.total === 'number' ? (
+          <Text style={styles.queueCount}>{activeQuery.currentData.pages[0].total}</Text>
+        ) : null}
+      </View>
 
-      {settled && !anyItems && !groups.some(([, query]) => query.isError) ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No follow-ups to show</Text>
-          <Text style={styles.subtitle}>New recommendations will appear here after visits are completed.</Text>
-        </View>
-      ) : null}
+      <View style={styles.list}>
+        {items.map(item => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open follow-up for ${item.patient.full_name}`}
+            key={item.followup_id}
+            style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
+            onPress={() => router.push({ pathname: '/assistant/followups/[followupId]', params: { followupId: item.followup_id } })}
+          >
+            <View style={styles.rowCopy}>
+              <Text style={styles.patient}>{item.patient.full_name}</Text>
+              <Text style={styles.meta}>Due {formatClinicDate(item.due_date)}</Text>
+              {item.linked_appointment ? (
+                <Text style={styles.appointmentMeta}>
+                  {formatClinicDate(item.linked_appointment.date)}{item.linked_appointment.time ? ` · ${formatClinicTime(item.linked_appointment.time)}` : ''}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <WorklistControls
+        query={activeQuery}
+        count={items.length}
+        emptyText={`No ${activeLabel.toLowerCase()} follow-ups.`}
+      />
     </AppScreen>
   );
 }
@@ -104,29 +118,24 @@ const styles = StyleSheet.create({
   header: { gap: 3 },
   title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  summaryCard: { flexGrow: 1, flexBasis: '46%', minWidth: 130, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 13, gap: 2 },
-  summaryLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  summaryCount: { color: colors.primaryDark, fontSize: 22, fontWeight: '800' },
-  section: { gap: spacing.sm, marginTop: spacing.xs },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-  sectionCount: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.xs },
+  filterBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 999, backgroundColor: colors.surface, paddingLeft: 12, paddingRight: 8, paddingVertical: 8 },
+  filterChipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' },
+  filterLabel: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  filterLabelActive: { color: colors.primaryDark },
+  filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
+  filterCountActive: { backgroundColor: colors.surface },
+  filterCountText: { color: colors.muted, fontSize: 12, fontWeight: '800' },
+  filterCountTextActive: { color: colors.primary },
+  queueHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  queueTitle: { color: colors.primaryDark, fontSize: 18, fontWeight: '800' },
+  queueCount: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  list: { gap: spacing.sm },
+  rowCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 14 },
+  rowCopy: { flex: 1, gap: 3 },
+  patient: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  meta: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  appointmentMeta: { color: colors.primaryDark, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  chevron: { color: colors.primary, fontSize: 25, fontWeight: '500', paddingLeft: spacing.xs },
   pressed: { opacity: 0.78 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  patient: { flex: 1, fontSize: 17, fontWeight: '800', color: colors.text },
-  meta: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  appointmentMeta: { color: colors.primaryDark, fontSize: 13, lineHeight: 19, fontWeight: '600' },
-  statusPill: { backgroundColor: colors.softPrimary, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { color: colors.primary, fontWeight: '700', fontSize: 11 },
-  statusBooked: { backgroundColor: colors.softSuccess },
-  statusBookedText: { color: colors.success },
-  statusOverdue: { backgroundColor: colors.softDanger },
-  statusOverdueText: { color: colors.danger },
-  statusDue: { backgroundColor: colors.softWarning },
-  statusDueText: { color: colors.warning },
-  viewDetails: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 2 },
-  emptyCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs, alignItems: 'center' },
-  emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
 });

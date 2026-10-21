@@ -11,19 +11,29 @@ test('follow-up worklist formats linked appointment times in 12-hour display', (
   assert.doesNotMatch(text, /linked_appointment\.time\?\.slice\(0, 5\)/);
 });
 
-test('follow-up worklist keeps zero-count states compact instead of rendering four empty sections', () => {
+test('follow-up worklist is queue-first rather than a dashboard clone', () => {
   const text = source();
-  assert.match(text, /summaryGrid/);
-  assert.match(text, /summaryCard/);
-  assert.match(text, /if \(items\.length === 0 && !query\.isError\) return null/);
-  assert.doesNotMatch(text, /No \$\{title\.toLowerCase\(\)\} follow-ups/);
-  assert.doesNotMatch(text, /items\.length} of/);
+  assert.match(text, /filterBar/);
+  assert.match(text, /filterChip/);
+  assert.match(text, /setSelected\(state\)/);
+  assert.doesNotMatch(text, /summaryGrid|summaryCard/);
+  assert.match(text, /const activeState = selected \?\? preferredState/);
+  assert.match(text, /WorklistControls\s*\n\s*query=\{activeQuery\}/);
 });
 
-test('follow-up cards are lightweight tappable summaries rather than nested Open buttons', () => {
+test('follow-up queue defaults to the most useful non-empty state', () => {
+  const text = source();
+  assert.match(text, /totalFor\(overdue\) > 0/);
+  assert.match(text, /totalFor\(due\) > 0/);
+  assert.match(text, /totalFor\(upcoming\) > 0/);
+  assert.match(text, /totalFor\(booked\) > 0/);
+});
+
+test('follow-up rows are compact tappable records without duplicate status chrome', () => {
   const text = source();
   assert.match(text, /accessibilityLabel={`Open follow-up for \$\{item\.patient\.full_name\}`}/);
-  assert.match(text, /View details ›/);
-  assert.match(text, /Appointment ·/);
+  assert.match(text, /<Text style=\{styles\.chevron\}>›<\/Text>/);
+  assert.doesNotMatch(text, /View details ›/);
+  assert.doesNotMatch(text, /statusPill|summaryCount/);
   assert.doesNotMatch(text, /<AppButton label="Open"/);
 });
