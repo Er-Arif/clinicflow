@@ -1,4 +1,4 @@
-import { formatClinicDate, formatClinicTime, formatClinicTimestamp } from '@/utils/dates';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
@@ -67,7 +67,6 @@ export default function FollowUpDetailsScreen() {
         <Row label="Patient" value={item.patient.full_name} />
         <Row label="Patient ID" value={item.patient.patient_code} />
         <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
-        {item.source_visit_completed_at ? <Row label="Visit completed" value={formatClinicTimestamp(item.source_visit_completed_at)} /> : null}
         {item.interval_days ? <Row label="Follow-up interval" value={`${item.interval_days} days`} /> : null}
         <Row label="Due" value={formatClinicDate(item.due_date)} />
         {item.linked_appointment ? <Row label="Appointment date" value={formatClinicDate(item.linked_appointment.date)} /> : null}
