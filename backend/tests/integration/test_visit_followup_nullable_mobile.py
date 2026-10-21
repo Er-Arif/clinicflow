@@ -63,6 +63,7 @@ def test_complete_visit_with_followup_allows_patient_without_phone(scenario):
     assert completed.followup.patient.mobile_number is None
     assert completed.followup.interval_days == 7
     assert completed.followup.due_date == s.clock.clinic_date() + timedelta(days=7)
+    assert completed.followup.source_visit_completed_at == completed.completed_at
 
     with s.factory() as db:
         followup = db.get(FollowUpRecommendation, completed.followup.followup_id)
