@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.modules.appointments.availability import AppointmentAvailabilityService
 from app.modules.appointments.cancellation_guard import (
     require_payment_correction_before_cancellation,
+    require_valid_cancellation_reason,
 )
 from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
@@ -125,6 +126,9 @@ def cancel_appointment(
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
     with db.begin():
+        require_valid_cancellation_reason(
+            db, context.clinic_id, appointment_id, request.reason, clock
+        )
         require_payment_correction_before_cancellation(db, context.clinic_id, appointment_id)
         return AppointmentService(db, clock, context).cancel(appointment_id, request)
 

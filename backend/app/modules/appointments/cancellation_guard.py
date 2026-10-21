@@ -5,10 +5,61 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.clock import Clock
 from app.core.errors import AppError
 from app.modules.appointments.models import Appointment
 from app.modules.payments.models import Payment
+from app.modules.scheduling.models import SessionOccurrence
 from app.modules.visits.models import Visit
+
+
+def require_valid_cancellation_reason(
+    db: Session,
+    clinic_id: UUID,
+    appointment_id: UUID,
+    reason: str,
+    clock: Clock,
+) -> None:
+    """Reject cancellation reasons that are impossible for the appointment state/time."""
+    if reason.upper() != "NO_SHOW":
+        return
+
+    appointment = db.scalar(
+        select(Appointment).where(
+            Appointment.appointment_id == appointment_id,
+            Appointment.clinic_id == clinic_id,
+        )
+    )
+    if appointment is None:
+        raise AppError("APPOINTMENT_NOT_FOUND", "Appointment not found.", 404)
+    if appointment.status != "BOOKED":
+        raise AppError(
+            "INVALID_CANCELLATION_REASON",
+            "Only a booked appointment can be marked as a no-show.",
+            422,
+        )
+    if appointment.appointment_time is None:
+        raise AppError(
+            "INVALID_CANCELLATION_REASON",
+            "An untimed appointment cannot be marked as a no-show.",
+            422,
+        )
+
+    occurrence = db.get(SessionOccurrence, appointment.session_occurrence_id)
+    if occurrence is None:  # pragma: no cover - protected by foreign key
+        raise RuntimeError("Appointment occurrence missing")
+
+    clinic_date = clock.clinic_date()
+    clinic_time = clock.clinic_now().time().replace(tzinfo=None)
+    scheduled_in_future = occurrence.occurrence_date > clinic_date or (
+        occurrence.occurrence_date == clinic_date and appointment.appointment_time > clinic_time
+    )
+    if scheduled_in_future:
+        raise AppError(
+            "NO_SHOW_TOO_EARLY",
+            "Mark as no-show only after the scheduled appointment time.",
+            422,
+        )
 
 
 def require_payment_correction_before_cancellation(

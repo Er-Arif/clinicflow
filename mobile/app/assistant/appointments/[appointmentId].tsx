@@ -73,15 +73,24 @@ export default function AppointmentDetailsScreen() {
   const paymentConfirmed = item.payment_status === 'CONFIRMED';
   const paymentCorrectionRequired = item.status === 'CHECKED_IN' && paymentConfirmed;
   const canCancel = (item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired;
-  const cancellationReasons = item.status === 'CHECKED_IN' ? ['PATIENT_CANCELLED', 'DOCTOR_UNAVAILABLE', 'OTHER'] : ['PATIENT_CANCELLED', 'NO_SHOW', 'DOCTOR_UNAVAILABLE', 'OTHER'];
+  const clinicDate = clinicTime.data?.clinic_date ?? '';
+  const clinicClockTime = clinicTime.data?.clinic_now?.slice(11, 19) ?? '';
+  const noShowAvailable = item.status === 'BOOKED' && Boolean(item.appointment_time) && Boolean(clinicDate) && (
+    item.session.date < clinicDate ||
+    (item.session.date === clinicDate && Boolean(clinicClockTime) && item.appointment_time! <= clinicClockTime)
+  );
+  const cancellationReasons = item.status === 'CHECKED_IN'
+    ? ['PATIENT_CANCELLED', 'DOCTOR_UNAVAILABLE', 'OTHER']
+    : ['PATIENT_CANCELLED', ...(noShowAvailable ? ['NO_SHOW'] : []), 'DOCTOR_UNAVAILABLE', 'OTHER'];
   const checkInError = checkInRequest.resultMatchesIntent ? apiError(checkInState.error) : null;
   const cancelError = submittedCancelIntent === cancelIntent ? apiError(cancelState.error) : null;
-  const scheduledForClinicDate = clinicTime.data?.clinic_date === item.session.date;
+  const scheduledForClinicDate = clinicDate === item.session.date;
   const canCheckIn = item.status === 'BOOKED' && scheduledForClinicDate;
-  const checkInDateUnavailable = item.status === 'BOOKED' && Boolean(clinicTime.data?.clinic_date) && !scheduledForClinicDate;
+  const checkInDateUnavailable = item.status === 'BOOKED' && Boolean(clinicDate) && !scheduledForClinicDate;
   const messageActionRelevant = item.status === 'BOOKED' || (item.status === 'CANCELLED' && item.cancellation_reason !== 'RESCHEDULED');
   const messagingAvailable = patient.data?.reminders_enabled === true;
   const messagingUnavailable = messageActionRelevant && Boolean(patient.data) && !messagingAvailable;
+  const reopensLinkedFollowup = item.linked_followup_status === 'BOOKED' && Boolean(item.linked_followup_id);
 
   return (
     <KeyboardSafeFormScreen>
@@ -107,7 +116,7 @@ export default function AppointmentDetailsScreen() {
       {messagingUnavailable ? <Text style={styles.actionNotice}>Messaging is unavailable for this patient.</Text> : null}
       {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare message.'}</Text> : null}
       {canCancel ? <AppButton compact label={showCancel ? 'Hide cancellation' : 'Cancel appointment'} tone="danger" onPress={() => { setSubmittedCancelIntent(null); setShowCancel(value => !value); }} /> : null}
-      {showCancel ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Cancellation</Text><View style={styles.reasonGrid}>{cancellationReasons.map(value => <AppButton key={value} compact label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} style={styles.reasonButton} />)}</View>{reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}{cancelError ? <Text style={styles.error}>{cancelError.message ?? 'Unable to cancel appointment.'}</Text> : null}<AppButton label="Confirm cancellation" tone="danger" loading={cancelState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void cancel()} /></View> : null}
+      {showCancel ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Cancellation</Text>{reopensLinkedFollowup ? <Text style={styles.cancellationNotice}>This appointment is linked to a booked follow-up. Cancelling it will reopen the follow-up so it can be booked again.</Text> : null}<View style={styles.reasonGrid}>{cancellationReasons.map(value => <AppButton key={value} compact label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} style={styles.reasonButton} />)}</View>{reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}{cancelError ? <Text style={styles.error}>{cancelError.message ?? 'Unable to cancel appointment.'}</Text> : null}<AppButton label={reopensLinkedFollowup ? 'Cancel and reopen follow-up' : 'Confirm cancellation'} tone="danger" loading={cancelState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void cancel()} /></View> : null}
     </KeyboardSafeFormScreen>
   );
 }
@@ -117,6 +126,6 @@ const styles = StyleSheet.create({
   headingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }, headingCopy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, fontSize: 13 },
   statusPill: { backgroundColor: colors.softSuccess, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, statusText: { color: colors.success, fontWeight: '700', fontSize: 11 }, statusChecked: { backgroundColor: colors.softPrimary }, statusCheckedText: { color: colors.primary }, statusCancelled: { backgroundColor: colors.surfaceSoft }, statusCancelledText: { color: colors.muted },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, correctionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: '#F0C5C5', borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning }, financialNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 }, actionNotice: { color: colors.muted, fontSize: 13, lineHeight: 18 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning }, financialNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 }, actionNotice: { color: colors.muted, fontSize: 13, lineHeight: 18 }, cancellationNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 },
   secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, flexButton: { flexGrow: 1, flexBasis: '46%' }, reasonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, reasonButton: { flexGrow: 1, flexBasis: '46%' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background }, error: { color: colors.danger },
 });
