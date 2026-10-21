@@ -363,8 +363,8 @@ class FollowUpService:
             clinic_id=self.context.clinic_id,
             user_id=self.context.user_id,
             operation=operation,
-            key=idempotency_key,
-            request_hash=payload_hash,
+            key=key,
+            request_hash=request_hash,
         )
 
     def _complete_idempotency(
