@@ -65,7 +65,8 @@ test('all editable route branches opt in; read-only routes do not acquire a keyb
       assert.ok(parent, `${file}: editable input must belong to its own form viewport`);
     }
   }
-  assert.equal(formRoutes, 25);
+  // Cancellation editing now lives inside AppointmentCancellationModal rather than the appointment route.
+  assert.equal(formRoutes, 24);
 });
 
 test('shared input composes consumer events and FormField uses the native input adapter', () => {
