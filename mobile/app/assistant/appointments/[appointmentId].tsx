@@ -1,6 +1,5 @@
 import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +10,7 @@ import { useCancelAppointmentMutation, useCheckInAppointmentMutation, useClinicT
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { AppointmentCancellationModal } from '@/features/appointments/AppointmentCancellationModal';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -66,7 +66,7 @@ export default function AppointmentDetailsScreen() {
       await cancelAppointment({ appointmentId, reason, note: note || undefined }).unwrap();
       setShowCancel(false);
     } catch {
-      // Stable API error shown below.
+      // Stable API error shown in the cancellation sheet.
     }
   }
 
@@ -89,7 +89,6 @@ export default function AppointmentDetailsScreen() {
   const checkInDateUnavailable = item.status === 'BOOKED' && Boolean(clinicDate) && !scheduledForClinicDate;
   const messageActionRelevant = item.status === 'BOOKED' || (item.status === 'CANCELLED' && item.cancellation_reason !== 'RESCHEDULED');
   const messagingAvailable = patient.data?.reminders_enabled === true;
-  const messagingUnavailable = messageActionRelevant && Boolean(patient.data) && !messagingAvailable;
   const reopensLinkedFollowup = item.linked_followup_status === 'BOOKED' && Boolean(item.linked_followup_id);
 
   return (
@@ -104,7 +103,7 @@ export default function AppointmentDetailsScreen() {
         {item.cancellation_reason ? <Row label="Cancellation" value={humanize(item.cancellation_reason)} /> : null}
       </View>
       {canCheckIn ? <AppButton label="Check in" loading={checkInState.isLoading} onPress={() => void doCheckIn()} /> : null}
-      {checkInDateUnavailable ? <Text style={styles.actionNotice}>Check in is only available on the scheduled clinic date ({formatClinicDate(item.session.date)}).</Text> : null}
+      {checkInDateUnavailable ? <Text style={styles.actionNotice}>Check-in available on {formatClinicDate(item.session.date)}.</Text> : null}
       {checkInError ? <Text style={styles.error}>{checkInError.message ?? 'Unable to check in patient.'}</Text> : null}
       {item.status === 'CHECKED_IN' && item.visit_id ? <AppButton label="Complete visit" onPress={() => router.push({ pathname: '/assistant/appointments/complete', params: { appointmentId } })} /> : null}
       <View style={styles.secondaryActions}>
@@ -113,10 +112,26 @@ export default function AppointmentDetailsScreen() {
       </View>
       {paymentCorrectionRequired ? <Text style={styles.financialNotice}>A confirmed payment must be voided or corrected before cancelling or rescheduling this appointment.</Text> : null}
       {messageActionRelevant && messagingAvailable ? <AppButton compact label={item.status === 'CANCELLED' ? 'Send cancellation' : item.rescheduled_from_appointment_id ? 'Send reschedule' : 'Send confirmation'} tone="secondary" loading={messageState.isLoading} onPress={() => void sendAppointmentMessage()} /> : null}
-      {messagingUnavailable ? <Text style={styles.actionNotice}>Messaging is unavailable for this patient.</Text> : null}
       {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare message.'}</Text> : null}
-      {canCancel ? <AppButton compact label={showCancel ? 'Hide cancellation' : 'Cancel appointment'} tone="danger" onPress={() => { setSubmittedCancelIntent(null); setShowCancel(value => !value); }} /> : null}
-      {showCancel ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Cancellation</Text>{reopensLinkedFollowup ? <Text style={styles.cancellationNotice}>This appointment is linked to a booked follow-up. Cancelling it will reopen the follow-up so it can be booked again.</Text> : null}<View style={styles.reasonGrid}>{cancellationReasons.map(value => <AppButton key={value} compact label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} style={styles.reasonButton} />)}</View>{reason === 'OTHER' ? <KeyboardSafeTextInput value={note} onChangeText={setNote} placeholder="Reason" style={styles.input} /> : null}{cancelError ? <Text style={styles.error}>{cancelError.message ?? 'Unable to cancel appointment.'}</Text> : null}<AppButton label={reopensLinkedFollowup ? 'Cancel and reopen follow-up' : 'Confirm cancellation'} tone="danger" loading={cancelState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void cancel()} /></View> : null}
+      {canCancel ? <AppButton compact label="Cancel appointment" tone="danger" onPress={() => { setSubmittedCancelIntent(null); setShowCancel(true); }} /> : null}
+      {showCancel ? (
+        <AppointmentCancellationModal
+          visible
+          patientName={item.patient.full_name}
+          appointmentDate={formatClinicDate(item.session.date)}
+          appointmentTime={item.appointment_time ? formatClinicTime(item.appointment_time) : 'Walk-in'}
+          reasons={cancellationReasons}
+          selectedReason={reason}
+          note={note}
+          reopensLinkedFollowup={reopensLinkedFollowup}
+          error={cancelError?.message ?? (cancelError ? 'Unable to cancel appointment.' : null)}
+          loading={cancelState.isLoading}
+          onReasonChange={setReason}
+          onNoteChange={setNote}
+          onConfirm={() => void cancel()}
+          onClose={() => { setSubmittedCancelIntent(null); setShowCancel(false); }}
+        />
+      ) : null}
     </KeyboardSafeFormScreen>
   );
 }
@@ -125,7 +140,7 @@ function Row({ label, value, emphasis }: { label: string; value: string; emphasi
 const styles = StyleSheet.create({
   headingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }, headingCopy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, fontSize: 13 },
   statusPill: { backgroundColor: colors.softSuccess, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, statusText: { color: colors.success, fontWeight: '700', fontSize: 11 }, statusChecked: { backgroundColor: colors.softPrimary }, statusCheckedText: { color: colors.primary }, statusCancelled: { backgroundColor: colors.surfaceSoft }, statusCancelledText: { color: colors.muted },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, correctionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: '#F0C5C5', borderRadius: radius.lg, padding: spacing.md, gap: spacing.md }, cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning }, financialNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 }, actionNotice: { color: colors.muted, fontSize: 13, lineHeight: 18 }, cancellationNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 },
-  secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, flexButton: { flexGrow: 1, flexBasis: '46%' }, reasonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, reasonButton: { flexGrow: 1, flexBasis: '46%' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background }, error: { color: colors.danger },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, label: { color: colors.muted, fontSize: 13 }, value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right', fontSize: 13 }, success: { color: colors.success }, warning: { color: colors.warning }, financialNotice: { color: colors.warning, fontSize: 13, lineHeight: 18 }, actionNotice: { color: colors.muted, fontSize: 13, lineHeight: 18 },
+  secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, flexButton: { flexGrow: 1, flexBasis: '46%' }, error: { color: colors.danger },
 });

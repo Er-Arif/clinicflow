@@ -32,9 +32,9 @@ const baseAppointment = {
   created_at: '2026-10-21T06:00:00Z',
 };
 
-function renderCancellation(appointment, clinicDate, clinicNow) {
+function renderAppointment(appointment, clinicDate, clinicNow, showCancel = true) {
   let stateIndex = 0;
-  const seededState = [true, 'PATIENT_CANCELLED', '', null];
+  const seededState = [showCancel, 'PATIENT_CANCELLED', '', null];
   const runtime = mobileRuntime({
     react: {
       ...React,
@@ -58,21 +58,45 @@ function renderCancellation(appointment, clinicDate, clinicNow) {
     '@/features/appointments/idempotency': {
       useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false }),
     },
+    'react-native-safe-area-context': {
+      useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
+    },
   });
   return runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
 }
 
-test('future linked follow-up cancellation explains reopen effect and hides no-show', () => {
-  const output = renderCancellation(
+test('appointment detail stays quiet until cancellation is opened', () => {
+  const output = renderAppointment(
+    baseAppointment,
+    '2026-10-21',
+    '2026-10-21T12:26:00+05:30',
+    false,
+  );
+
+  assert.match(output.markup, /Check-in available on 27 Oct 2026/);
+  assert.doesNotMatch(output.markup, /Messaging is unavailable/);
+  assert.doesNotMatch(output.markup, /reopen the linked follow-up/);
+  assert.equal(output.controls.some(control => control.label === 'Keep appointment'), false);
+  assert.ok(output.controls.find(control => control.label === 'Cancel appointment'));
+});
+
+test('future linked follow-up cancellation uses a compact sheet and hides no-show', () => {
+  const output = renderAppointment(
     baseAppointment,
     '2026-10-21',
     '2026-10-21T12:26:00+05:30',
   );
 
-  assert.match(output.markup, /linked to a booked follow-up/);
-  assert.match(output.markup, /reopen the follow-up so it can be booked again/);
+  const modal = output.controls.find(control => control.nativeType === 'Modal');
+  assert.ok(modal);
+  assert.equal(typeof modal.onRequestClose, 'function');
+  assert.match(output.markup, /Testing · 27 Oct 2026 · 08:30 PM/);
+  assert.match(output.markup, /This will reopen the linked follow-up/);
   assert.equal(output.controls.some(control => control.label === 'No show'), false);
-  assert.ok(output.controls.find(control => control.label === 'Cancel and reopen follow-up'));
+  assert.ok(output.controls.find(control => control.label === 'Keep appointment'));
+  assert.ok(output.controls.find(control => control.accessibilityLabel === 'Dismiss cancellation'));
+  assert.ok(output.controls.find(control => control.accessibilityLabel === 'Close cancellation'));
+  assert.doesNotMatch(output.markup, /Cancel and reopen follow-up|Hide cancellation|Messaging is unavailable/);
 });
 
 test('no-show becomes available only after the scheduled appointment time', () => {
@@ -83,13 +107,13 @@ test('no-show becomes available only after the scheduled appointment time', () =
     linked_followup_status: null,
     session: { ...baseAppointment.session, date: '2026-10-21' },
   };
-  const output = renderCancellation(
+  const output = renderAppointment(
     appointment,
     '2026-10-21',
     '2026-10-21T21:00:00+05:30',
   );
 
   assert.ok(output.controls.find(control => control.label === 'No show'));
-  assert.ok(output.controls.find(control => control.label === 'Confirm cancellation'));
-  assert.doesNotMatch(output.markup, /reopen the follow-up/);
+  assert.ok(output.controls.find(control => control.label === 'Keep appointment'));
+  assert.doesNotMatch(output.markup, /reopen the linked follow-up/);
 });
