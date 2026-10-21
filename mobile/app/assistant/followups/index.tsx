@@ -1,4 +1,4 @@
-import { formatClinicDate } from '@/utils/dates';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -50,7 +50,7 @@ export default function FollowUpsScreen() {
               <View key={item.followup_id} style={styles.card}>
                 <Text style={styles.patient}>{item.patient.full_name}</Text>
                 <Text style={styles.subtitle}>Due {formatClinicDate(item.due_date)} · {humanize(item.status)}{item.overdue ? ' · Overdue' : ''}</Text>
-                {item.linked_appointment ? <Text style={styles.subtitle}>Booked {formatClinicDate(item.linked_appointment.date)} {item.linked_appointment.time?.slice(0, 5) ?? ''}</Text> : null}
+                {item.linked_appointment ? <Text style={styles.subtitle}>Booked {formatClinicDate(item.linked_appointment.date)} {item.linked_appointment.time ? formatClinicTime(item.linked_appointment.time) : ''}</Text> : null}
                 <AppButton label="Open" tone="secondary" onPress={() => router.push({ pathname: '/assistant/followups/[followupId]', params: { followupId: item.followup_id } })} />
               </View>
             ))}
@@ -70,4 +70,3 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   patient: { fontSize: 17, fontWeight: '800', color: colors.text },
 });
-
