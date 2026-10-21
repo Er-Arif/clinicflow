@@ -17,8 +17,9 @@ function humanize(value?: string | null) { if (!value) return ''; return value.t
 
 export default function AppointmentDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ appointmentId: string }>();
+  const params = useLocalSearchParams<{ appointmentId: string; returnToFollowupId?: string }>();
   const appointmentId = String(params.appointmentId ?? '');
+  const returnToFollowupId = String(params.returnToFollowupId ?? '');
   const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
   const patientId = appointment.data?.patient.patient_id ?? '';
   const patient = useGetPatientQuery(patientId, { skip: !patientId });
@@ -33,8 +34,16 @@ export default function AppointmentDetailsScreen() {
   const [submittedCancelIntent, setSubmittedCancelIntent] = useState<string | null>(null);
   const cancelIntent = JSON.stringify({ appointment_id: appointmentId, reason, note: note || null });
 
+  function goBack() {
+    if (returnToFollowupId) {
+      router.replace({ pathname: '/assistant/followups/[followupId]', params: { followupId: returnToFollowupId } });
+      return;
+    }
+    router.back();
+  }
+
   if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
-  if (!appointment.data) return <AppScreen><BackButton /><Text style={styles.title}>Unable to load appointment</Text><QueryState query={appointment} label="appointment" /></AppScreen>;
+  if (!appointment.data) return <AppScreen><BackButton onPress={goBack} /><Text style={styles.title}>Unable to load appointment</Text><QueryState query={appointment} label="appointment" /></AppScreen>;
   const item = appointment.data;
 
   async function doCheckIn() {
@@ -92,7 +101,7 @@ export default function AppointmentDetailsScreen() {
 
   return (
     <AppScreen>
-      <QueryState query={appointment} label="appointment" /><BackButton />
+      <QueryState query={appointment} label="appointment" /><BackButton onPress={goBack} />
       <View style={styles.headingRow}><View style={styles.headingCopy}><Text style={styles.title}>{item.patient.full_name}</Text><Text style={styles.subtitle}>{item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular consultation'}</Text></View>
         <View style={[styles.statusPill, item.status === 'CHECKED_IN' && styles.statusChecked, item.status === 'CANCELLED' && styles.statusCancelled]}><Text style={[styles.statusText, item.status === 'CHECKED_IN' && styles.statusCheckedText, item.status === 'CANCELLED' && styles.statusCancelledText]}>{humanize(item.status)}</Text></View>
       </View>

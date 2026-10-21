@@ -86,7 +86,16 @@ export default function FollowUpDetailsScreen() {
         </>
       ) : null}
       {item.status === 'BOOKED' && item.linked_appointment ? (
-        <AppButton label="Open appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: item.linked_appointment!.appointment_id } })} />
+        <AppButton
+          label="Open appointment"
+          onPress={() => router.push({
+            pathname: '/assistant/appointments/[appointmentId]',
+            params: {
+              appointmentId: item.linked_appointment!.appointment_id,
+              returnToFollowupId: item.followup_id,
+            },
+          })}
+        />
       ) : null}
 
       {item.status === 'OPEN' && showClose ? (
