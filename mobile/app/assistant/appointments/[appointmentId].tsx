@@ -1,6 +1,5 @@
 import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -92,7 +91,7 @@ export default function AppointmentDetailsScreen() {
   const reopensLinkedFollowup = item.linked_followup_status === 'BOOKED' && Boolean(item.linked_followup_id);
 
   return (
-    <KeyboardSafeFormScreen>
+    <AppScreen>
       <QueryState query={appointment} label="appointment" /><BackButton />
       <View style={styles.headingRow}><View style={styles.headingCopy}><Text style={styles.title}>{item.patient.full_name}</Text><Text style={styles.subtitle}>{item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular consultation'}</Text></View>
         <View style={[styles.statusPill, item.status === 'CHECKED_IN' && styles.statusChecked, item.status === 'CANCELLED' && styles.statusCancelled]}><Text style={[styles.statusText, item.status === 'CHECKED_IN' && styles.statusCheckedText, item.status === 'CANCELLED' && styles.statusCancelledText]}>{humanize(item.status)}</Text></View>
@@ -132,7 +131,7 @@ export default function AppointmentDetailsScreen() {
           onClose={() => { setSubmittedCancelIntent(null); setShowCancel(false); }}
         />
       ) : null}
-    </KeyboardSafeFormScreen>
+    </AppScreen>
   );
 }
 

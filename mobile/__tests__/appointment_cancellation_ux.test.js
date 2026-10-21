@@ -58,9 +58,6 @@ function renderAppointment(appointment, clinicDate, clinicNow, showCancel = true
     '@/features/appointments/idempotency': {
       useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false }),
     },
-    'react-native-safe-area-context': {
-      useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
-    },
   });
   return runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
 }

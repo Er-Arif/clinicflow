@@ -91,8 +91,8 @@ test('future appointment hides check-in and unavailable messaging actions', () =
 
   assert.equal(output.controls.some(control => control.label === 'Check in'), false);
   assert.equal(output.controls.some(control => control.label === 'Send confirmation'), false);
-  assert.match(output.markup, /Check in is only available on the scheduled clinic date \(27 Oct 2026\)\./);
-  assert.match(output.markup, /Messaging is unavailable for this patient\./);
+  assert.match(output.markup, /Check-in available on 27 Oct 2026\./);
+  assert.doesNotMatch(output.markup, /Messaging is unavailable for this patient\./);
   assert.ok(output.controls.some(control => control.label === 'Reschedule'));
   assert.ok(output.controls.some(control => control.label === 'Cancel appointment'));
 });
