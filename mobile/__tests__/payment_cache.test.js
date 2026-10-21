@@ -5,6 +5,19 @@ const { mobileRuntime } = require('./helpers/loadMobile');
 const ready = data => ({ data, currentData: data, isLoading: false, isFetching: false, isError: false, isSuccess: true, refetch() {} });
 const intentKey = { useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false, reset() {} }) };
 
+const receipt = {
+  clinic_name: 'Medeor',
+  receipt_number: 'RCT-2026-000005',
+  patient_name: 'No Phone UAT',
+  doctor_name: 'Arif Ali',
+  visit_date: '2026-10-21',
+  appointment_type: 'REGULAR',
+  amount: '500.00',
+  payment_method: 'CASH',
+  issued_at: '2026-10-21T14:51:00+05:30',
+  voided: false,
+};
+
 test('appointment payment navigation carries appointment and visit context', () => {
   let destination;
   const appointment = {
@@ -141,7 +154,7 @@ test('same-day WhatsApp-only patient keeps valid check-in and messaging actions'
   assert.doesNotMatch(output.markup, /Messaging is unavailable for this patient\./);
 });
 
-test('cash confirmation forwards appointment and visit ids so detail caches are invalidated', async () => {
+test('cash confirmation forwards appointment and visit ids through the receipt', async () => {
   let confirmationArg;
   let destination;
   const runtime = mobileRuntime({
@@ -172,5 +185,49 @@ test('cash confirmation forwards appointment and visit ids so detail caches are 
   assert.equal(confirmationArg.visitId, 'visit1');
   assert.equal(confirmationArg.paymentId, 'pay1');
   assert.equal(confirmationArg.paymentMethod, 'CASH');
-  assert.deepEqual(destination, { pathname: '/assistant/payments/receipt', params: { paymentId: 'pay1' } });
+  assert.deepEqual(destination, {
+    pathname: '/assistant/payments/receipt',
+    params: { paymentId: 'pay1', appointmentId: 'a1', visitId: 'visit1' },
+  });
+});
+
+test('receipt Done returns to the originating appointment when context is present', () => {
+  let destination;
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ paymentId: 'pay1', appointmentId: 'a1', visitId: 'visit1' }),
+      useRouter: () => ({ replace: value => { destination = value; }, push() {}, back() {} }),
+    },
+    '@/api/api': {
+      useClinicTimeQuery: () => ready({ timezone: 'Asia/Kolkata' }),
+      useGetReceiptQuery: () => ready(receipt),
+    },
+  });
+
+  const output = runtime.render(runtime.load('app/assistant/payments/receipt.tsx').default);
+  output.controls.find(control => control.label === 'Done').onPress();
+
+  assert.deepEqual(destination, {
+    pathname: '/assistant/appointments/[appointmentId]',
+    params: { appointmentId: 'a1' },
+  });
+});
+
+test('receipt Done returns to payments when opened without appointment context', () => {
+  let destination;
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ paymentId: 'pay1' }),
+      useRouter: () => ({ replace: value => { destination = value; }, push() {}, back() {} }),
+    },
+    '@/api/api': {
+      useClinicTimeQuery: () => ready({ timezone: 'Asia/Kolkata' }),
+      useGetReceiptQuery: () => ready(receipt),
+    },
+  });
+
+  const output = runtime.render(runtime.load('app/assistant/payments/receipt.tsx').default);
+  output.controls.find(control => control.label === 'Done').onPress();
+
+  assert.equal(destination, '/assistant/payments');
 });

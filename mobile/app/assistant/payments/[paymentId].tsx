@@ -45,6 +45,12 @@ export default function PaymentDetailsScreen() {
   const item = payment.data;
   const canVoid = me.data?.permissions.includes('payment.void') ?? false;
 
+  const receiptParams = (resolvedPaymentId: string) => ({
+    paymentId: resolvedPaymentId,
+    ...(appointmentId ? { appointmentId } : {}),
+    ...(visitId ? { visitId } : {}),
+  });
+
   async function confirmCash() {
     try {
       const result = await confirmPayment({
@@ -54,7 +60,7 @@ export default function PaymentDetailsScreen() {
         appointmentId,
         visitId,
       }).unwrap();
-      router.replace({ pathname: '/assistant/payments/receipt', params: { paymentId: result.payment.payment_id } });
+      router.replace({ pathname: '/assistant/payments/receipt', params: receiptParams(result.payment.payment_id) });
     } catch {
       // The current request error is rendered below.
     }
@@ -93,7 +99,7 @@ export default function PaymentDetailsScreen() {
     <View style={styles.headingRow}><View style={styles.headingCopy}><Text style={styles.title}>{item.patient_name}</Text><Text style={styles.subtitle}>₹{item.amount_due} · {item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular consultation'}</Text></View><View style={[styles.statusPill, item.status === 'PENDING' && styles.pendingPill, item.status === 'VOID' && styles.voidPill]}><Text style={[styles.statusText, item.status === 'PENDING' && styles.pendingText, item.status === 'VOID' && styles.voidText]}>{paymentStatus(item.status)}</Text></View></View>
     <View style={styles.card}><Row label="Patient ID" value={item.patient_code} /><Row label="Visit date" value={formatClinicDate(item.visit_date)} /><Row label="Amount due" value={`₹${item.amount_due}`} />{item.amount_paid != null ? <Row label="Amount paid" value={`₹${item.amount_paid}`} /> : null}{item.payment_method ? <Row label="Method" value={paymentMethod(item.payment_method)} /> : null}{item.receipt_number ? <Row label="Receipt" value={item.receipt_number} /> : null}{item.void_reason ? <Row label="Void reason" value={item.void_reason} /> : null}</View>
     {item.status === 'PENDING' ? <View style={styles.actions}><AppButton style={styles.flexButton} label={`Confirm ₹${item.amount_due} cash`} loading={confirmState.isLoading} onPress={() => void confirmCash()} /><AppButton style={styles.flexButton} label="Pay by UPI" tone="secondary" onPress={() => router.push({ pathname: '/assistant/payments/upi', params: { paymentId, ...(appointmentId ? { appointmentId } : {}), ...(visitId ? { visitId } : {}) } })} /></View> : null}
-    {item.status === 'CONFIRMED' && item.receipt_number ? <AppButton label="View receipt" onPress={() => router.push({ pathname: '/assistant/payments/receipt', params: { paymentId } })} /> : null}
+    {item.status === 'CONFIRMED' && item.receipt_number ? <AppButton label="View receipt" onPress={() => router.push({ pathname: '/assistant/payments/receipt', params: receiptParams(paymentId) })} /> : null}
     {item.status === 'CONFIRMED' && canVoid ? <AppButton compact label={showVoid ? 'Hide correction' : 'Void payment'} tone="danger" onPress={() => { voidRequest.reset(); setShowVoid(value => !value); }} /> : null}
     {showVoid ? <View style={styles.correctionCard}><Text style={styles.cardTitle}>Financial correction</Text><Text style={styles.warning}>The original payment and receipt stay in history.</Text><KeyboardSafeTextInput value={voidReason} onChangeText={setVoidReason} placeholder="Reason for void" style={styles.input} /><AppButton compact label={replace ? 'Replacement payment: yes' : 'Replacement payment: no'} tone="secondary" onPress={() => setReplace(value => !value)} /><AppButton label="Confirm void" tone="danger" loading={voidState.isLoading} disabled={voidReason.trim().length < 2} onPress={() => void doVoid()} /></View> : null}
     {confirmError ? <Text style={styles.error}>{confirmError.message ?? 'Unable to confirm payment.'}</Text> : null}

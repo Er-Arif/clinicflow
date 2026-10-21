@@ -32,7 +32,14 @@ export default function UpiPaymentScreen() {
         appointmentId,
         visitId,
       }).unwrap();
-      router.replace({ pathname: '/assistant/payments/receipt', params: { paymentId: result.payment.payment_id } });
+      router.replace({
+        pathname: '/assistant/payments/receipt',
+        params: {
+          paymentId: result.payment.payment_id,
+          ...(appointmentId ? { appointmentId } : {}),
+          ...(visitId ? { visitId } : {}),
+        },
+      });
     } catch {
       // The current request error is rendered below.
     }
