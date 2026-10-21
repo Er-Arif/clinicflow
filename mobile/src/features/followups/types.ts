@@ -12,7 +12,6 @@ export type FollowUp = {
   };
   source_visit_id: string;
   source_visit_date: string;
-  source_visit_completed_at: string | null;
   doctor_id: string;
   due_date: string;
   interval_days: number | null;
@@ -51,6 +50,7 @@ export type FollowUpBookResult = {
 
 export type VisitCompletionPayload = {
   follow_up?: { interval_days: number } | { due_date: string } | null;
+  late_completion_reason?: string;
 };
 
 export type VisitCompletionResult = {
