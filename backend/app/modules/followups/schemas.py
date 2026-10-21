@@ -19,6 +19,7 @@ class FollowUpCreateInput(BaseModel):
 
 class VisitCompleteRequest(BaseModel):
     follow_up: FollowUpCreateInput | None = None
+    late_completion_reason: str | None = Field(default=None, max_length=500)
 
 
 class FollowUpPatientSummary(BaseModel):
@@ -40,7 +41,6 @@ class FollowUpResponse(BaseModel):
     patient: FollowUpPatientSummary
     source_visit_id: UUID
     source_visit_date: date
-    source_visit_completed_at: datetime | None = None
     doctor_id: UUID
     due_date: date
     interval_days: int | None
