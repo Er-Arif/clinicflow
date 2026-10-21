@@ -47,7 +47,7 @@ export default function FollowUpsScreen() {
       onRefresh={() => { for (const [, , query] of groups) void query.refetch(); }}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Follow-ups</Text>
+        <Text style={styles.title}>Follow-up</Text>
         <Text style={styles.subtitle}>Work queue for recommended and booked follow-up visits</Text>
       </View>
 

@@ -55,6 +55,8 @@ export default function AssistantLayout() {
           name="followups"
           options={{
             title: 'Follow-ups',
+            tabBarLabel: 'Follow-up',
+            tabBarAccessibilityLabel: 'Follow-up',
             tabBarIcon: ({ color, size }) => <TabIcon name="followups" color={color} size={size} />,
           }}
         />

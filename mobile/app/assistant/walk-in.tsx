@@ -34,9 +34,11 @@ export default function WalkInScreen() {
   const me = useMeQuery();
   const [addWalkIn, addState] = useAddWalkInMutation();
   const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim();
+  const shouldSearch = normalizedQuery.length >= 2 && !initialPatientId;
   const search = useSearchPatientsQuery(
-    { q: query.trim() },
-    { skip: query.trim().length < 2 || Boolean(initialPatientId) },
+    { q: normalizedQuery },
+    { skip: !shouldSearch },
   );
   const [patient, setPatient] = useState<Patient | null>(null);
   const [doctorId, setDoctorId] = useState('');
@@ -156,20 +158,33 @@ export default function WalkInScreen() {
       {!patient ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Patient</Text>
-          <KeyboardSafeTextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search name, mobile or patient ID"
-            style={styles.input}
-          />
+          <View style={styles.searchField}>
+            <KeyboardSafeTextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search name, mobile or patient ID"
+              style={[styles.input, query.length > 0 && styles.searchWithClear]}
+            />
+            {query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                hitSlop={8}
+                onPress={() => setQuery('')}
+                style={styles.clearSearch}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <QueryState query={search} label="patients" />
-          {search.data?.items.map(item => (
+          {shouldSearch ? search.data?.items.map(item => (
             <Pressable key={item.patient_id} style={styles.patientRow} onPress={() => setPatient(item)}>
               <Text style={styles.patientName}>{item.full_name}</Text>
               <Text style={styles.subtitle}>{item.patient_code} · {item.mobile_number?.trim() || 'No mobile number'}</Text>
             </Pressable>
-          ))}
-          {query.trim().length >= 2 && !search.isFetching && !search.isError && search.data?.items.length === 0 ? (
+          )) : null}
+          {shouldSearch && !search.isFetching && !search.isError && search.data?.items.length === 0 ? (
             <AppButton compact label="Register new patient" tone="secondary" onPress={() => router.push('/assistant/patients/new')} />
           ) : null}
         </View>
@@ -282,6 +297,10 @@ const styles = StyleSheet.create({
   cardSelected: { borderColor: colors.primary, backgroundColor: '#FBFDFF' },
   cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.text },
+  searchField: { position: 'relative' },
+  searchWithClear: { paddingRight: 50 },
+  clearSearch: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' },
+  clearSearchText: { color: colors.muted, fontSize: 24, lineHeight: 26, fontWeight: '500' },
   patientRow: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: spacing.sm },
   patientName: { color: colors.text, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },

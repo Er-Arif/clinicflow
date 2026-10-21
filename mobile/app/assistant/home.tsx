@@ -12,7 +12,7 @@ import { useClinicClock } from '@/features/reporting/useClinicClock';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicTime } from '@/utils/dates';
 
-type AppointmentFilter = 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED';
+type AppointmentFilter = 'BOOKED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED';
 
 export default function AssistantHome() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function AssistantHome() {
       {data ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard label="Appointments" value={data.appointments} onPress={() => openAppointments()} accessibilityLabel={`View all ${data.appointments} appointments`} />
+            <MetricCard label="Appointments" value={data.appointments} onPress={() => openAppointments('BOOKED')} accessibilityLabel={`View ${data.appointments} booked appointments`} />
             <MetricCard label="Checked in" value={data.checked_in} onPress={() => openAppointments('CHECKED_IN')} accessibilityLabel={`View ${data.checked_in} checked-in appointments`} />
             <MetricCard label="Completed" value={data.completed} onPress={() => openAppointments('COMPLETED')} accessibilityLabel={`View ${data.completed} completed appointments`} />
             <MetricCard label="Cancelled" value={data.cancelled} onPress={() => openAppointments('CANCELLED')} accessibilityLabel={`View ${data.cancelled} cancelled appointments`} />

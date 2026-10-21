@@ -39,14 +39,27 @@ export default function PatientSearchScreen() {
         <Text style={styles.subtitle}>Search before creating a new patient.</Text>
       </View>
 
-      <KeyboardSafeTextInput
-        autoFocus
-        placeholder="Mobile, patient name or patient ID"
-        value={query}
-        onChangeText={setQuery}
-        style={styles.search}
-        autoCapitalize="words"
-      />
+      <View style={styles.searchField}>
+        <KeyboardSafeTextInput
+          autoFocus
+          placeholder="Mobile, patient name or patient ID"
+          value={query}
+          onChangeText={setQuery}
+          style={[styles.search, query.length > 0 && styles.searchWithClear]}
+          autoCapitalize="words"
+        />
+        {query.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            hitSlop={8}
+            onPress={() => setQuery('')}
+            style={styles.clearSearch}
+          >
+            <Text style={styles.clearSearchText}>×</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {shouldSearch ? <QueryState query={patients} label="patients" hasData={Boolean(data)} /> : null}
       {!shouldSearch ? (
@@ -102,6 +115,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, marginTop: 4 },
   link: { color: colors.primary, fontWeight: '700', paddingTop: 6 },
+  searchField: { position: 'relative' },
   search: {
     minHeight: 50,
     borderWidth: 1,
@@ -111,6 +125,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+  searchWithClear: { paddingRight: 50 },
+  clearSearch: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' },
+  clearSearchText: { color: colors.muted, fontSize: 24, lineHeight: 26, fontWeight: '500' },
   helper: { color: colors.muted, lineHeight: 20 },
   list: { gap: spacing.sm },
   card: {
