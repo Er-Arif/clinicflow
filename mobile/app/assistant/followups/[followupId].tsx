@@ -1,6 +1,5 @@
 import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +10,7 @@ import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { FollowUpCloseModal } from '@/features/followups/FollowUpCloseModal';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 function humanize(value: string) {
@@ -53,7 +53,7 @@ export default function FollowUpDetailsScreen() {
       await closeFollowUp({ followupId, reason, note: note || undefined }).unwrap();
       setShowClose(false);
     } catch {
-      // Stable API error shown below.
+      // Stable API error shown in the closure sheet.
     }
   }
 
@@ -83,22 +83,27 @@ export default function FollowUpDetailsScreen() {
           {reminderQuery.data?.items[0] ? (
             <AppButton label="Send WhatsApp reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
           ) : null}
-          <AppButton label="Close follow-up" tone="danger" onPress={() => setShowClose((v) => !v)} />
+          <AppButton label="Close follow-up" tone="danger" onPress={() => setShowClose(true)} />
         </>
       ) : null}
       {item.status === 'BOOKED' && item.linked_appointment ? (
         <AppButton label="Open appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: item.linked_appointment!.appointment_id } })} />
       ) : null}
 
-      {showClose ? (
-        <View style={styles.card}>
-          {['PATIENT_DECLINED', 'NO_LONGER_REQUIRED', 'CONTACTED', 'OTHER'].map((value) => (
-            <AppButton key={value} label={humanize(value)} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} />
-          ))}
-          {reason === 'OTHER' ? <KeyboardSafeTextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Reason" /> : null}
-          {closeState.error ? <Text style={styles.error}>{apiError(closeState.error)?.message ?? 'Unable to close follow-up.'}</Text> : null}
-          <AppButton label="Confirm close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
-        </View>
+      {item.status === 'OPEN' && showClose ? (
+        <FollowUpCloseModal
+          visible
+          patientName={item.patient.full_name}
+          dueDate={formatClinicDate(item.due_date)}
+          selectedReason={reason}
+          note={note}
+          error={closeState.error ? apiError(closeState.error)?.message ?? 'Unable to close follow-up.' : null}
+          loading={closeState.isLoading}
+          onReasonChange={setReason}
+          onNoteChange={setNote}
+          onConfirm={() => void close()}
+          onClose={() => setShowClose(false)}
+        />
       ) : null}
     </KeyboardSafeFormScreen>
   );
@@ -115,6 +120,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.muted },
   value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right' },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
-  error: { color: colors.danger },
 });
