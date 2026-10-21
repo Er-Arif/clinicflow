@@ -1,6 +1,5 @@
 import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -58,7 +57,7 @@ export default function FollowUpDetailsScreen() {
   }
 
   return (
-    <KeyboardSafeFormScreen>
+    <AppScreen>
       <QueryState query={query} label="follow-up" />
       <BackButton />
       <Text style={styles.title}>Follow-up details</Text>
@@ -105,7 +104,7 @@ export default function FollowUpDetailsScreen() {
           onClose={() => setShowClose(false)}
         />
       ) : null}
-    </KeyboardSafeFormScreen>
+    </AppScreen>
   );
 }
 
