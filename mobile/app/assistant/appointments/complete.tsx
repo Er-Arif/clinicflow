@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useCompleteVisitMutation, useGetAppointmentQuery } from '@/api/api';
+import { useClinicTimeQuery, useCompleteVisitMutation, useGetAppointmentQuery } from '@/api/api';
 import { apiError } from '@/api/errors';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
@@ -14,6 +14,7 @@ import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import type { FollowUp } from '@/features/followups/types';
 import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicDate } from '@/utils/dates';
 
 function paymentStatus(value?: string | null) {
   if (!value) return 'Pending';
@@ -25,11 +26,13 @@ export default function CompleteVisitScreen() {
   const params = useLocalSearchParams<{ appointmentId: string }>();
   const appointmentId = String(params.appointmentId ?? '');
   const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
+  const clinicTime = useClinicTimeQuery();
   const [completeVisit, completeState] = useCompleteVisitMutation();
   const [followUpRequired, setFollowUpRequired] = useState(false);
   const [mode, setMode] = useState<'INTERVAL' | 'DATE'>('INTERVAL');
   const [intervalDays, setIntervalDays] = useState('7');
   const [dueDate, setDueDate] = useState('');
+  const [lateCompletionReason, setLateCompletionReason] = useState('');
   const [resultFollowup, setResultFollowup] = useState<FollowUp | null>(null);
   const [completed, setCompleted] = useState(false);
 
@@ -38,9 +41,13 @@ export default function CompleteVisitScreen() {
     : mode === 'INTERVAL'
       ? { interval_days: Number(intervalDays) }
       : { due_date: dueDate };
+  const visitDate = appointment.data?.session.date ?? '';
+  const clinicDate = clinicTime.data?.clinic_date ?? '';
+  const isLateCompletion = Boolean(visitDate && clinicDate && visitDate < clinicDate);
   const completionIntent = JSON.stringify({
     visit_id: appointment.data?.visit_id ?? null,
     follow_up: followUpPayload,
+    late_completion_reason: isLateCompletion ? lateCompletionReason.trim() : null,
   });
   const completionRequest = useIntentIdempotencyKey('complete', completionIntent);
 
@@ -61,7 +68,10 @@ export default function CompleteVisitScreen() {
     try {
       const result = await completeVisit({
         visitId: item.visit_id,
-        body: { follow_up: followUpPayload },
+        body: {
+          follow_up: followUpPayload,
+          ...(isLateCompletion ? { late_completion_reason: lateCompletionReason.trim() } : {}),
+        },
         idempotencyKey: completionRequest.getKey(),
       }).unwrap();
       await appointment.refetch();
@@ -99,9 +109,26 @@ export default function CompleteVisitScreen() {
   return (
     <KeyboardSafeFormScreen>
       <QueryState query={appointment} label="appointment" />
+      <QueryState query={clinicTime} label="clinic date" />
       <BackButton />
-      <Text style={styles.title}>Complete visit</Text>
+      <Text style={styles.title}>{isLateCompletion ? 'Resolve previous-day visit' : 'Complete visit'}</Text>
       <Text style={styles.subtitle}>{item.patient.full_name} · Payment {paymentStatus(item.payment_status)}</Text>
+
+      {isLateCompletion ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningTitle}>Previous-day OPD visit left open</Text>
+          <Text style={styles.subtitle}>
+            Visit date: {formatClinicDate(visitDate)}. OPD visits should normally be completed on the same clinic day. Closing it now records a late administrative closure without moving the clinical visit to today.
+          </Text>
+          <KeyboardSafeTextInput
+            value={lateCompletionReason}
+            onChangeText={setLateCompletionReason}
+            placeholder="Why was this visit left open?"
+            style={styles.input}
+            maxLength={500}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.strong}>Follow-up required?</Text>
@@ -119,13 +146,16 @@ export default function CompleteVisitScreen() {
             <AppButton label="Specific date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
           </View>
           {mode === 'INTERVAL' ? (
-            <KeyboardSafeTextInput
-              value={intervalDays}
-              onChangeText={setIntervalDays}
-              keyboardType="number-pad"
-              placeholder="7"
-              style={styles.input}
-            />
+            <>
+              <KeyboardSafeTextInput
+                value={intervalDays}
+                onChangeText={setIntervalDays}
+                keyboardType="number-pad"
+                placeholder="7"
+                style={styles.input}
+              />
+              <Text style={styles.helper}>Interval starts from the visit date ({formatClinicDate(visitDate)}).</Text>
+            </>
           ) : (
             <DatePicker value={dueDate} onChange={setDueDate} placeholder="YYYY-MM-DD" />
           )}
@@ -134,16 +164,16 @@ export default function CompleteVisitScreen() {
 
       {completionError ? <Text style={styles.error}>{completionError.message ?? 'Unable to complete visit.'}</Text> : null}
       <AppButton
-        label="Complete visit"
+        label={isLateCompletion ? 'Close visit as completed' : 'Complete visit'}
         loading={completeState.isLoading}
         disabled={
           !item.visit_id ||
+          (isLateCompletion && lateCompletionReason.trim().length < 2) ||
           (followUpRequired && mode === 'INTERVAL' && (!Number.isInteger(Number(intervalDays)) || Number(intervalDays) < 1)) ||
           (followUpRequired && mode === 'DATE' && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))
         }
         onPress={() => void submit()}
       />
-      <AppButton label="Cancel" tone="secondary" onPress={() => router.back()} />
     </KeyboardSafeFormScreen>
   );
 }
@@ -152,7 +182,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20 },
   strong: { color: colors.text, fontWeight: '800' },
+  helper: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.md },
+  warningCard: { backgroundColor: colors.softWarning, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  warningTitle: { color: colors.warning, fontWeight: '800' },
   actions: { gap: spacing.sm },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
   error: { color: colors.danger },
