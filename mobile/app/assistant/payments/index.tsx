@@ -37,7 +37,7 @@ export default function PaymentsScreen() {
 
   return (
     <AppScreen refreshing={payments.isFetching} onRefresh={() => { if (filter !== 'TODAY' || date) void payments.refetch(); else void clinicTime.refetch(); }}>
-      <BackButton />
+      <BackButton onPress={() => router.replace('/assistant/more')} />
       <Text style={styles.title}>Payments</Text>
       <Text style={styles.subtitle}>Pending collections and confirmed financial history.</Text>
       <View style={styles.filters}>
@@ -84,4 +84,3 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: spacing.xl },
   error: { color: colors.danger },
 });
-

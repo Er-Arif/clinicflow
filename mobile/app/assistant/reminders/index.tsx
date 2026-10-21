@@ -41,7 +41,7 @@ export default function RemindersScreen() {
   return (
     <AppScreen refreshing={reminders.isFetching && !reminders.isFetchingNextPage}
       onRefresh={() => { if (clinicTime.data?.clinic_date) void reminders.refetch(); else void clinicTime.refetch(); }}>
-      <BackButton />
+      <BackButton onPress={() => router.replace('/assistant/more')} />
       <Text style={styles.title}>Reminders</Text>
       <Text style={styles.subtitle}>Due through {clinicTime.data?.clinic_date ?? 'today'} · WhatsApp is sent manually.</Text>
       {clinicTime.isLoading ? <ActivityIndicator /> : null}
