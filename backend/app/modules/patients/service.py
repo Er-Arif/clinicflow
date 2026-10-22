@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
+from app.modules.appointments.models import Appointment
 from app.modules.audit.service import AuditService
 from app.modules.identity.service import AuthContext
 from app.modules.patients.models import NumberCounter, Patient
@@ -23,6 +24,8 @@ from app.modules.patients.schemas import (
     PatientTimelineResponse,
     PatientUpdateRequest,
 )
+from app.modules.scheduling.models import SessionOccurrence
+from app.modules.visits.models import Visit
 
 _LEGACY_PATIENT_CODE = re.compile(r"^PT-(\d+)$", re.IGNORECASE)
 
@@ -65,8 +68,12 @@ class PatientService:
         rows = self.db.scalars(
             base.order_by(ranking, Patient.full_name, Patient.patient_code).limit(limit).offset(offset)
         ).all()
+        visit_summaries = self._visit_summaries([patient.patient_id for patient in rows])
         return PatientListResponse(
-            items=[self._response(patient) for patient in rows],
+            items=[
+                self._response(patient, visit_summary=visit_summaries.get(patient.patient_id))
+                for patient in rows
+            ],
             total=total,
             limit=limit,
             offset=offset,
@@ -136,7 +143,7 @@ class PatientService:
             request_id=_request_id(),
             new_values=self._audit_values(patient),
         )
-        return self._response(patient)
+        return self._response(patient, visit_summary=(0, None))
 
     def update(self, patient_id: UUID, request: PatientUpdateRequest) -> PatientResponse:
         patient = self.db.scalar(
@@ -279,17 +286,22 @@ class PatientService:
         return list(self.db.scalars(query.order_by(Patient.full_name)).all())
 
     def _raise_duplicate(self, patients: list[Patient]) -> None:
-        candidates = [
-            DuplicatePatientCandidate(
-                patient_id=item.patient_id,
-                patient_code=item.patient_code,
-                full_name=item.full_name,
-                mobile_number=item.mobile_e164 or "",
-                gender=item.gender,
-                age=self._age(item),
-            ).model_dump(mode="json")
-            for item in patients
-        ]
+        visit_summaries = self._visit_summaries([patient.patient_id for patient in patients])
+        candidates = []
+        for item in patients:
+            completed_visits, last_visit_date = visit_summaries.get(item.patient_id, (0, None))
+            candidates.append(
+                DuplicatePatientCandidate(
+                    patient_id=item.patient_id,
+                    patient_code=item.patient_code,
+                    full_name=item.full_name,
+                    mobile_number=item.mobile_e164 or "",
+                    gender=item.gender,
+                    age=self._age(item),
+                    previous_completed_visits=completed_visits,
+                    last_visit_date=last_visit_date,
+                ).model_dump(mode="json")
+            )
         raise AppError(
             code="POTENTIAL_DUPLICATE_PATIENT",
             message="A patient with this mobile number already exists.",
@@ -308,7 +320,43 @@ class PatientService:
             self._not_found()
         return patient
 
-    def _response(self, patient: Patient) -> PatientResponse:
+    def _visit_summaries(self, patient_ids: list[UUID]) -> dict[UUID, tuple[int, date | None]]:
+        if not patient_ids:
+            return {}
+        rows = self.db.execute(
+            select(
+                Visit.patient_id,
+                func.count(Visit.visit_id).label("completed_visits"),
+                func.max(SessionOccurrence.occurrence_date).label("last_visit_date"),
+            )
+            .join(Appointment, Appointment.appointment_id == Visit.appointment_id)
+            .join(
+                SessionOccurrence,
+                SessionOccurrence.session_occurrence_id == Appointment.session_occurrence_id,
+            )
+            .where(
+                Visit.clinic_id == self.context.clinic_id,
+                Visit.patient_id.in_(patient_ids),
+                Visit.status == "COMPLETED",
+            )
+            .group_by(Visit.patient_id)
+        ).all()
+        return {
+            row.patient_id: (int(row.completed_visits or 0), row.last_visit_date)
+            for row in rows
+        }
+
+    def _response(
+        self,
+        patient: Patient,
+        *,
+        visit_summary: tuple[int, date | None] | None = None,
+    ) -> PatientResponse:
+        if visit_summary is None:
+            visit_summary = self._visit_summaries([patient.patient_id]).get(
+                patient.patient_id, (0, None)
+            )
+        completed_visits, last_visit_date = visit_summary
         return PatientResponse(
             patient_id=patient.patient_id,
             patient_code=patient.patient_code,
@@ -323,6 +371,8 @@ class PatientService:
             gender=patient.gender,
             preferred_language=patient.preferred_language,
             reminders_enabled=patient.reminders_enabled,
+            previous_completed_visits=completed_visits,
+            last_visit_date=last_visit_date,
             version=patient.version,
             created_at=patient.created_at,
             updated_at=patient.updated_at,
