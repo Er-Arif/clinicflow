@@ -49,7 +49,9 @@ export default function MessagePreviewScreen() {
   async function confirmSent() {
     try {
       await markSent(reminderId).unwrap();
-      router.replace('/assistant/reminders');
+      // Preview is always pushed from its caller. Return to that exact caller
+      // instead of forcing every successful send into the Reminders tab.
+      router.back();
     } catch (e) {
       setError(apiError(e)?.message ?? 'Unable to mark message as sent.');
     }
