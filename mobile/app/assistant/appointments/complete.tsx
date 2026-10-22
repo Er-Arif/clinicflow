@@ -13,6 +13,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import type { FollowUp } from '@/features/followups/types';
+import { useFocusedHardwareBack } from '@/navigation/useFocusedHardwareBack';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicDate } from '@/utils/dates';
 
@@ -35,6 +36,13 @@ export default function CompleteVisitScreen() {
   const [lateCompletionReason, setLateCompletionReason] = useState('');
   const [resultFollowup, setResultFollowup] = useState<FollowUp | null>(null);
   const [completed, setCompleted] = useState(false);
+
+  function exitCompleted() {
+    router.dismissTo('/assistant/appointments');
+  }
+
+  // Once the visit is committed, Back must not reopen the completed form path.
+  useFocusedHardwareBack(exitCompleted, completed);
 
   const followUpPayload = !followUpRequired
     ? null
@@ -101,7 +109,7 @@ export default function CompleteVisitScreen() {
             onPress={() => router.replace({ pathname: '/assistant/followups/book', params: { followupId: resultFollowup.followup_id } })}
           />
         ) : null}
-        <AppButton label="Done" tone="secondary" onPress={() => router.replace('/assistant/appointments')} />
+        <AppButton label="Done" tone="secondary" onPress={exitCompleted} />
       </AppScreen>
     );
   }
