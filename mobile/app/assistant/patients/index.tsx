@@ -46,7 +46,7 @@ export default function PatientSearchScreen() {
       <View style={styles.searchField}>
         <KeyboardSafeTextInput
           autoFocus
-          placeholder="Mobile, patient name or patient number"
+          placeholder="Mobile, name or patient number"
           value={query}
           onChangeText={setQuery}
           style={[styles.search, query.length > 0 && styles.searchWithClear]}
