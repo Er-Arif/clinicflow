@@ -126,6 +126,7 @@ class AvailabilitySlot(BaseModel):
     time: time
     available: bool
     normal_booking_allowed: bool
+    override_booking_allowed: bool = False
 
 
 class AvailabilitySession(BaseModel):
