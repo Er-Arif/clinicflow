@@ -17,9 +17,10 @@ function humanize(value?: string | null) { if (!value) return ''; return value.t
 
 export default function AppointmentDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ appointmentId: string; returnToFollowupId?: string }>();
+  const params = useLocalSearchParams<{ appointmentId: string; returnToFollowupId?: string; returnToAppointments?: string }>();
   const appointmentId = String(params.appointmentId ?? '');
   const returnToFollowupId = String(params.returnToFollowupId ?? '');
+  const returnToAppointments = params.returnToAppointments === '1';
   const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
   const patientId = appointment.data?.patient.patient_id ?? '';
   const patient = useGetPatientQuery(patientId, { skip: !patientId });
@@ -37,6 +38,10 @@ export default function AppointmentDetailsScreen() {
   function goBack() {
     if (returnToFollowupId) {
       router.replace({ pathname: '/assistant/followups/[followupId]', params: { followupId: returnToFollowupId } });
+      return;
+    }
+    if (returnToAppointments) {
+      router.dismissTo('/assistant/appointments');
       return;
     }
     router.back();
@@ -116,7 +121,7 @@ export default function AppointmentDetailsScreen() {
       {item.status === 'CHECKED_IN' && item.visit_id ? <AppButton label="Complete visit" onPress={() => router.push({ pathname: '/assistant/appointments/complete', params: { appointmentId } })} /> : null}
       <View style={styles.secondaryActions}>
         {item.payment_id && ['PENDING', 'CONFIRMED'].includes(item.payment_status ?? '') ? <AppButton compact style={styles.flexButton} label={paymentConfirmed ? 'View receipt' : 'Collect payment'} tone={paymentConfirmed ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/assistant/payments/[paymentId]', params: { paymentId: item.payment_id!, appointmentId, ...(item.visit_id ? { visitId: item.visit_id } : {}) } })} /> : null}
-        {(item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired ? <AppButton compact style={styles.flexButton} label="Reschedule" tone="secondary" onPress={() => router.push({ pathname: '/assistant/appointments/reschedule', params: { appointmentId } })} /> : null}
+        {(item.status === 'BOOKED' || item.status === 'CHECKED_IN') && !paymentCorrectionRequired ? <AppButton compact style={styles.flexButton} label="Reschedule" tone="secondary" onPress={() => router.push({ pathname: '/assistant/appointments/reschedule', params: { appointmentId, ...(returnToFollowupId ? { returnToFollowupId } : returnToAppointments ? { returnToAppointments: '1' } : {}) } })} /> : null}
       </View>
       {messageActionRelevant && messagingAvailable ? <AppButton compact label={item.status === 'CANCELLED' ? 'Send cancellation' : item.rescheduled_from_appointment_id ? 'Send reschedule' : 'Send confirmation'} tone="secondary" loading={messageState.isLoading} onPress={() => void sendAppointmentMessage()} /> : null}
       {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare message.'}</Text> : null}
