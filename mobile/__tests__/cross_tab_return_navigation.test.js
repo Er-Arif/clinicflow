@@ -44,6 +44,26 @@ const appointment = {
   rescheduled_from_appointment_id: null,
 };
 
+function appointmentRuntime(router, params = { appointmentId: 'appointment-1', returnToFollowupId: 'followup-1' }) {
+  return mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => params,
+      useRouter: () => router,
+    },
+    '@/api/api': {
+      useGetAppointmentQuery: () => ready(appointment),
+      useGetPatientQuery: () => ready({ patient_id: 'patient-1', reminders_enabled: false }),
+      useClinicTimeQuery: () => ready({ clinic_date: '2026-10-21', clinic_now: '2026-10-21T15:19:00+05:30' }),
+      useCheckInAppointmentMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
+      useCancelAppointmentMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
+      useCreateAppointmentMessageMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
+    },
+    '@/features/appointments/idempotency': {
+      useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false, reset() {} }),
+    },
+  });
+}
+
 test('opening a booked follow-up appointment carries the follow-up return target', () => {
   let destination;
   const runtime = mobileRuntime({
@@ -73,26 +93,10 @@ test('opening a booked follow-up appointment carries the follow-up return target
 test('appointment Back returns to the originating follow-up instead of stale appointment history', () => {
   let replaced;
   let backed = false;
-  const runtime = mobileRuntime({
-    'expo-router': {
-      useLocalSearchParams: () => ({ appointmentId: 'appointment-1', returnToFollowupId: 'followup-1' }),
-      useRouter: () => ({
-        push() {},
-        replace: value => { replaced = value; },
-        back: () => { backed = true; },
-      }),
-    },
-    '@/api/api': {
-      useGetAppointmentQuery: () => ready(appointment),
-      useGetPatientQuery: () => ready({ patient_id: 'patient-1', reminders_enabled: false }),
-      useClinicTimeQuery: () => ready({ clinic_date: '2026-10-21', clinic_now: '2026-10-21T15:19:00+05:30' }),
-      useCheckInAppointmentMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
-      useCancelAppointmentMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
-      useCreateAppointmentMessageMutation: () => [() => ({ unwrap: async () => ({}) }), {}],
-    },
-    '@/features/appointments/idempotency': {
-      useIntentIdempotencyKey: () => ({ getKey: () => 'key', resultMatchesIntent: false, reset() {} }),
-    },
+  const runtime = appointmentRuntime({
+    push() {},
+    replace: value => { replaced = value; },
+    back: () => { backed = true; },
   });
 
   const output = runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
@@ -103,4 +107,24 @@ test('appointment Back returns to the originating follow-up instead of stale app
     params: { followupId: 'followup-1' },
   });
   assert.equal(backed, false);
+});
+
+test('rescheduling a linked follow-up appointment preserves its follow-up return target', () => {
+  let destination;
+  const runtime = appointmentRuntime({
+    push: value => { destination = value; },
+    replace() {},
+    back() {},
+  });
+
+  const output = runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
+  output.controls.find(control => control.label === 'Reschedule').onPress();
+
+  assert.deepEqual(destination, {
+    pathname: '/assistant/appointments/reschedule',
+    params: {
+      appointmentId: 'appointment-1',
+      returnToFollowupId: 'followup-1',
+    },
+  });
 });
