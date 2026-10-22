@@ -33,7 +33,7 @@ export default function AssistantHome() {
   return (
     <AppScreen refreshing={home.isFetching} onRefresh={refresh}>
       <ClinicHeader
-        title="Today"
+        title="Overview"
         subtitle={`${clock?.greeting ?? 'Welcome'}${firstName ? `, ${firstName}` : ''}`}
         displayTime={clock?.displayTime}
         compactDate={clock?.compactDate}
