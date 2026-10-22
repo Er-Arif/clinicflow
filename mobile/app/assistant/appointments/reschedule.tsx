@@ -18,8 +18,9 @@ import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function RescheduleAppointmentScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ appointmentId: string }>();
+  const params = useLocalSearchParams<{ appointmentId: string; returnToFollowupId?: string; returnToAppointments?: string }>();
   const appointmentId = String(params.appointmentId ?? '');
+  const returnToFollowupId = String(params.returnToFollowupId ?? '');
   const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
   const me = useMeQuery();
   const clinicTime = useClinicTimeQuery();
@@ -72,7 +73,13 @@ export default function RescheduleAppointmentScreen() {
           ...(overrideEnabled ? { capacity_override: { enabled: true as const, reason: overrideReason } } : {}),
         },
       }).unwrap();
-      router.replace(`/assistant/appointments/${result.replacement.appointment_id}`);
+      router.replace({
+        pathname: '/assistant/appointments/[appointmentId]',
+        params: {
+          appointmentId: result.replacement.appointment_id,
+          ...(returnToFollowupId ? { returnToFollowupId } : { returnToAppointments: '1' }),
+        },
+      });
     } catch {
       // The current request error is rendered below.
     }
