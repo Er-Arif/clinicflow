@@ -6,6 +6,7 @@ import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { TimePicker } from '@/components/TimePicker';
+import { useFocusedHardwareBack } from '@/navigation/useFocusedHardwareBack';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { ScheduleReview } from './ScheduleReview';
 import type { ScheduleOverview } from './types';
@@ -63,6 +64,11 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
   const nextKey = useRef(0);
   const busy = state.phase === 'previewing' || state.phase === 'applying' || state.phase === 'saved';
   const change = (update: (draft: WeeklyDraft) => WeeklyDraft) => editor.edit(update(editor.getSnapshot().draft));
+
+  // The UI intentionally removes/disables Back while preview/apply is in flight.
+  // Android hardware Back must obey the same lock instead of escaping the route.
+  useFocusedHardwareBack(() => {}, busy);
+
   const add = () => change(draft => {
     if (draft.sessions.length >= 12) return draft;
     const session = defaultSession(`added-${++nextKey.current}`);
