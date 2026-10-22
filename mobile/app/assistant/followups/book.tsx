@@ -67,7 +67,7 @@ export default function BookFollowUpScreen() {
           ...(override ? { capacity_override: { enabled: true as const, reason: overrideReason } } : {}),
         },
       }).unwrap();
-      router.replace({ pathname: '/assistant/followups/[followupId]', params: { followupId } });
+      router.dismissTo({ pathname: '/assistant/followups/[followupId]', params: { followupId } });
     } catch {
       // The current request error is rendered below.
     }
