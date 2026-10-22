@@ -1,8 +1,8 @@
 import { formatClinicDate } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { useCallback, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useListPaymentsQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
@@ -33,16 +33,6 @@ export default function PaymentsScreen() {
       ...(date ? { date } : {}),
     },
     { skip: filter === 'TODAY' && !date },
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-        router.replace('/assistant/more');
-        return true;
-      });
-      return () => subscription.remove();
-    }, [router]),
   );
 
   return (
