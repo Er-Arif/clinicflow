@@ -137,7 +137,6 @@ export default function WalkInScreen() {
       // The current request error is rendered below.
     }
   }
-
   const sessionFull = activeSession ? activeSession.remaining_capacity <= 0 : false;
   const blocked = activeSession?.status === 'BLOCKED';
   const canSubmitOverride = !sessionFull
@@ -163,7 +162,7 @@ export default function WalkInScreen() {
             <KeyboardSafeTextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search name, mobile or patient number"
+              placeholder="Mobile, name or patient number"
               style={[styles.input, query.length > 0 && styles.searchWithClear]}
             />
             {query.length > 0 ? (
