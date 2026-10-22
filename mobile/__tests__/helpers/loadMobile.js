@@ -31,7 +31,11 @@ function mobileRuntime(overrides = {}) {
       useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
     },
     '@react-native-community/datetimepicker': host('DateTimePicker'),
-    'expo-router': { useRouter: () => ({ back() {}, push() {}, dismissTo() {} }), useLocalSearchParams: () => ({}) },
+    'expo-router': {
+      useRouter: () => ({ back() {}, push() {}, replace() {}, dismissTo() {} }),
+      useLocalSearchParams: () => ({}),
+      useFocusEffect: () => {},
+    },
     'expo-secure-store': { getItemAsync: async () => null },
     ...overrides,
   };
