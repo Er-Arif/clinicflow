@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings, validate_runtime_settings
+from app.core.config import Settings, sqlalchemy_database_url, validate_runtime_settings
 from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 
 
@@ -25,6 +25,14 @@ def test_production_accepts_strong_secret_and_postgres() -> None:
         database_url="postgresql+psycopg://clinicflow:secret@postgres:5432/clinicflow",
     )
     validate_runtime_settings(config)
+
+
+def test_standard_postgres_url_uses_psycopg3_driver() -> None:
+    standard = "postgresql://clinicflow:secret@postgres:5432/clinicflow"
+    explicit = "postgresql+psycopg://clinicflow:secret@postgres:5432/clinicflow"
+
+    assert sqlalchemy_database_url(standard) == explicit
+    assert sqlalchemy_database_url(explicit) == explicit
 
 
 def test_api_responses_include_security_and_request_headers() -> None:
