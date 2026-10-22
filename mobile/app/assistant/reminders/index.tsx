@@ -28,6 +28,9 @@ export default function RemindersScreen() {
   const [skipReminder, skipState] = useSkipReminderMutation();
   const [error, setError] = useState<string | null>(null);
   const items = worklistItems(reminders.currentData, item => item.reminder_id);
+  const dueThroughLabel = clinicTime.data?.clinic_date
+    ? formatClinicDate(clinicTime.data.clinic_date)
+    : 'today';
 
   async function skip(reminderId: string) {
     setError(null);
@@ -43,7 +46,7 @@ export default function RemindersScreen() {
       onRefresh={() => { if (clinicTime.data?.clinic_date) void reminders.refetch(); else void clinicTime.refetch(); }}>
       <BackButton onPress={() => router.replace('/assistant/more')} />
       <Text style={styles.title}>Reminders</Text>
-      <Text style={styles.subtitle}>Due through {clinicTime.data?.clinic_date ?? 'today'} · WhatsApp is sent manually.</Text>
+      <Text style={styles.subtitle}>Due through {dueThroughLabel} · WhatsApp is sent manually.</Text>
       {clinicTime.isLoading ? <ActivityIndicator /> : null}
       {clinicTime.isError ? <>
         <Text style={styles.error}>Unable to load clinic date.</Text>
@@ -63,7 +66,11 @@ export default function RemindersScreen() {
           <AppButton label="Skip" tone="secondary" loading={skipState.isLoading} onPress={() => void skip(item.reminder_id)} />
         </View>
       ))}
-      <WorklistControls query={reminders} count={items.length} emptyText="All reminders are handled." />
+      <WorklistControls
+        query={reminders}
+        count={items.length}
+        emptyText={`No reminders due through ${dueThroughLabel}.`}
+      />
     </AppScreen>
   );
 }
