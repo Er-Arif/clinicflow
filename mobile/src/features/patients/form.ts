@@ -3,19 +3,22 @@ import { z } from 'zod';
 export const patientFormSchema = z
   .object({
     fullName: z.string().trim().min(1, 'Enter the patient name.').max(160),
-    mobile: z.string().trim().min(10, 'Enter a valid mobile number.'),
+    mobile: z.string().trim().refine(
+      (value) => value.length === 0 || value.length >= 10,
+      'Enter a valid mobile number or leave it blank.',
+    ),
     whatsappSame: z.boolean(),
     whatsapp: z.string().trim(),
     ageMode: z.enum(['DOB', 'AGE']),
     dateOfBirth: z.string().trim(),
     approximateAge: z.string().trim(),
-    gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']),
+    gender: z.union([z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']), z.literal('')]),
     language: z.enum(['EN', 'HI']),
     remindersEnabled: z.boolean(),
   })
   .superRefine((value, ctx) => {
-    if (!value.whatsappSame && value.whatsapp.length < 10) {
-      ctx.addIssue({ code: 'custom', path: ['whatsapp'], message: 'Enter the WhatsApp number.' });
+    if (!value.whatsappSame && value.whatsapp.length > 0 && value.whatsapp.length < 10) {
+      ctx.addIssue({ code: 'custom', path: ['whatsapp'], message: 'Enter a valid WhatsApp number.' });
     }
     if (value.ageMode === 'DOB') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value.dateOfBirth)) {
@@ -42,6 +45,9 @@ export const patientFormSchema = z
         });
       }
     }
+    if (!value.gender) {
+      ctx.addIssue({ code: 'custom', path: ['gender'], message: 'Select the patient gender.' });
+    }
   });
 
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
@@ -54,7 +60,7 @@ export const patientFormDefaults: PatientFormValues = {
   ageMode: 'AGE',
   dateOfBirth: '',
   approximateAge: '',
-  gender: 'MALE',
+  gender: '',
   language: 'EN',
-  remindersEnabled: true,
+  remindersEnabled: false,
 };

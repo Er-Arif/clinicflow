@@ -6,7 +6,12 @@ from pydantic import ValidationError
 from app.core.errors import AppError
 from app.modules.patients.phone import normalize_indian_mobile, try_normalize_indian_mobile
 from app.modules.patients.schemas import PatientCreateRequest
-from app.modules.patients.service import _age_from_dob, _whole_years
+from app.modules.patients.service import (
+    _age_from_dob,
+    _format_patient_code,
+    _patient_code_search_candidate,
+    _whole_years,
+)
 
 
 def test_indian_mobile_normalization() -> None:
@@ -44,16 +49,62 @@ def test_patient_requires_exactly_one_age_source() -> None:
         )
 
 
-def test_whatsapp_required_when_different_number_selected() -> None:
-    with pytest.raises(ValidationError):
-        PatientCreateRequest(
-            full_name="Rahman Ali",
-            mobile_number="9876543210",
-            approximate_age_years=42,
-            whatsapp_same_as_mobile=False,
-            gender="MALE",
-            preferred_language="HI",
-        )
+def test_patient_can_be_registered_without_phone_contact() -> None:
+    request = PatientCreateRequest(
+        full_name="Rahman Ali",
+        mobile_number=None,
+        approximate_age_years=42,
+        whatsapp_same_as_mobile=True,
+        reminders_enabled=True,
+        gender="MALE",
+        preferred_language="HI",
+    )
+
+    assert request.mobile_number is None
+    assert request.whatsapp_same_as_mobile is False
+    assert request.whatsapp_number is None
+    assert request.reminders_enabled is False
+
+
+def test_patient_can_have_mobile_without_whatsapp() -> None:
+    request = PatientCreateRequest(
+        full_name="Rahman Ali",
+        mobile_number="9876543210",
+        approximate_age_years=42,
+        whatsapp_same_as_mobile=False,
+        whatsapp_number=None,
+        reminders_enabled=True,
+        gender="MALE",
+        preferred_language="HI",
+    )
+
+    assert request.mobile_number == "9876543210"
+    assert request.whatsapp_same_as_mobile is False
+    assert request.whatsapp_number is None
+    assert request.reminders_enabled is False
+
+
+def test_patient_number_format_uses_four_digit_minimum_and_expands() -> None:
+    assert _format_patient_code(1) == "0001"
+    assert _format_patient_code(9) == "0009"
+    assert _format_patient_code(999) == "0999"
+    assert _format_patient_code(9999) == "9999"
+    assert _format_patient_code(10000) == "10000"
+    assert _format_patient_code(100000) == "100000"
+
+    with pytest.raises(ValueError):
+        _format_patient_code(0)
+
+
+def test_patient_number_search_accepts_short_and_legacy_input() -> None:
+    assert _patient_code_search_candidate("1") == "0001"
+    assert _patient_code_search_candidate("23") == "0023"
+    assert _patient_code_search_candidate("0001") == "0001"
+    assert _patient_code_search_candidate("10000") == "10000"
+    assert _patient_code_search_candidate("PT-000001") == "0001"
+    assert _patient_code_search_candidate("pt-000023") == "0023"
+    assert _patient_code_search_candidate("0") is None
+    assert _patient_code_search_candidate("Rahman") is None
 
 
 def test_age_math() -> None:

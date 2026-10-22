@@ -9,14 +9,14 @@ test('1. Exceptions list structure & item rendering requirements', () => {
   assert.ok(fs.existsSync(exceptionsFile), 'Exceptions hub screen file must exist');
   const content = fs.readFileSync(exceptionsFile, 'utf8');
 
-  // Must render date, scope (Full Day or specific session), reason, retained appointment count, status, unblock
+  // Must render date, scope (full day or specific session), reason, retained appointment count, status, unblock
   assert.ok(content.includes('item.date'), 'Must render item date');
   assert.ok(content.includes('item.scope'), 'Must evaluate item scope');
   assert.ok(content.includes('item.reason'), 'Must render item reason');
   assert.ok(content.includes('retained_appointments_count'), 'Must check retained appointments count');
   assert.ok(content.includes('BLOCKED'), 'Must display BLOCKED status');
   assert.ok(content.includes('handleUnblock'), 'Must provide Unblock action handler');
-  assert.ok(content.includes('+ Block a Date'), 'Must include + Block a Date CTA');
+  assert.ok(content.includes('+ Block a date'), 'Must include + Block a date CTA');
 });
 
 test('2. Full-day block creation payload & API contract', () => {
@@ -34,7 +34,7 @@ test('3. Specific-session block creation payload & contract', () => {
   const content = fs.readFileSync(newFile, 'utf8');
 
   assert.ok(content.includes("scope === 'SESSION'"), 'Must conditionally handle SESSION scope');
-  assert.ok(content.includes('Select Session'), 'Must show session selector when specific session chosen');
+  assert.ok(content.includes('Select session'), 'Must show session selector when specific session chosen');
   assert.ok(content.includes('effectiveSessionDefId'), 'Must pass selected session definition ID when scope is SESSION');
 });
 
@@ -86,7 +86,7 @@ test('8. Structurally keyboard-safe form structure in upper half of viewport', (
   assert.ok(content.includes('label="Reason"'), 'Reason label must be present');
   // Reason appears in the upper compact card
   const reasonIdx = content.indexOf('label="Reason"');
-  const buttonIdx = content.indexOf('label="Save Blocked Date"');
+  const buttonIdx = content.indexOf('label="Save blocked date"');
   assert.ok(reasonIdx > 0 && buttonIdx > 0 && content.includes('footer={'), 'Reason belongs to the form and Save belongs to the pinned footer');
 });
 
@@ -169,22 +169,22 @@ test('13. Working days formatting: non-contiguous working days & wrap styling', 
   assert.ok(!content.includes('horizontal={true}'), 'Must not horizontally scroll working days');
 });
 
-test('14. View All Exceptions always visible, even with zero exceptions', () => {
+test('14. View all exceptions always visible, even with zero exceptions', () => {
   const hubFile = path.resolve(__dirname, '../app/doctor/more/schedule/index.tsx');
   const content = fs.readFileSync(hubFile, 'utf8');
 
-  // Button row contains View All Exceptions unconditionally
+  // Button row contains View all exceptions unconditionally
   const buttonRowStart = content.indexOf('style={styles.buttonRow}');
   assert.ok(buttonRowStart > 0, 'buttonRow must exist');
   const buttonRowContent = content.slice(buttonRowStart, content.indexOf('</View>', buttonRowStart + 100) + 500);
 
-  assert.ok(buttonRowContent.includes('label="+ Block a Date"'), 'Must include + Block a Date in button row');
-  assert.ok(buttonRowContent.includes('label="View All Exceptions"'), 'Must include View All Exceptions in button row');
+  assert.ok(buttonRowContent.includes('label="+ Block a date"'), 'Must include + Block a date in button row');
+  assert.ok(buttonRowContent.includes('label="View all exceptions"'), 'Must include View all exceptions in button row');
   // Confirm it is NOT conditioned on exceptionCount > 0
-  assert.ok(!buttonRowContent.includes('exceptionCount > 0 &&'), 'View All Exceptions must not be hidden when count == 0');
+  assert.ok(!buttonRowContent.includes('exceptionCount > 0 &&'), 'View all exceptions must not be hidden when count == 0');
 });
 
-test('15. Exceptions & Time Off section/header navigates to hub', () => {
+test('15. Exceptions & time off section/header navigates to hub', () => {
   const hubFile = path.resolve(__dirname, '../app/doctor/more/schedule/index.tsx');
   const content = fs.readFileSync(hubFile, 'utf8');
 
@@ -249,12 +249,12 @@ test('19. Keyboard-oriented screen structure with resizable viewport and reachab
   assert.ok(footerIdx > svCloseIdx, 'Action footer must be positioned OUTSIDE the ScrollView');
 
   // Reason visibility handling on focus / keyboard show
-  assert.ok(content.includes('<KeyboardSafeFormScreen') && content.includes('footer={'), 'Block a Date must supply its pinned actions to the shared container');
+  assert.ok(content.includes('<KeyboardSafeFormScreen') && content.includes('footer={'), 'Block a date must supply its pinned actions to the shared container');
   assert.ok(shared.includes('onLayout=') && shared.includes('visibility.schedule()'), 'Must retry visibility after viewport layout changes');
   assert.ok(shared.includes('keyboardDidShow'), 'Must listen to keyboard show event for viewport adjustment');
 });
 
-test('20. Single active session freezes scope to Full Day with helper notice', () => {
+test('20. Single active session freezes scope to Full day with helper notice', () => {
   const newFile = path.resolve(__dirname, '../app/doctor/more/schedule/exceptions/new.tsx');
   const content = fs.readFileSync(newFile, 'utf8');
 
@@ -263,8 +263,8 @@ test('20. Single active session freezes scope to Full Day with helper notice', (
     content.includes('Only one working session is configured for this date.'),
     'Must display helper notice when only one working session is configured'
   );
-  // When single session, Specific Session is not presented as a selectable scope
-  assert.ok(content.includes('sessions.length >= 2'), 'Specific Session scope must require 2 or more sessions');
+  // When single session, Specific session is not presented as a selectable scope
+  assert.ok(content.includes('sessions.length >= 2'), 'Specific session scope must require 2 or more sessions');
   assert.ok(
     content.includes("scope: singleSession ? 'FULL_DAY' : scope") ||
       content.includes("scope: effectiveScope") ||

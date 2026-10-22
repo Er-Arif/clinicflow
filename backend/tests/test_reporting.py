@@ -9,6 +9,7 @@ from app.core.errors import AppError
 from app.main import app
 from app.modules.identity.service import AuthContext
 from app.modules.patients.models import Patient
+from app.modules.reporting.schemas import DoctorTodayDetailItem, PatientSummaryBase
 from app.modules.reporting.service import ReportingService, _money
 
 
@@ -28,6 +29,30 @@ def _service() -> ReportingService:
 def test_reporting_money_is_fixed_precision() -> None:
     assert _money(Decimal("500")) == Decimal("500.00")
     assert _money(None) == Decimal("0.00")
+
+
+def test_reporting_summaries_allow_missing_mobile() -> None:
+    patient = PatientSummaryBase(
+        patient_id="00000000-0000-0000-0000-000000000001",
+        patient_code="PT-000001",
+        full_name="No Phone Patient",
+        mobile_number=None,
+        gender="MALE",
+        age=30,
+    )
+    today = DoctorTodayDetailItem(
+        appointment_id="00000000-0000-0000-0000-000000000002",
+        patient_id="00000000-0000-0000-0000-000000000001",
+        patient_name="No Phone Patient",
+        mobile_number=None,
+        gender="MALE",
+        age=30,
+        appointment_time=None,
+        appointment_type="REGULAR",
+        status="CHECKED_IN",
+    )
+    assert patient.mobile_number == ""
+    assert today.mobile_number == ""
 
 
 def test_report_range_allows_same_day() -> None:

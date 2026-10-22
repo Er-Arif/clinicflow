@@ -11,9 +11,15 @@ export function clinicClockParts(instant: number, timezone: string) {
   }).formatToParts(new Date(instant));
   const part = (type: string) => parts.find(p => p.type === type)!.value;
   const hour = Number(part('hour'));
+  const displayHour = String(hour % 12 || 12).padStart(2, '0');
+  const compactDate = new Intl.DateTimeFormat('en-IN', {
+    timeZone: timezone, weekday: 'short', day: '2-digit', month: 'short',
+  }).format(new Date(instant));
   return {
     date: `${part('year')}-${part('month')}-${part('day')}`,
     time: `${part('hour')}:${part('minute')}:${part('second')}`,
+    displayTime: `${displayHour}:${part('minute')} ${hour < 12 ? 'AM' : 'PM'}`,
+    compactDate,
     greeting: hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening',
     readableDate: new Intl.DateTimeFormat('en-IN', {
       timeZone: timezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',

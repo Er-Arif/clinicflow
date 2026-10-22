@@ -12,6 +12,12 @@ import { BackButton } from '@/components/BackButton';
 import { WorklistControls } from '@/components/WorklistControls';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function humanize(value?: string | null) {
+  if (!value) return '';
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
+
 export default function RemindersScreen() {
   const router = useRouter();
   const clinicTime = useClinicTimeQuery();
@@ -22,11 +28,14 @@ export default function RemindersScreen() {
   const [skipReminder, skipState] = useSkipReminderMutation();
   const [error, setError] = useState<string | null>(null);
   const items = worklistItems(reminders.currentData, item => item.reminder_id);
+  const dueThroughLabel = clinicTime.data?.clinic_date
+    ? formatClinicDate(clinicTime.data.clinic_date)
+    : 'today';
 
   async function skip(reminderId: string) {
     setError(null);
     try {
-      await skipReminder({ reminderId, reason: 'Skipped by Assistant' }).unwrap();
+      await skipReminder({ reminderId, reason: 'Skipped by assistant' }).unwrap();
     } catch (e) {
       setError(apiError(e)?.message ?? 'Unable to skip reminder.');
     }
@@ -35,9 +44,9 @@ export default function RemindersScreen() {
   return (
     <AppScreen refreshing={reminders.isFetching && !reminders.isFetchingNextPage}
       onRefresh={() => { if (clinicTime.data?.clinic_date) void reminders.refetch(); else void clinicTime.refetch(); }}>
-      <BackButton />
+      <BackButton onPress={() => router.replace('/assistant/more')} />
       <Text style={styles.title}>Reminders</Text>
-      <Text style={styles.subtitle}>Due through {clinicTime.data?.clinic_date ?? 'today'} · WhatsApp is sent manually.</Text>
+      <Text style={styles.subtitle}>Due through {dueThroughLabel} · WhatsApp is sent manually.</Text>
       {clinicTime.isLoading ? <ActivityIndicator /> : null}
       {clinicTime.isError ? <>
         <Text style={styles.error}>Unable to load clinic date.</Text>
@@ -47,8 +56,8 @@ export default function RemindersScreen() {
       {items.map((item) => (
         <View key={item.reminder_id} style={styles.card}>
           <Text style={styles.patient}>{item.patient_name}</Text>
-          <Text style={styles.subtitle}>{item.reminder_type.replaceAll('_', ' ')} · Due {formatClinicDate(item.due_on)} · {item.language}</Text>
-          {!item.sendable ? <Text style={styles.warning}>Temporarily suppressed: {item.suppression_reason?.replaceAll('_', ' ')}</Text> : null}
+          <Text style={styles.subtitle}>{humanize(item.reminder_type)} · Due {formatClinicDate(item.due_on)} · {item.language}</Text>
+          {!item.sendable ? <Text style={styles.warning}>Temporarily suppressed: {humanize(item.suppression_reason)}</Text> : null}
           <AppButton
             label="Send WhatsApp"
             disabled={!item.sendable}
@@ -57,7 +66,11 @@ export default function RemindersScreen() {
           <AppButton label="Skip" tone="secondary" loading={skipState.isLoading} onPress={() => void skip(item.reminder_id)} />
         </View>
       ))}
-      <WorklistControls query={reminders} count={items.length} emptyText="All reminders are handled." />
+      <WorklistControls
+        query={reminders}
+        count={items.length}
+        emptyText={`No reminders due through ${dueThroughLabel}.`}
+      />
     </AppScreen>
   );
 }
@@ -70,4 +83,3 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   patient: { fontSize: 17, fontWeight: '800', color: colors.text },
 });
-

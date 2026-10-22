@@ -81,6 +81,11 @@ class AppointmentPatientSummary(BaseModel):
     full_name: str
     mobile_number: str
 
+    @field_validator("mobile_number", mode="before")
+    @classmethod
+    def normalize_optional_mobile(cls, value: str | None) -> str:
+        return value or ""
+
 
 class AppointmentDoctorSummary(BaseModel):
     doctor_id: UUID

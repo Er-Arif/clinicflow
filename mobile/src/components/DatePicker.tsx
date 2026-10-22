@@ -23,13 +23,13 @@ export function DatePicker({ value, onChange, minimumDate, maximumDate, allowCle
 
   return (
     <View style={style}>
-      <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityValue={{ text: displayDate }} style={{ flex: 1, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => setShow(true)}>
-          <Text style={[styles.text, !value && { color: colors.muted }]}>{displayDate}</Text>
+      <View style={styles.input}>
+        <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityValue={{ text: displayDate }} style={styles.pressable} onPress={() => setShow(true)}>
+          <Text style={[styles.text, !value && styles.placeholder]}>{displayDate}</Text>
         </Pressable>
         {allowClear && value ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Clear ${accessibilityLabel.toLowerCase()}`} style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: 'center' }} onPress={() => onChange('')}>
-            <Text style={{ color: colors.danger, fontWeight: 'bold' }}>Clear</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Clear ${accessibilityLabel.toLowerCase()}`} style={styles.clearButton} onPress={() => onChange('')}>
+            <Text style={styles.clearText}>Clear</Text>
           </Pressable>
         ) : null}
       </View>
@@ -41,16 +41,12 @@ export function DatePicker({ value, onChange, minimumDate, maximumDate, allowCle
           minimumDate={minimumDate}
           maximumDate={maximumDate}
           onChange={(event, selectedDate) => {
-            if (Platform.OS === 'android') {
-              setShow(false);
-            }
+            if (Platform.OS === 'android') setShow(false);
             if (event.type === 'set' && selectedDate) {
               const yyyy = selectedDate.getFullYear();
               const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
               const dd = String(selectedDate.getDate()).padStart(2, '0');
               onChange(`${yyyy}-${mm}-${dd}`);
-            } else if (event.type === 'dismissed') {
-              // do nothing
             }
           }}
         />
@@ -61,16 +57,17 @@ export function DatePicker({ value, onChange, minimumDate, maximumDate, allowCle
 
 const styles = StyleSheet.create({
   input: {
-    minHeight: 48,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
   },
-  text: {
-    color: colors.text,
-    fontSize: 16,
-  },
+  pressable: { flex: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
+  clearButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
+  text: { color: colors.text, fontSize: 14, fontWeight: '500' },
+  placeholder: { color: colors.muted, fontWeight: '400' },
+  clearText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
 });

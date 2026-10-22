@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     db_connect_timeout: int = Field(default=5, ge=1, le=60)
 
 
+def sqlalchemy_database_url(value: str) -> str:
+    """Use ClinicFlow's psycopg 3 driver for standard managed-Postgres URLs."""
+    if value.startswith("postgresql://"):
+        return f"postgresql+psycopg://{value[len('postgresql://') :]}"
+    return value
+
+
 def validate_runtime_settings(config: Settings) -> None:
     """Fail closed when a deploy-like environment uses unsafe runtime settings."""
 

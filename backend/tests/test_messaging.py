@@ -32,6 +32,11 @@ def test_all_seed_templates_use_supported_variables() -> None:
         validate_template_body(body)
 
 
+def test_all_seed_templates_include_clinic_contact_number() -> None:
+    for _kind, _language, body in DEFAULT_MESSAGE_TEMPLATES:
+        assert "{clinic_contact_number}" in body
+
+
 def test_reminder_has_unique_appointment_and_followup_type_indexes() -> None:
     indexes = {index.name: index for index in Reminder.__table__.indexes}
     assert indexes["uq_reminders_appointment_type"].unique is True

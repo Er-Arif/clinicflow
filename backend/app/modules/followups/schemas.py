@@ -19,13 +19,14 @@ class FollowUpCreateInput(BaseModel):
 
 class VisitCompleteRequest(BaseModel):
     follow_up: FollowUpCreateInput | None = None
+    late_completion_reason: str | None = Field(default=None, max_length=500)
 
 
 class FollowUpPatientSummary(BaseModel):
     patient_id: UUID
     patient_code: str
     full_name: str
-    mobile_number: str
+    mobile_number: str | None
 
 
 class FollowUpLinkedAppointmentSummary(BaseModel):

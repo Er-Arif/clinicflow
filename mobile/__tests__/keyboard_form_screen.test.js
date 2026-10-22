@@ -17,25 +17,25 @@ function find(node, predicate) {
 }
 const tag = (node) => ts.isJsxElement(node) ? node.openingElement.tagName.getText() : ts.isJsxSelfClosingElement(node) ? node.tagName.getText() : '';
 
-test('Reset Password registers both password and reason inside the reusable form viewport', () => {
+test('Reset password registers both password and reason inside the reusable form viewport', () => {
   const source = parse('app/doctor/more/users/[userId].tsx');
   const forms = find(source, (node) => tag(node) === 'KeyboardSafeFormScreen');
   assert.equal(forms.length, 1);
-  const inputs = find(forms[0], (node) => tag(node) === 'KeyboardSafeTextInput');
+  const inputs = find(forms[0], (node) => tag(node) === 'FormField');
   assert.equal(inputs.length, 4);
-  const password = inputs.find(node => node.getText().includes('New temporary password'));
+  const password = inputs.find(node => node.getText().includes('label="Temporary password"'));
   assert.ok(password);
   assert.ok(password.getText().includes('secureTextEntry'), 'Secure input semantics must be retained');
   assert.ok(password.getText().includes('onChangeText={setTemporaryPassword}'));
   assert.ok(inputs.some(node => node.getText().includes('onChangeText={setResetReason}')));
 });
 
-test('Block a Date uses the same viewport and supplies both pinned actions', () => {
+test('Block a date uses the same viewport and supplies both pinned actions', () => {
   const source = parse('app/doctor/more/schedule/exceptions/new.tsx');
   const form = find(source, (node) => tag(node) === 'KeyboardSafeFormScreen')[0];
   assert.ok(form);
   const footer = form.openingElement.attributes.properties.find(property => property.name?.getText() === 'footer');
-  assert.ok(footer.getText().includes('label="Save Blocked Date"'));
+  assert.ok(footer.getText().includes('label="Save blocked date"'));
   assert.ok(footer.getText().includes('label="Cancel"'));
   assert.ok(find(form, (node) => tag(node) === 'FormField').some(node => node.getText().includes('label="Reason"')));
   assert.equal(find(source, (node) => tag(node) === 'ScrollView').length, 0, 'Route must not duplicate the shared scroll viewport');
@@ -65,7 +65,8 @@ test('all editable route branches opt in; read-only routes do not acquire a keyb
       assert.ok(parent, `${file}: editable input must belong to its own form viewport`);
     }
   }
-  assert.equal(formRoutes, 25);
+  // Appointment cancellation and follow-up closure editing now live inside dedicated modals.
+  assert.equal(formRoutes, 23);
 });
 
 test('shared input composes consumer events and FormField uses the native input adapter', () => {

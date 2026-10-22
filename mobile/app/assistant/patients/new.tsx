@@ -57,7 +57,7 @@ export default function NewPatientScreen() {
   return (
     <KeyboardSafeFormScreen>
       <BackButton />
-      <Text style={styles.title}>New Patient</Text>
+      <Text style={styles.title}>New patient</Text>
       <Text style={styles.subtitle}>Enter only the administrative information ClinicFlow needs.</Text>
 
       {duplicateCandidates.length ? (
@@ -68,7 +68,7 @@ export default function NewPatientScreen() {
               <Text style={styles.candidateName}>{candidate.full_name}</Text>
               <Text style={styles.meta}>{candidate.patient_code} · Age {candidate.age}</Text>
               <AppButton
-                label="Open Existing Patient"
+                label="Open existing patient"
                 tone="secondary"
                 onPress={() => router.replace(`/assistant/patients/${candidate.patient_id}`)}
               />
@@ -78,7 +78,7 @@ export default function NewPatientScreen() {
             If this is another family member or patient who legitimately shares the number, continue explicitly.
           </Text>
           <AppButton
-            label="Register Another Patient With This Number"
+            label="Register another patient with this number"
             onPress={() => void registerSharedNumber()}
             loading={mutation.isLoading}
           />
@@ -88,7 +88,7 @@ export default function NewPatientScreen() {
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <PatientForm
         initialValues={initial}
-        submitLabel="Save Patient"
+        submitLabel="Save patient"
         loading={mutation.isLoading}
         onSubmit={(values) => void submit(values)}
       />
@@ -97,16 +97,22 @@ export default function NewPatientScreen() {
 }
 
 function toPayload(values: PatientFormValues, allowSharedMobile: boolean): PatientCreatePayload {
+  const mobile = values.mobile.trim();
+  const whatsapp = values.whatsapp.trim();
+  const hasMobile = mobile.length > 0;
+  const whatsappSameAsMobile = hasMobile && values.whatsappSame;
+  const messageContactAvailable = whatsappSameAsMobile || whatsapp.length >= 10;
+
   return {
     full_name: values.fullName.trim(),
-    mobile_number: values.mobile.trim(),
-    whatsapp_same_as_mobile: values.whatsappSame,
-    whatsapp_number: values.whatsappSame ? undefined : values.whatsapp.trim(),
+    mobile_number: hasMobile ? mobile : null,
+    whatsapp_same_as_mobile: whatsappSameAsMobile,
+    whatsapp_number: whatsappSameAsMobile ? undefined : whatsapp || undefined,
     date_of_birth: values.ageMode === 'DOB' ? values.dateOfBirth : undefined,
     approximate_age_years: values.ageMode === 'AGE' ? Number(values.approximateAge) : undefined,
-    gender: values.gender,
+    gender: values.gender as PatientCreatePayload['gender'],
     preferred_language: values.language,
-    reminders_enabled: values.remindersEnabled,
+    reminders_enabled: messageContactAvailable && values.remindersEnabled,
     allow_shared_mobile: allowSharedMobile,
   };
 }
@@ -128,4 +134,3 @@ const styles = StyleSheet.create({
   candidateName: { fontWeight: '700', color: colors.text },
   meta: { color: colors.muted, lineHeight: 20 },
 });
-

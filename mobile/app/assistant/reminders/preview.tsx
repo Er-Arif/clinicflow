@@ -49,7 +49,9 @@ export default function MessagePreviewScreen() {
   async function confirmSent() {
     try {
       await markSent(reminderId).unwrap();
-      router.replace('/assistant/reminders');
+      // Preview is always pushed from its caller. Return to that exact caller
+      // instead of forcing every successful send into the Reminders tab.
+      router.back();
     } catch (e) {
       setError(apiError(e)?.message ?? 'Unable to mark message as sent.');
     }
@@ -58,7 +60,7 @@ export default function MessagePreviewScreen() {
   return (
     <AppScreen>
       <BackButton />
-      <Text style={styles.title}>WhatsApp Message</Text>
+      <Text style={styles.title}>WhatsApp message</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {prepared ? (
         <>
@@ -69,12 +71,12 @@ export default function MessagePreviewScreen() {
           </View>
           <View style={styles.card}><Text style={styles.message}>{prepared.rendered_message}</Text></View>
           <AppButton label="Open WhatsApp" onPress={() => void openWhatsApp()} />
-          <AppButton label="Copy Message" tone="secondary" onPress={() => void Clipboard.setStringAsync(prepared.rendered_message)} />
+          <AppButton label="Copy message" tone="secondary" onPress={() => void Clipboard.setStringAsync(prepared.rendered_message)} />
           {opened ? (
             <View style={styles.card}>
               <Text style={styles.question}>Was the message sent?</Text>
-              <AppButton label="Mark Sent" loading={markSentState.isLoading} onPress={() => void confirmSent()} />
-              <AppButton label="Not Sent" tone="secondary" onPress={() => setOpened(false)} />
+              <AppButton label="Mark sent" loading={markSentState.isLoading} onPress={() => void confirmSent()} />
+              <AppButton label="Not sent" tone="secondary" onPress={() => setOpened(false)} />
             </View>
           ) : null}
         </>
@@ -92,4 +94,3 @@ const styles = StyleSheet.create({
   message: { color: colors.text, lineHeight: 22 },
   question: { color: colors.text, fontWeight: '800', fontSize: 17 },
 });
-

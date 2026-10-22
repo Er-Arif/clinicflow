@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.context import request_id_var
 from app.core.errors import AppError
+from app.modules.appointments.models import Appointment
 from app.modules.audit.service import AuditService
 from app.modules.identity.service import AuthContext
 from app.modules.patients.models import NumberCounter, Patient
@@ -22,6 +24,10 @@ from app.modules.patients.schemas import (
     PatientTimelineResponse,
     PatientUpdateRequest,
 )
+from app.modules.scheduling.models import SessionOccurrence
+from app.modules.visits.models import Visit
+
+_LEGACY_PATIENT_CODE = re.compile(r"^PT-(\d+)$", re.IGNORECASE)
 
 
 class PatientService:
@@ -36,15 +42,23 @@ class PatientService:
             return PatientListResponse(items=[], total=0, limit=limit, offset=offset)
 
         phone = try_normalize_indian_mobile(cleaned)
+        code_candidate = _patient_code_search_candidate(cleaned)
         like = f"%{cleaned}%"
-        criteria = [Patient.patient_code.ilike(cleaned), Patient.full_name.ilike(like)]
+        criteria = [Patient.full_name.ilike(like)]
+        if code_candidate:
+            criteria.insert(0, Patient.patient_code == code_candidate)
+        if cleaned != code_candidate:
+            criteria.append(Patient.patient_code == cleaned)
         if phone:
             criteria.insert(0, Patient.mobile_e164 == phone)
 
         ranking_whens = []
         if phone:
             ranking_whens.append((Patient.mobile_e164 == phone, 0))
-        ranking_whens.append((func.lower(Patient.patient_code) == cleaned.lower(), 1))
+        if code_candidate:
+            ranking_whens.append((Patient.patient_code == code_candidate, 1))
+        else:
+            ranking_whens.append((func.lower(Patient.patient_code) == cleaned.lower(), 1))
         ranking = case(*ranking_whens, else_=2)
         base = select(Patient).where(
             Patient.clinic_id == self.context.clinic_id,
@@ -54,8 +68,12 @@ class PatientService:
         rows = self.db.scalars(
             base.order_by(ranking, Patient.full_name, Patient.patient_code).limit(limit).offset(offset)
         ).all()
+        visit_summaries = self._visit_summaries([patient.patient_id for patient in rows])
         return PatientListResponse(
-            items=[self._response(patient) for patient in rows],
+            items=[
+                self._response(patient, visit_summary=visit_summaries.get(patient.patient_id))
+                for patient in rows
+            ],
             total=total,
             limit=limit,
             offset=offset,
@@ -73,16 +91,20 @@ class PatientService:
 
     def create(self, request: PatientCreateRequest) -> PatientResponse:
         full_name = _clean_name(request.full_name)
-        mobile = normalize_indian_mobile(request.mobile_number)
+        mobile = normalize_indian_mobile(request.mobile_number) if request.mobile_number else None
+        whatsapp_same_as_mobile = bool(request.whatsapp_same_as_mobile and mobile)
         whatsapp = (
             mobile
-            if request.whatsapp_same_as_mobile
-            else normalize_indian_mobile(request.whatsapp_number or "")
+            if whatsapp_same_as_mobile
+            else normalize_indian_mobile(request.whatsapp_number)
+            if request.whatsapp_number
+            else None
         )
 
-        duplicates = self._mobile_duplicates(mobile)
-        if duplicates and not request.allow_shared_mobile:
-            self._raise_duplicate(duplicates)
+        if mobile:
+            duplicates = self._mobile_duplicates(mobile)
+            if duplicates and not request.allow_shared_mobile:
+                self._raise_duplicate(duplicates)
 
         today = self.clock.clinic_date()
         if request.date_of_birth is not None and request.date_of_birth > today:
@@ -98,13 +120,13 @@ class PatientService:
             full_name=full_name,
             mobile_e164=mobile,
             whatsapp_e164=whatsapp,
-            whatsapp_same_as_mobile=request.whatsapp_same_as_mobile,
+            whatsapp_same_as_mobile=whatsapp_same_as_mobile,
             date_of_birth=request.date_of_birth,
             approximate_age_years=request.approximate_age_years,
             age_as_of_date=today if request.approximate_age_years is not None else None,
             gender=request.gender,
             preferred_language=request.preferred_language,
-            reminders_enabled=request.reminders_enabled,
+            reminders_enabled=bool(request.reminders_enabled and whatsapp),
             created_by=self.context.user_id,
             version=1,
         )
@@ -121,7 +143,7 @@ class PatientService:
             request_id=_request_id(),
             new_values=self._audit_values(patient),
         )
-        return self._response(patient)
+        return self._response(patient, visit_summary=(0, None))
 
     def update(self, patient_id: UUID, request: PatientUpdateRequest) -> PatientResponse:
         patient = self.db.scalar(
@@ -148,42 +170,33 @@ class PatientService:
         if "full_name" in changed and request.full_name is not None:
             patient.full_name = _clean_name(request.full_name)
 
-        mobile_changed = "mobile_number" in changed and request.mobile_number is not None
+        mobile_changed = "mobile_number" in changed
         if mobile_changed:
-            new_mobile = normalize_indian_mobile(request.mobile_number or "")
-            duplicates = self._mobile_duplicates(new_mobile, exclude_patient_id=patient.patient_id)
-            if duplicates and not request.allow_shared_mobile:
-                self._raise_duplicate(duplicates)
+            new_mobile = (
+                normalize_indian_mobile(request.mobile_number) if request.mobile_number else None
+            )
+            if new_mobile:
+                duplicates = self._mobile_duplicates(
+                    new_mobile, exclude_patient_id=patient.patient_id
+                )
+                if duplicates and not request.allow_shared_mobile:
+                    self._raise_duplicate(duplicates)
             patient.mobile_e164 = new_mobile
 
         if "whatsapp_same_as_mobile" in changed and request.whatsapp_same_as_mobile is not None:
             patient.whatsapp_same_as_mobile = request.whatsapp_same_as_mobile
 
         if patient.whatsapp_same_as_mobile:
-            patient.whatsapp_e164 = patient.mobile_e164
-        elif (
-            "whatsapp_same_as_mobile" in changed
-            and request.whatsapp_same_as_mobile is False
-            and "whatsapp_number" not in changed
-        ):
-            raise AppError(
-                code="WHATSAPP_NUMBER_REQUIRED",
-                message="Enter the patient's WhatsApp number.",
-                status_code=422,
-            )
+            if patient.mobile_e164:
+                patient.whatsapp_e164 = patient.mobile_e164
+            else:
+                patient.whatsapp_same_as_mobile = False
+                patient.whatsapp_e164 = None
         elif "whatsapp_number" in changed:
-            if not request.whatsapp_number:
-                raise AppError(
-                    code="WHATSAPP_NUMBER_REQUIRED",
-                    message="Enter the patient's WhatsApp number.",
-                    status_code=422,
-                )
-            patient.whatsapp_e164 = normalize_indian_mobile(request.whatsapp_number)
-        elif patient.whatsapp_e164 is None:
-            raise AppError(
-                code="WHATSAPP_NUMBER_REQUIRED",
-                message="Enter the patient's WhatsApp number.",
-                status_code=422,
+            patient.whatsapp_e164 = (
+                normalize_indian_mobile(request.whatsapp_number)
+                if request.whatsapp_number
+                else None
             )
 
         dob_touched = "date_of_birth" in changed
@@ -220,7 +233,9 @@ class PatientService:
         if "preferred_language" in changed and request.preferred_language is not None:
             patient.preferred_language = request.preferred_language
         if "reminders_enabled" in changed and request.reminders_enabled is not None:
-            patient.reminders_enabled = request.reminders_enabled
+            patient.reminders_enabled = bool(request.reminders_enabled and patient.whatsapp_e164)
+        elif not patient.whatsapp_e164:
+            patient.reminders_enabled = False
 
         patient.version += 1
         self.db.flush()
@@ -257,7 +272,7 @@ class PatientService:
             raise RuntimeError("Patient number counter could not be initialized")
         counter.last_value += 1
         self.db.flush()
-        return f"PT-{counter.last_value:06d}"
+        return _format_patient_code(counter.last_value)
 
     def _mobile_duplicates(
         self, mobile: str, *, exclude_patient_id: UUID | None = None
@@ -271,17 +286,22 @@ class PatientService:
         return list(self.db.scalars(query.order_by(Patient.full_name)).all())
 
     def _raise_duplicate(self, patients: list[Patient]) -> None:
-        candidates = [
-            DuplicatePatientCandidate(
-                patient_id=item.patient_id,
-                patient_code=item.patient_code,
-                full_name=item.full_name,
-                mobile_number=item.mobile_e164,
-                gender=item.gender,
-                age=self._age(item),
-            ).model_dump(mode="json")
-            for item in patients
-        ]
+        visit_summaries = self._visit_summaries([patient.patient_id for patient in patients])
+        candidates = []
+        for item in patients:
+            completed_visits, last_visit_date = visit_summaries.get(item.patient_id, (0, None))
+            candidates.append(
+                DuplicatePatientCandidate(
+                    patient_id=item.patient_id,
+                    patient_code=item.patient_code,
+                    full_name=item.full_name,
+                    mobile_number=item.mobile_e164 or "",
+                    gender=item.gender,
+                    age=self._age(item),
+                    previous_completed_visits=completed_visits,
+                    last_visit_date=last_visit_date,
+                ).model_dump(mode="json")
+            )
         raise AppError(
             code="POTENTIAL_DUPLICATE_PATIENT",
             message="A patient with this mobile number already exists.",
@@ -300,13 +320,49 @@ class PatientService:
             self._not_found()
         return patient
 
-    def _response(self, patient: Patient) -> PatientResponse:
+    def _visit_summaries(self, patient_ids: list[UUID]) -> dict[UUID, tuple[int, date | None]]:
+        if not patient_ids:
+            return {}
+        rows = self.db.execute(
+            select(
+                Visit.patient_id,
+                func.count(Visit.visit_id).label("completed_visits"),
+                func.max(SessionOccurrence.occurrence_date).label("last_visit_date"),
+            )
+            .join(Appointment, Appointment.appointment_id == Visit.appointment_id)
+            .join(
+                SessionOccurrence,
+                SessionOccurrence.session_occurrence_id == Appointment.session_occurrence_id,
+            )
+            .where(
+                Visit.clinic_id == self.context.clinic_id,
+                Visit.patient_id.in_(patient_ids),
+                Visit.status == "COMPLETED",
+            )
+            .group_by(Visit.patient_id)
+        ).all()
+        return {
+            row.patient_id: (int(row.completed_visits or 0), row.last_visit_date)
+            for row in rows
+        }
+
+    def _response(
+        self,
+        patient: Patient,
+        *,
+        visit_summary: tuple[int, date | None] | None = None,
+    ) -> PatientResponse:
+        if visit_summary is None:
+            visit_summary = self._visit_summaries([patient.patient_id]).get(
+                patient.patient_id, (0, None)
+            )
+        completed_visits, last_visit_date = visit_summary
         return PatientResponse(
             patient_id=patient.patient_id,
             patient_code=patient.patient_code,
             full_name=patient.full_name,
-            mobile_number=patient.mobile_e164,
-            whatsapp_number=patient.whatsapp_e164 or patient.mobile_e164,
+            mobile_number=patient.mobile_e164 or "",
+            whatsapp_number=patient.whatsapp_e164 or "",
             whatsapp_same_as_mobile=patient.whatsapp_same_as_mobile,
             date_of_birth=patient.date_of_birth,
             approximate_age_years=patient.approximate_age_years,
@@ -315,6 +371,8 @@ class PatientService:
             gender=patient.gender,
             preferred_language=patient.preferred_language,
             reminders_enabled=patient.reminders_enabled,
+            previous_completed_visits=completed_visits,
+            last_visit_date=last_visit_date,
             version=patient.version,
             created_at=patient.created_at,
             updated_at=patient.updated_at,
@@ -353,6 +411,22 @@ class PatientService:
             message="Patient not found.",
             status_code=404,
         )
+
+
+def _format_patient_code(value: int) -> str:
+    if value < 1:
+        raise ValueError("Patient number must be positive.")
+    return f"{value:04d}"
+
+
+def _patient_code_search_candidate(value: str) -> str | None:
+    cleaned = value.strip()
+    legacy_match = _LEGACY_PATIENT_CODE.fullmatch(cleaned)
+    digits = legacy_match.group(1) if legacy_match else cleaned if cleaned.isdigit() else None
+    if digits is None:
+        return None
+    number = int(digits)
+    return _format_patient_code(number) if number > 0 else None
 
 
 def _clean_name(value: str) -> str:

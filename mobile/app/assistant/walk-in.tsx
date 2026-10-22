@@ -4,7 +4,6 @@ import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-
 import {
   useAddWalkInMutation,
   useClinicTimeQuery,
@@ -18,9 +17,10 @@ import {
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { BackButton } from '@/components/BackButton';
-import { newIdempotencyKey } from '@/features/appointments/idempotency';
+import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import type { Patient } from '@/features/patients/types';
 import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicTime, formatClinicTimeRange } from '@/utils/dates';
 
 export default function WalkInScreen() {
   const router = useRouter();
@@ -33,10 +33,14 @@ export default function WalkInScreen() {
   const fee = useGetCurrentFeeQuery();
   const me = useMeQuery();
   const [addWalkIn, addState] = useAddWalkInMutation();
-  const [idempotencyKey] = useState(() => newIdempotencyKey('walkin'));
-
   const [query, setQuery] = useState('');
-  const search = useSearchPatientsQuery({ q: query.trim() }, { skip: query.trim().length < 2 || Boolean(initialPatientId) });
+  const normalizedQuery = query.trim();
+  const isPatientNumberQuery = /^\d+$/.test(normalizedQuery);
+  const shouldSearch = (isPatientNumberQuery || normalizedQuery.length >= 2) && !initialPatientId;
+  const search = useSearchPatientsQuery(
+    { q: normalizedQuery },
+    { skip: !shouldSearch },
+  );
   const [patient, setPatient] = useState<Patient | null>(null);
   const [doctorId, setDoctorId] = useState('');
   const [appointmentType, setAppointmentType] = useState<'REGULAR' | 'FOLLOW_UP'>('REGULAR');
@@ -47,22 +51,9 @@ export default function WalkInScreen() {
   const [adjustReason, setAdjustReason] = useState('');
 
   useEffect(() => {
-    const unsub = navigation.addListener('blur', () => {
-      if (!initialPatientId) {
-        setPatient(null);
-        setQuery('');
-      }
-      setOverrideEnabled(false);
-      setOverrideReason('');
-      setAdjustFee(false);
-      setAdjustReason('');
-    });
-    return unsub;
-  }, [navigation, initialPatientId]);
-
-  useEffect(() => {
     if (initialPatient.data) setPatient(initialPatient.data);
   }, [initialPatient.data]);
+
   useEffect(() => {
     if (!doctorId && doctors.data?.[0]?.doctor_id) setDoctorId(doctors.data[0].doctor_id);
   }, [doctorId, doctors.data]);
@@ -73,24 +64,52 @@ export default function WalkInScreen() {
     { skip: !doctorId || !clinicDate },
   );
   const isOwner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
-  const assistantCanAdjust = Boolean(fee.data?.assistant_adjustment_allowed);
-  const canAdjust = isOwner || assistantCanAdjust;
-  const suggestedFee = useMemo(() => {
-    if (!fee.data) return '';
-    return String(appointmentType === 'REGULAR' ? fee.data.regular_fee : fee.data.followup_fee);
-  }, [appointmentType, fee.data]);
+  const canAdjust = isOwner || Boolean(fee.data?.assistant_adjustment_allowed);
+  const suggestedFee = useMemo(
+    () => !fee.data ? '' : String(appointmentType === 'REGULAR' ? fee.data.regular_fee : fee.data.followup_fee),
+    [appointmentType, fee.data],
+  );
   const clinicClock = clinicTime.data?.clinic_now?.slice(11, 16) ?? '';
-
-  const activeSession = (availability.data?.sessions && clinicClock)
-    ? (availability.data.sessions.find(session =>
-        session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5)
-      ) ?? null)
+  const activeSession = availability.data?.sessions && clinicClock
+    ? availability.data.sessions.find(
+      session => session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5),
+    ) ?? null
     : null;
+
+  const walkInIntent = JSON.stringify({
+    patient_id: patient?.patient_id ?? null,
+    doctor_id: doctorId,
+    session_definition_id: activeSession?.session_definition_id ?? null,
+    appointment_type: appointmentType,
+    fee_adjustment: adjustFee
+      ? { amount: adjustedAmount, reason: adjustReason.trim() }
+      : null,
+    capacity_override: overrideEnabled
+      ? { enabled: true, reason: overrideReason.trim() }
+      : null,
+  });
+  const walkInRequest = useIntentIdempotencyKey('walkin', walkInIntent);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('blur', () => {
+      walkInRequest.reset();
+      if (!initialPatientId) {
+        setPatient(null);
+        setQuery('');
+      }
+      setOverrideEnabled(false);
+      setOverrideReason('');
+      setAdjustFee(false);
+      setAdjustReason('');
+    });
+    return unsub;
+  }, [navigation, initialPatientId, walkInRequest.reset]);
 
   useEffect(() => {
     setOverrideEnabled(false);
     setOverrideReason('');
   }, [doctorId, clinicDate]);
+
   useEffect(() => {
     setAdjustedAmount(suggestedFee);
   }, [suggestedFee, appointmentType]);
@@ -99,66 +118,93 @@ export default function WalkInScreen() {
     if (!patient || !doctorId || !activeSession) return;
     try {
       const result = await addWalkIn({
-        idempotencyKey,
+        idempotencyKey: walkInRequest.getKey(),
         body: {
           patient_id: patient.patient_id,
           doctor_id: doctorId,
           session_definition_id: activeSession.session_definition_id,
           appointment_type: appointmentType,
-          ...(adjustFee ? { fee_adjustment: { amount: adjustedAmount, reason: adjustReason.trim() } } : {}),
-          ...(overrideEnabled ? { capacity_override: { enabled: true as const, reason: overrideReason.trim() } } : {}),
+          ...(adjustFee ? {
+            fee_adjustment: { amount: adjustedAmount, reason: adjustReason.trim() },
+          } : {}),
+          ...(overrideEnabled ? {
+            capacity_override: { enabled: true as const, reason: overrideReason.trim() },
+          } : {}),
         },
       }).unwrap();
       router.replace(`/assistant/appointments/${result.appointment.appointment_id}`);
     } catch {
-      // Stable API error shown below.
+      // The current request error is rendered below.
     }
   }
-
   const sessionFull = activeSession ? activeSession.remaining_capacity <= 0 : false;
   const blocked = activeSession?.status === 'BLOCKED';
-  const overrideRequired = sessionFull;
-  const canSubmitOverride = !overrideRequired || (isOwner && overrideEnabled && overrideReason.trim().length >= 2);
-  const adjustmentValid = !adjustFee || (/^\d+(\.\d{1,2})?$/.test(adjustedAmount) && adjustReason.trim().length >= 2);
+  const canSubmitOverride = !sessionFull
+    || (isOwner && overrideEnabled && overrideReason.trim().length >= 2);
+  const adjustmentValid = !adjustFee
+    || (/^\d+(\.\d{1,2})?$/.test(adjustedAmount) && adjustReason.trim().length >= 2);
+  const activeErr = walkInRequest.resultMatchesIntent ? apiError(addState.error) : null;
 
   return (
     <KeyboardSafeFormScreen>
       <QueryState query={clinicTime} label="clinic date" />
       <QueryState query={availability} label="availability" />
       <BackButton />
-      <Text style={styles.title}>Add Walk-in</Text>
-      <Text style={styles.subtitle}>Create the appointment and check the patient in as one transaction.</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Add walk-in</Text>
+        <Text style={styles.subtitle}>Register and check in</Text>
+      </View>
 
       {!patient ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Patient</Text>
-          <KeyboardSafeTextInput value={query} onChangeText={setQuery} placeholder="Search mobile, name or patient ID" style={styles.input} />
+          <View style={styles.searchField}>
+            <KeyboardSafeTextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Mobile, name or patient number"
+              style={[styles.input, query.length > 0 && styles.searchWithClear]}
+            />
+            {query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                hitSlop={8}
+                onPress={() => setQuery('')}
+                style={styles.clearSearch}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <QueryState query={search} label="patients" />
-          {search.data?.items.map((item) => (
+          {shouldSearch ? search.data?.items.map(item => (
             <Pressable key={item.patient_id} style={styles.patientRow} onPress={() => setPatient(item)}>
               <Text style={styles.patientName}>{item.full_name}</Text>
-              <Text style={styles.subtitle}>{item.patient_code} · {item.mobile_number}</Text>
+              <Text style={styles.subtitle}>{item.patient_code} · {item.mobile_number?.trim() || 'No mobile number'}</Text>
             </Pressable>
-          ))}
-          {query.trim().length >= 2 && !search.isFetching && !search.isError && search.data?.items.length === 0 ? (
-            <AppButton label="Register New Patient" tone="secondary" onPress={() => router.push('/assistant/patients/new')} />
+          )) : null}
+          {shouldSearch && !search.isFetching && !search.isError && search.data?.items.length === 0 ? (
+            <AppButton compact label="Register new patient" tone="secondary" onPress={() => router.push('/assistant/patients/new')} />
           ) : null}
         </View>
       ) : (
         <View style={styles.card}>
           <View style={styles.row}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.copy}>
               <Text style={styles.cardTitle}>{patient.full_name}</Text>
-              <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number}</Text>
+              <Text style={styles.subtitle}>{patient.patient_code} · {patient.mobile_number?.trim() || 'No mobile number'}</Text>
             </View>
-            {!initialPatientId ? <Pressable onPress={() => setPatient(null)}><Text style={styles.link}>Change</Text></Pressable> : null}
+            {!initialPatientId ? (
+              <Pressable onPress={() => setPatient(null)}><Text style={styles.link}>Change</Text></Pressable>
+            ) : null}
           </View>
         </View>
       )}
 
-      <Text style={styles.label}>Appointment Type</Text>
+      <Text style={styles.label}>Type</Text>
       <View style={styles.chips}>
-        {(['REGULAR', 'FOLLOW_UP'] as const).map((type) => (
+        {(['REGULAR', 'FOLLOW_UP'] as const).map(type => (
           <Pressable key={type} style={[styles.chip, appointmentType === type && styles.chipActive]} onPress={() => setAppointmentType(type)}>
             <Text style={appointmentType === type ? styles.chipTextActive : styles.chipText}>{type === 'REGULAR' ? 'Regular' : 'Follow-up'}</Text>
           </Pressable>
@@ -167,51 +213,40 @@ export default function WalkInScreen() {
 
       <Text style={styles.label}>Doctor</Text>
       <View style={styles.chips}>
-        {doctors.data?.map((doctor) => (
+        {doctors.data?.map(doctor => (
           <Pressable key={doctor.doctor_id} style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]} onPress={() => setDoctorId(doctor.doctor_id)}>
             <Text style={doctorId === doctor.doctor_id ? styles.chipTextActive : styles.chipText}>{doctor.display_name}</Text>
           </Pressable>
         ))}
       </View>
 
-      <Text style={styles.label}>Today&apos;s Session</Text>
-
+      <Text style={styles.label}>Current session</Text>
       {availability.isSuccess && !availability.isFetching && !availability.isError && !activeSession ? (
-        <Text style={styles.subtitle}>
-          No active clinic session right now.{"\n\n"}Walk-ins can only be added during an active clinic session.
-        </Text>
+        <Text style={styles.empty}>No active clinic session right now.</Text>
       ) : null}
       {activeSession ? (
-        <View style={[styles.card, styles.cardSelected, activeSession.status === 'BLOCKED' && styles.disabled]}>
+        <View style={[styles.card, styles.cardSelected, blocked && styles.disabled]}>
           <View style={styles.row}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.copy}>
               <Text style={styles.cardTitle}>{activeSession.name}</Text>
-              <Text style={styles.subtitle}>{activeSession.start_time.slice(0, 5)}–{activeSession.end_time.slice(0, 5)} · {activeSession.used_capacity} / {activeSession.maximum_capacity} capacity used</Text>
+              <Text style={styles.subtitle}>{formatClinicTimeRange(activeSession.start_time, activeSession.end_time)} · {activeSession.used_capacity}/{activeSession.maximum_capacity} booked</Text>
             </View>
-            <Text style={activeSession.status === 'BLOCKED' ? styles.warning : (activeSession.remaining_capacity > 0 ? styles.success : styles.warning)}>
-              {activeSession.status === 'BLOCKED' ? 'BLOCKED' : (activeSession.remaining_capacity > 0 ? 'AVAILABLE' : 'FULL')}
-            </Text>
+            <Text style={blocked || sessionFull ? styles.warning : styles.success}>{blocked ? 'Blocked' : sessionFull ? 'Full' : 'Available'}</Text>
           </View>
         </View>
       ) : null}
 
       {activeSession && sessionFull && isOwner && !blocked ? (
         <View style={styles.card}>
-          <Pressable onPress={() => setOverrideEnabled((value) => !value)}>
-            <Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Add Extra Walk-in</Text>
-            <Text style={styles.subtitle}>The selected session is full. Owner override requires a reason.</Text>
-          </Pressable>
+          <Pressable onPress={() => setOverrideEnabled(value => !value)}><Text style={styles.cardTitle}>{overrideEnabled ? '✓ ' : ''}Add extra walk-in</Text></Pressable>
           {overrideEnabled ? <KeyboardSafeTextInput value={overrideReason} onChangeText={setOverrideReason} placeholder="Override reason" style={styles.input} /> : null}
         </View>
       ) : null}
-      {activeSession && sessionFull && !isOwner ? <Text style={styles.warning}>This session is full. Ask the Owner/Doctor before adding another patient.</Text> : null}
+      {activeSession && sessionFull && !isOwner ? <Text style={styles.warning}>Session is full. Owner approval is required.</Text> : null}
 
       <View style={styles.feeCard}>
-        <View>
-          <Text style={styles.label}>Fee</Text>
-          <Text style={styles.fee}>₹{adjustFee ? adjustedAmount : suggestedFee || '—'}</Text>
-        </View>
-        {canAdjust ? <AppButton label={adjustFee ? 'Use Normal Fee' : 'Adjust Fee'} tone="secondary" onPress={() => setAdjustFee((value) => !value)} /> : null}
+        <View><Text style={styles.feeLabel}>Fee</Text><Text style={styles.fee}>₹{adjustFee ? adjustedAmount : suggestedFee || '—'}</Text></View>
+        {canAdjust ? <AppButton compact label={adjustFee ? 'Normal fee' : 'Adjust fee'} tone="secondary" onPress={() => setAdjustFee(value => !value)} /> : null}
       </View>
       {adjustFee ? (
         <View style={styles.card}>
@@ -220,45 +255,27 @@ export default function WalkInScreen() {
         </View>
       ) : null}
 
-      {(() => {
-        const activeErr = apiError(addState.error);
-        if (!activeErr) return null;
-        if (activeErr.code === 'APPOINTMENT_DUPLICATE_ACTIVE') {
-          const details = activeErr.details as {
-            appointment_id?: string;
-            date?: string;
-            time?: string | null;
-            status?: string;
-            appointment_type?: string;
-          } | undefined;
-          return (
-            <View style={styles.duplicateCard}>
-              <Text style={styles.duplicateTitle}>Active Appointment Conflict</Text>
-              <Text style={styles.duplicateText}>
-                {patient?.full_name ?? 'This patient'} already has an active {String(details?.appointment_type ?? '').replace('_', ' ').toLowerCase()} appointment with {doctors.data?.find((d) => d.doctor_id === doctorId)?.display_name ?? 'this doctor'} today.
-              </Text>
-              <View style={styles.duplicateMeta}>
-                {details?.time ? <Text style={styles.duplicateMetaText}>Time: {String(details.time).slice(0, 5)}</Text> : null}
-                <Text style={styles.duplicateMetaText}>Status: {String(details?.status ?? '')}</Text>
-              </View>
-              {details?.appointment_id ? (
-                <AppButton
-                  label="View Existing Appointment"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/assistant/appointments/[appointmentId]',
-                      params: { appointmentId: String(details.appointment_id) },
-                    })
-                  }
-                />
-              ) : null}
-            </View>
-          );
-        }
-        return <Text style={styles.error}>{activeErr.message ?? 'Unable to add walk-in.'}</Text>;
-      })()}
+      {activeErr?.code === 'APPOINTMENT_DUPLICATE_ACTIVE' ? (
+        <View style={styles.conflictCard}>
+          <Text style={styles.cardTitle}>Active appointment already exists</Text>
+          {(activeErr.details as { time?: string | null } | undefined)?.time ? (
+            <Text style={styles.subtitle}>{formatClinicTime((activeErr.details as { time: string }).time)}</Text>
+          ) : null}
+          {(activeErr.details as { appointment_id?: string } | undefined)?.appointment_id ? (
+            <AppButton
+              compact
+              label="View existing appointment"
+              onPress={() => router.push({
+                pathname: '/assistant/appointments/[appointmentId]',
+                params: { appointmentId: String((activeErr.details as { appointment_id: string }).appointment_id) },
+              })}
+            />
+          ) : null}
+        </View>
+      ) : activeErr ? <Text style={styles.error}>{activeErr.message ?? 'Unable to add walk-in.'}</Text> : null}
+
       <AppButton
-        label="Add & Check In"
+        label="Add & check in"
         loading={addState.isLoading}
         disabled={!patient || !doctorId || !activeSession || blocked || !canSubmitOverride || !adjustmentValid}
         onPress={() => void submit()}
@@ -268,39 +285,35 @@ export default function WalkInScreen() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
-  link: { color: colors.primary, fontWeight: '800', paddingTop: 4 },
-  label: { color: colors.text, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  cardSelected: { borderColor: colors.primary, backgroundColor: colors.softPrimary },
-  cardTitle: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.background, paddingHorizontal: 14, color: colors.text },
+  header: { gap: 3 },
+  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  copy: { flex: 1, gap: 3 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
+  empty: { color: colors.muted, fontSize: 13 },
+  link: { color: colors.primary, fontWeight: '700', paddingTop: 4 },
+  label: { color: colors.text, fontWeight: '700' },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  cardSelected: { borderColor: colors.primary, backgroundColor: '#FBFDFF' },
+  cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
+  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.text },
+  searchField: { position: 'relative' },
+  searchWithClear: { paddingRight: 50 },
+  clearSearch: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' },
+  clearSearchText: { color: colors.muted, fontSize: 24, lineHeight: 26, fontWeight: '500' },
   patientRow: { borderTopWidth: 1, borderColor: colors.border, paddingVertical: spacing.sm },
   patientName: { color: colors.text, fontWeight: '800' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
-  chipActive: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  chipText: { color: colors.text },
-  chipTextActive: { color: colors.primary, fontWeight: '800' },
-  success: { color: colors.success, fontWeight: '800' },
-  warning: { color: colors.warning, fontWeight: '800' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.surface },
+  chipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' },
+  chipText: { color: colors.muted, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryDark, fontWeight: '800' },
+  success: { color: colors.success, fontWeight: '700', fontSize: 12 },
+  warning: { color: colors.warning, fontWeight: '700', fontSize: 12 },
   error: { color: colors.danger, fontWeight: '700' },
   disabled: { opacity: 0.5 },
-  feeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, backgroundColor: colors.softPrimary, borderRadius: radius.md, padding: spacing.md },
-  fee: { color: colors.primary, fontSize: 22, fontWeight: '900' },
-  duplicateCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.warning,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  duplicateTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  duplicateText: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  duplicateMeta: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.xs },
-  duplicateMetaText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  feeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, backgroundColor: colors.softPrimary, borderRadius: radius.lg, padding: spacing.md },
+  feeLabel: { color: colors.muted, fontWeight: '700' },
+  fee: { color: colors.primaryDark, fontSize: 23, fontWeight: '800' },
+  conflictCard: { backgroundColor: colors.softWarning, borderWidth: 1, borderColor: '#F2D49C', borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
 });
-

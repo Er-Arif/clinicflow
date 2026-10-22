@@ -37,7 +37,7 @@ export function DateRangeControls({ today, selection }: { today?: string; select
         accessibilityRole="button" accessibilityLabel={label === 'Custom' ? 'Custom range' : label}
         accessibilityState={{ selected: preset === label, disabled: !today }} disabled={!today}
         style={[styles.chip, preset === label && styles.selected]} onPress={() => select(label)}>
-        <Text style={{ color: preset === label ? colors.primary : colors.text, fontWeight: '700' }}>{label}</Text>
+        <Text style={[styles.chipText, preset === label && styles.selectedText]}>{label}</Text>
       </Pressable>)}
     </View>
     {preset === 'Custom' ? <View style={styles.dates}>
@@ -46,16 +46,22 @@ export function DateRangeControls({ today, selection }: { today?: string; select
       <View style={styles.field}><Text style={styles.label}>To</Text><DatePicker value={range.to}
         accessibilityLabel="Range end date" onChange={to => setCustom({ ...range, to })} /></View>
     </View> : null}
-    {today ? <Text accessibilityRole={error ? 'alert' : undefined} style={{ color: error ? colors.danger : colors.muted }}>
+    {today ? <Text accessibilityRole={error ? 'alert' : undefined} style={[styles.range, error && styles.error]}>
       {error ?? `${formatClinicDate(range.from)} – ${formatClinicDate(range.to)}`}
     </Text> : null}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.sm }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  container: { gap: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   selected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  dates: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, field: { flexGrow: 1, flexBasis: 130, gap: spacing.xs },
-  label: { color: colors.text, fontWeight: '600' },
+  chipText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+  selectedText: { color: colors.primary, fontWeight: '800' },
+  dates: { flexDirection: 'row', gap: spacing.sm },
+  field: { flex: 1, gap: spacing.xs },
+  label: { color: colors.text, fontWeight: '600', fontSize: 13 },
+  range: { color: colors.muted, fontSize: 12 },
+  error: { color: colors.danger },
 });

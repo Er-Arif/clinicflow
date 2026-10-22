@@ -4,14 +4,14 @@ from functools import lru_cache
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.config import settings, validate_runtime_settings
+from app.core.config import settings, sqlalchemy_database_url, validate_runtime_settings
 
 
 @lru_cache
 def get_engine() -> Engine:
     validate_runtime_settings(settings)
     return create_engine(
-        settings.database_url,
+        sqlalchemy_database_url(settings.database_url),
         pool_pre_ping=True,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,

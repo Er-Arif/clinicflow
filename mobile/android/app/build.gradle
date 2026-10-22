@@ -31,8 +31,7 @@ react {
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "prodDebug"]
+    //   Staging intentionally stays non-debuggable so JS/assets are embedded.
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -42,7 +41,7 @@ react {
     //   The path to the CLI configuration file. Default is empty.
     // bundleConfig = file(../rn-cli.config.js)
     //
-    //   The name of the generated asset file containing your JS bundle
+    //   The name of the generated asset file containing the JS bundle
     // bundleAssetName = "MyApplication.android.bundle"
     //
     //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
@@ -169,6 +168,16 @@ android {
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
         }
+        // Standalone UAT build. JS/assets are embedded in the APK, so after
+        // installation the phone does not need Metro, adb reverse, or USB.
+        // It stays debug-signed and is never a production artifact.
+        staging {
+            initWith release
+            signingConfig signingConfigs.debug
+            debuggable false
+            matchingFallbacks = ['release']
+            versionNameSuffix "-staging"
+        }
     }
     packagingOptions {
         jniLibs {
@@ -215,10 +224,10 @@ dependencies {
     }
 
     if (isWebpEnabled) {
-        // For webp support
+        // For WebP support
         implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
         if (isWebpAnimatedEnabled) {
-            // Animated webp support
+            // Animated WebP support
             implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
         }
     }

@@ -1,29 +1,44 @@
 import { QueryState } from '@/components/QueryState';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useListAppointmentsQuery } from '@/api/api';
 import { DatePicker } from '@/components/DatePicker';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicTime } from '@/utils/dates';
+
+const FILTER_STATUSES = ['BOOKED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'] as const;
+type AppointmentStatusFilter = (typeof FILTER_STATUSES)[number];
+
+function statusLabel(value: string) {
+  return value === 'CHECKED_IN' ? 'Checked in' : value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ');
+}
+
+function routeStatus(value?: string): AppointmentStatusFilter | undefined {
+  return FILTER_STATUSES.includes(value as AppointmentStatusFilter) ? value as AppointmentStatusFilter : undefined;
+}
 
 export default function AppointmentsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const params = useLocalSearchParams<{ status?: string }>();
   const clinicTime = useClinicTimeQuery();
+  const requestedStatus = routeStatus(params.status);
   const [dateInput, setDate] = useState('');
-  const [status, setStatus] = useState<string | undefined>();
-
+  const [status, setStatus] = useState<AppointmentStatusFilter | undefined>(requestedStatus);
   const date = dateInput || clinicTime.data?.clinic_date || '';
+
+  useEffect(() => {
+    setStatus(requestedStatus);
+  }, [requestedStatus]);
 
   useEffect(() => {
     const unsub = navigation.getParent()?.addListener('blur', () => {
       setStatus(undefined);
-      if (clinicTime.data?.clinic_date) {
-        setDate(clinicTime.data.clinic_date);
-      }
+      if (clinicTime.data?.clinic_date) setDate(clinicTime.data.clinic_date);
     });
     return unsub;
   }, [navigation, clinicTime.data?.clinic_date]);
@@ -32,52 +47,47 @@ export default function AppointmentsScreen() {
 
   return (
     <AppScreen refreshing={appointments.isFetching} onRefresh={() => { if (date) void appointments.refetch(); else void clinicTime.refetch(); }}>
-      <View>
+      <View style={styles.header}>
         <Text style={styles.title}>Appointments</Text>
-        <Text style={styles.subtitle}>Bookings for the selected clinic date.</Text>
+        <Text style={styles.subtitle}>Daily bookings and check-ins</Text>
       </View>
-      <DatePicker value={date} onChange={setDate} placeholder="YYYY-MM-DD" />
+      <DatePicker value={date} onChange={setDate} placeholder="Select date" />
       <View style={styles.chips}>
-        {[undefined, 'BOOKED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'].map((value) => (
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: status === value }} key={value?.replaceAll('_', ' ') ?? 'ALL'} onPress={() => setStatus(value)} style={[styles.chip, status === value && styles.chipActive]}>
-            <Text style={status === value ? styles.chipTextActive : styles.chipText}>{value?.replaceAll('_', ' ') ?? 'ALL'}</Text>
+        {([undefined, ...FILTER_STATUSES] as const).map(value => (
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: status === value }} key={value ?? 'ALL'} onPress={() => setStatus(value)} style={[styles.chip, status === value && styles.chipActive]}>
+            <Text style={status === value ? styles.chipTextActive : styles.chipText}>{value ? statusLabel(value) : 'All'}</Text>
           </Pressable>
         ))}
       </View>
       <QueryState query={clinicTime} label="clinic date" />
-      <QueryState query={appointments} label="appointments" hasData={Boolean(appointments.currentData)} empty={appointments.currentData?.items.length === 0 ? "No appointments for this date and status." : undefined} />
-      {appointments.currentData?.items.map((item) => (
-        <Pressable key={item.appointment_id} style={styles.card} onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.patient.full_name}</Text>
-              <Text style={styles.subtitle}>{item.appointment_time?.slice(0, 5)} · {item.appointment_type.replace('_', ' ')}</Text>
+      <QueryState query={appointments} label="appointments" hasData={Boolean(appointments.currentData)} empty={appointments.currentData?.items.length === 0 ? 'No appointments found.' : undefined} />
+
+      <View style={styles.list}>
+        {appointments.currentData?.items.map(item => (
+          <Pressable key={item.appointment_id} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}>
+            <View style={styles.row}>
+              <View style={styles.copy}>
+                <Text style={styles.name}>{item.patient.full_name}</Text>
+                <Text style={styles.subtitle}>{item.appointment_time ? formatClinicTime(item.appointment_time) : 'Walk-in'} · {item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular'}</Text>
+              </View>
+              <View style={[styles.statusPill, item.status === 'CHECKED_IN' && styles.statusChecked, item.status === 'CANCELLED' && styles.statusMuted]}>
+                <Text style={[styles.statusText, item.status === 'CHECKED_IN' && styles.statusCheckedText, item.status === 'CANCELLED' && styles.statusMutedText]}>{statusLabel(item.status)}</Text>
+              </View>
             </View>
-            <Text style={item.status === 'CANCELLED' ? styles.cancelled : item.status === 'CHECKED_IN' ? styles.checkedIn : styles.booked}>{item.status.replace('_', ' ')}</Text>
-          </View>
-        </Pressable>
-      ))}
-      <AppButton label="New Appointment" onPress={() => router.push('/assistant/patients')} />
+          </Pressable>
+        ))}
+      </View>
+      <AppButton label="New appointment" onPress={() => router.push('/assistant/patients')} />
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
-  link: { color: colors.primary, fontWeight: '700', paddingTop: 6 },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  chipActive: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  chipText: { color: colors.text },
-  chipTextActive: { color: colors.primary, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  name: { fontSize: 17, fontWeight: '800', color: colors.text },
-  booked: { color: colors.success, fontWeight: '800' },
-  checkedIn: { color: colors.primary, fontWeight: '800' },
-  cancelled: { color: colors.muted, fontWeight: '800' },
+  header: { gap: 3 }, row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' }, copy: { flex: 1, gap: 3 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surface },
+  chipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' }, chipText: { color: colors.muted, fontWeight: '600' }, chipTextActive: { color: colors.primaryDark, fontWeight: '800' },
+  list: { gap: spacing.sm }, card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md }, pressed: { opacity: 0.78 },
+  name: { fontSize: 16, fontWeight: '800', color: colors.text }, statusPill: { backgroundColor: colors.softSuccess, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, statusText: { color: colors.success, fontWeight: '700', fontSize: 11 },
+  statusChecked: { backgroundColor: colors.softPrimary }, statusCheckedText: { color: colors.primary }, statusMuted: { backgroundColor: colors.surfaceSoft }, statusMutedText: { color: colors.muted },
 });
-
-

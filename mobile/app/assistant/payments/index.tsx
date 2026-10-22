@@ -12,6 +12,16 @@ import { colors, radius, spacing } from '@/theme/tokens';
 const filters = ['PENDING', 'CONFIRMED', 'TODAY'] as const;
 type Filter = (typeof filters)[number];
 
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
+
+function methodLabel(value?: string | null) {
+  if (!value) return 'Unpaid';
+  return value === 'UPI' ? 'UPI' : humanize(value);
+}
+
 export default function PaymentsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('PENDING');
@@ -27,7 +37,7 @@ export default function PaymentsScreen() {
 
   return (
     <AppScreen refreshing={payments.isFetching} onRefresh={() => { if (filter !== 'TODAY' || date) void payments.refetch(); else void clinicTime.refetch(); }}>
-      <BackButton />
+      <BackButton onPress={() => router.replace('/assistant/more')} />
       <Text style={styles.title}>Payments</Text>
       <Text style={styles.subtitle}>Pending collections and confirmed financial history.</Text>
       <View style={styles.filters}>
@@ -47,8 +57,8 @@ export default function PaymentsScreen() {
           style={styles.card}
         >
           <View style={styles.row}><Text style={styles.name}>{item.patient_name}</Text><Text style={styles.amount}>₹{item.amount_due}</Text></View>
-          <Text style={styles.meta}>{item.patient_code} · {formatClinicDate(item.visit_date)} · {item.appointment_type.replace('_', ' ')}</Text>
-          <View style={styles.row}><Text style={[styles.status, item.status === 'PENDING' ? styles.pending : styles.confirmed]}>{item.status}</Text><Text style={styles.meta}>{item.payment_method ?? 'Unpaid'}</Text></View>
+          <Text style={styles.meta}>{item.patient_code} · {formatClinicDate(item.visit_date)} · {humanize(item.appointment_type)}</Text>
+          <View style={styles.row}><Text style={[styles.status, item.status === 'PENDING' ? styles.pending : styles.confirmed]}>{humanize(item.status)}</Text><Text style={styles.meta}>{methodLabel(item.payment_method)}</Text></View>
         </Pressable>
       ))}
     </AppScreen>
@@ -74,4 +84,3 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: spacing.xl },
   error: { color: colors.danger },
 });
-

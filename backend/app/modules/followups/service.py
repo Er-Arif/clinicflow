@@ -341,6 +341,7 @@ class FollowUpService:
             ),
             source_visit_id=item.source_visit_id,
             source_visit_date=source_occurrence.occurrence_date,
+            source_visit_completed_at=source_visit.completed_at,
             doctor_id=source_visit.doctor_id,
             due_date=item.due_date,
             interval_days=item.interval_days,
