@@ -11,7 +11,6 @@ from app.modules.messaging.contact_guard import ensure_clinic_contact
 from app.modules.messaging.models import Reminder
 from app.modules.messaging.schemas import PreparedMessageResponse, ReminderResponse
 
-
 CLINIC_ID = UUID("00000000-0000-0000-0000-000000000001")
 REMINDER_ID = UUID("00000000-0000-0000-0000-000000000002")
 PATIENT_ID = UUID("00000000-0000-0000-0000-000000000003")
