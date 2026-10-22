@@ -2,10 +2,76 @@ import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useCreateAppointmentMessageMutation, useGetAppointmentQuery } from '@/api/api';
 import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { useFocusedHardwareBack } from '@/navigation/useFocusedHardwareBack';
 import { colors, radius, spacing } from '@/theme/tokens';
-export default function AppointmentBookedScreen(){const router=useRouter();const params=useLocalSearchParams<{appointmentId:string}>();const appointmentId=String(params.appointmentId??'');const appointment=useGetAppointmentQuery(appointmentId,{skip:!appointmentId});const[createMessage,messageState]=useCreateAppointmentMessageMutation();async function sendConfirmation(){try{const prepared=await createMessage({appointmentId,messageType:'APPOINTMENT_CONFIRMATION'}).unwrap();router.push({pathname:'/assistant/reminders/preview',params:{reminderId:prepared.reminder.reminder_id}});}catch{}}if(appointment.isLoading)return <AppScreen><ActivityIndicator/></AppScreen>;if(!appointment.data)return <AppScreen><Text style={styles.title}>Appointment booked</Text><QueryState query={appointment} label="booked appointment"/></AppScreen>;return <AppScreen><View style={styles.successBadge}><Text style={styles.successMark}>✓</Text></View><Text style={styles.title}>Appointment booked</Text><View style={styles.card}><Text style={styles.name}>{appointment.data.patient.full_name}</Text><Text style={styles.meta}>{formatClinicDate(appointment.data.session.date)} · {appointment.data.appointment_time?formatClinicTime(appointment.data.appointment_time):'Walk-in'}</Text><Text style={styles.meta}>{appointment.data.doctor.display_name}</Text><Text style={styles.fee}>₹{appointment.data.effective_fee}</Text></View>{messageState.error?<Text style={styles.error}>{apiError(messageState.error)?.message??'Unable to prepare confirmation.'}</Text>:null}<AppButton label="Send WhatsApp confirmation" loading={messageState.isLoading} onPress={()=>void sendConfirmation()}/><View style={styles.actions}><AppButton style={styles.action} label="View appointment" tone="secondary" onPress={()=>router.replace(`/assistant/appointments/${appointmentId}`)}/><AppButton style={styles.action} label="Done" tone="secondary" onPress={()=>router.replace('/assistant/appointments')}/></View></AppScreen>}
-const styles=StyleSheet.create({successBadge:{width:48,height:48,borderRadius:24,backgroundColor:colors.softSuccess,alignItems:'center',justifyContent:'center'},successMark:{color:colors.success,fontWeight:'900',fontSize:24},title:{fontSize:27,fontWeight:'800',color:colors.primaryDark},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.xs},name:{color:colors.text,fontWeight:'800',fontSize:20},meta:{color:colors.muted,fontSize:14},fee:{color:colors.primaryDark,fontSize:22,fontWeight:'800',marginTop:spacing.xs},actions:{flexDirection:'row',gap:spacing.sm},action:{flex:1},error:{color:colors.danger}});
+
+export default function AppointmentBookedScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ appointmentId: string }>();
+  const appointmentId = String(params.appointmentId ?? '');
+  const appointment = useGetAppointmentQuery(appointmentId, { skip: !appointmentId });
+  const [createMessage, messageState] = useCreateAppointmentMessageMutation();
+
+  function exitBooked() {
+    router.dismissTo('/assistant/appointments');
+  }
+
+  // This is a terminal success screen. Android Back must not resurrect the
+  // already-submitted review/booking form underneath it.
+  useFocusedHardwareBack(exitBooked);
+
+  async function sendConfirmation() {
+    try {
+      const prepared = await createMessage({ appointmentId, messageType: 'APPOINTMENT_CONFIRMATION' }).unwrap();
+      router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: prepared.reminder.reminder_id } });
+    } catch {}
+  }
+
+  if (appointment.isLoading) return <AppScreen><ActivityIndicator /></AppScreen>;
+  if (!appointment.data) return <AppScreen><Text style={styles.title}>Appointment booked</Text><QueryState query={appointment} label="booked appointment" /></AppScreen>;
+
+  return (
+    <AppScreen>
+      <View style={styles.successBadge}><Text style={styles.successMark}>✓</Text></View>
+      <Text style={styles.title}>Appointment booked</Text>
+      <View style={styles.card}>
+        <Text style={styles.name}>{appointment.data.patient.full_name}</Text>
+        <Text style={styles.meta}>{formatClinicDate(appointment.data.session.date)} · {appointment.data.appointment_time ? formatClinicTime(appointment.data.appointment_time) : 'Walk-in'}</Text>
+        <Text style={styles.meta}>{appointment.data.doctor.display_name}</Text>
+        <Text style={styles.fee}>₹{appointment.data.effective_fee}</Text>
+      </View>
+      {messageState.error ? <Text style={styles.error}>{apiError(messageState.error)?.message ?? 'Unable to prepare confirmation.'}</Text> : null}
+      <AppButton label="Send WhatsApp confirmation" loading={messageState.isLoading} onPress={() => void sendConfirmation()} />
+      <View style={styles.actions}>
+        <AppButton
+          style={styles.action}
+          label="View appointment"
+          tone="secondary"
+          onPress={() => router.replace({
+            pathname: '/assistant/appointments/[appointmentId]',
+            params: { appointmentId, returnToAppointments: '1' },
+          })}
+        />
+        <AppButton style={styles.action} label="Done" tone="secondary" onPress={exitBooked} />
+      </View>
+    </AppScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  successBadge: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.softSuccess, alignItems: 'center', justifyContent: 'center' },
+  successMark: { color: colors.success, fontWeight: '900', fontSize: 24 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
+  name: { color: colors.text, fontWeight: '800', fontSize: 20 },
+  meta: { color: colors.muted, fontSize: 14 },
+  fee: { color: colors.primaryDark, fontSize: 22, fontWeight: '800', marginTop: spacing.xs },
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  action: { flex: 1 },
+  error: { color: colors.danger },
+});
