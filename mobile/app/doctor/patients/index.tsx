@@ -40,7 +40,7 @@ export default function DoctorPatientSearchScreen() {
         <KeyboardSafeTextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Mobile, patient name or patient number"
+          placeholder="Mobile, name or patient number"
           style={[styles.input, query.length > 0 && styles.searchWithClear]}
           autoCapitalize="words"
         />
