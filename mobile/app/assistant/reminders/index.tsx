@@ -1,7 +1,7 @@
 import { formatClinicDate } from '@/utils/dates';
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useClinicTimeQuery, useReminderWorklistInfiniteQuery, useSkipReminderMutation } from '@/api/api';
 import { worklistItems } from '@/api/worklists';
@@ -31,6 +31,16 @@ export default function RemindersScreen() {
   const dueThroughLabel = clinicTime.data?.clinic_date
     ? formatClinicDate(clinicTime.data.clinic_date)
     : 'today';
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/assistant/more');
+        return true;
+      });
+      return () => subscription.remove();
+    }, [router]),
+  );
 
   async function skip(reminderId: string) {
     setError(null);
