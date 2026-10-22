@@ -30,14 +30,13 @@ def apply_booking_time_rules(
     response: AvailabilityResponse,
     clock: Clock,
 ) -> AvailabilityResponse:
+    # Do not expose elapsed slots at all. This keeps ordinary booking, follow-up,
+    # reschedule and capacity-override UIs on the same safe contract: a time that
+    # has already passed cannot be selected or overridden.
     for session in response.sessions:
-        for slot in session.slots:
-            past = is_past_or_current_slot(clock, response.date, slot.time)
-            # Capacity/occupied-slot conflicts may be overridden by authorized
-            # staff. Time itself never can: a past slot is not a valid booking
-            # target even when capacity override is available.
-            slot.override_booking_allowed = session.status == "AVAILABLE" and not past
-            if past:
-                slot.available = False
-                slot.normal_booking_allowed = False
+        session.slots = [
+            slot
+            for slot in session.slots
+            if not is_past_or_current_slot(clock, response.date, slot.time)
+        ]
     return response
