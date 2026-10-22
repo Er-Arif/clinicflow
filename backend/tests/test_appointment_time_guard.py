@@ -9,7 +9,11 @@ from app.modules.appointments.time_guard import (
     is_past_or_current_slot,
     require_future_slot,
 )
-from app.modules.scheduling.schemas import AvailabilityResponse, AvailabilitySession, AvailabilitySlot
+from app.modules.scheduling.schemas import (
+    AvailabilityResponse,
+    AvailabilitySession,
+    AvailabilitySlot,
+)
 
 
 class FrozenClock:
