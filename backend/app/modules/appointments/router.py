@@ -22,6 +22,7 @@ from app.modules.appointments.schemas import (
     AppointmentResponse,
 )
 from app.modules.appointments.service import AppointmentService
+from app.modules.appointments.time_guard import require_future_slot
 from app.modules.identity.dependencies import (
     ensure_password_ready,
     get_auth_context,
@@ -87,6 +88,7 @@ def create_appointment(
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
+    require_future_slot(clock, request.appointment_date, request.appointment_time)
     with db.begin():
         return AppointmentService(db, clock, context).create(
             request, idempotency_key=_idempotency_key(idempotency_key)
@@ -144,6 +146,7 @@ def reschedule_appointment(
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> AppointmentRescheduleResponse:
+    require_future_slot(clock, request.new_appointment_date, request.new_appointment_time)
     with db.begin():
         return AppointmentService(db, clock, context).reschedule(
             appointment_id,
