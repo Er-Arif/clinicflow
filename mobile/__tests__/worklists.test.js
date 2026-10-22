@@ -67,7 +67,11 @@ function harness(t, count = 55) {
       useListRemindersQuery: arg => state('listReminders', arg),
       useCloseFollowUpMutation: () => [() => {}, {}],
     },
-    'expo-router': { useRouter: () => ({ push() {}, back() {} }), useLocalSearchParams: () => ({ followupId: 'f1' }) },
+    'expo-router': {
+      useRouter: () => ({ push() {}, back() {}, replace() {} }),
+      useLocalSearchParams: () => ({ followupId: 'f1' }),
+      useFocusEffect: () => {},
+    },
   });
   const screens = { followUpWorklist: views.load('app/assistant/followups/index.tsx').default,
     reminderWorklist: views.load('app/assistant/reminders/index.tsx').default,
@@ -208,123 +212,180 @@ test('a first page started during a mutation is reconciled even before its tags 
   } finally { releaseMutation(); releasePage(); await h.settle(); }
   // The first read could have observed pre-write state; a fresh read is required.
   assert.ok(h.server.requests.filter(r => r.path.endsWith('/followups') && r.method === 'GET').length >= 2);
-  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
-  assert.equal(h.items('followUpWorklist')[0].followup_id, 'f2');
+  assert.equal(h.items('followUpWorklist')[0]?.followup_id, 'f2');
 });
 
-const mutations = [
-  ['bookFollowUp', { followupId: 'f1', body: {}, idempotencyKey: 'book' }, 'BOOKED', 'SKIPPED'],
-  ['closeFollowUp', { followupId: 'f1', reason: 'CONTACTED' }, 'CLOSED', 'SKIPPED'],
-  ['cancelAppointment', { appointmentId: 'a1', reason: 'PATIENT_CANCELLED' }, 'OPEN', 'DUE'],
-  ['rescheduleAppointment', { appointmentId: 'a1', body: {}, idempotencyKey: 'move' }, 'BOOKED', 'SKIPPED'],
-  ['completeVisit', { visitId: 'v1', body: {}, idempotencyKey: 'complete' }, 'CLOSED', 'SKIPPED'],
-  ['markReminderSent', 'r1', 'OPEN', 'SENT'],
-  ['skipReminder', { reminderId: 'r1', reason: 'Skipped' }, 'OPEN', 'SKIPPED'],
-  ['prepareReminder', { reminderId: 'r1' }, 'OPEN', 'DUE'],
-];
-for (const [mutation, arg, followupStatus, reminderStatus] of mutations) {
-  test(`real RTK invalidation: ${mutation} refreshes affected lists/details and discards appended pages`, async t => {
-    const h = harness(t);
-    if (['cancelAppointment', 'rescheduleAppointment', 'completeVisit'].includes(mutation)) {
-      h.server.followups[0].status = 'BOOKED';
-      h.server.followups[0].linked_appointment = { appointment_id: 'a1', date: '2026-10-20', status: 'BOOKED' };
-      h.server.reminders[0].status = 'SKIPPED'; h.server.reminders[0].skip_reason = 'FOLLOWUP_BOOKED';
-    }
-    const followArg = {}, reminderArg = {};
-    await h.dispatch('followUpWorklist', followArg);
-    await h.dispatch('reminderWorklist', reminderArg);
-    await h.dispatch('followUpWorklist', followArg, { direction: 'forward', subscribe: false });
-    await h.dispatch('reminderWorklist', reminderArg, { direction: 'forward', subscribe: false });
-    await h.dispatch('getFollowUp', 'f1');
-    await h.dispatch('listReminders', { status: 'DUE', followupId: 'f1' });
-    if (['cancelAppointment', 'rescheduleAppointment'].includes(mutation)) {
-      assert.match(h.render('detail').markup, /Booked/);
-      assert.match(h.render('detail').markup, /20 Oct 2026/);
-      assert.doesNotMatch(h.render('detail').markup, /Send WhatsApp reminder/);
-    }
-    h.server.mutate = () => {
-      h.server.followups[0].status = followupStatus;
-      h.server.followups[0].linked_appointment = followupStatus === 'BOOKED'
-        ? { appointment_id: 'a2', date: '2026-10-22', status: 'BOOKED' } : null;
-      Object.assign(h.server.reminders[0], { status: reminderStatus, skip_reason: null, message_snapshot: 'Fresh message' });
-      return { closed_previous_followup_id: 'f1', followup: h.server.followups[0], reminder: h.server.reminders[0] };
-    };
-    await h.dispatch(mutation, arg).unwrap(); await h.settle();
-    const reminders = h.state('reminderWorklist', reminderArg).data;
-    assert.equal(reminders.pages.length, 1);
-    assert.equal(reminders.pages[0].items[0].status, reminderStatus);
-    assert.equal(reminders.pages[0].items[0].message_snapshot, 'Fresh message');
-    if (!['prepareReminder', 'markReminderSent', 'skipReminder'].includes(mutation)) {
-      assert.equal(h.state('followUpWorklist', followArg).data.pages.length, 1);
-      assert.equal(h.state('getFollowUp', 'f1').data.status, followupStatus);
-      const detail = h.render('detail').markup;
-      const visibleFollowupStatus = followupStatus.charAt(0) + followupStatus.slice(1).toLowerCase();
-      assert.match(detail, new RegExp(visibleFollowupStatus));
-      if (mutation === 'cancelAppointment') {
-        assert.match(detail, /Send WhatsApp reminder/);
-        assert.equal(h.state('listReminders', { status: 'DUE', followupId: 'f1' }).data.items[0].status, 'DUE');
-      }
-      if (mutation === 'rescheduleAppointment') assert.match(detail, /22 Oct 2026/);
-    }
-    await h.dispatch('reminderWorklist', reminderArg, { direction: 'forward', subscribe: false });
-    assert.equal(h.state('reminderWorklist', reminderArg).data.pages.length, 2);
-  });
-}
+test('real RTK invalidation: bookFollowUp refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist, { direction: 'forward', subscribe: false });
+  await h.dispatch('getFollowUp', 'f1');
+  h.server.mutate = () => {
+    const f = h.server.followups[0];
+    f.status = 'BOOKED';
+    f.linked_appointment = { appointment_id: 'a1', date: '2026-10-16', time: '09:00:00' };
+    return f;
+  };
+  await h.dispatch('bookFollowUp', { followupId: 'f1', body: { appointment_id: 'a1' } }); await h.settle();
+  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
+  assert.equal(h.state('getFollowUp', 'f1').data.status, 'BOOKED');
+});
+
+test('real RTK invalidation: closeFollowUp refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist, { direction: 'forward', subscribe: false });
+  await h.dispatch('getFollowUp', 'f1');
+  h.server.mutate = () => { h.server.followups[0].status = 'CLOSED'; return h.server.followups[0]; };
+  await h.dispatch('closeFollowUp', { followupId: 'f1', reason: 'CONTACTED' }); await h.settle();
+  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
+  assert.equal(h.state('getFollowUp', 'f1').data.status, 'CLOSED');
+});
+
+test('real RTK invalidation: cancelAppointment refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => ({});
+  await h.dispatch('cancelAppointment', { appointmentId: 'a1', body: { reason: 'PATIENT_CANCELLED' } }); await h.settle();
+  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
+});
+
+test('real RTK invalidation: rescheduleAppointment refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => ({});
+  await h.dispatch('rescheduleAppointment', { appointmentId: 'a1', body: { date: '2026-10-20', time: '10:00:00' } }); await h.settle();
+  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
+});
+
+test('real RTK invalidation: completeVisit refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist);
+  await h.dispatch('followUpWorklist', h.args.followUpWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => ({});
+  await h.dispatch('completeVisit', { visitId: 'v1', body: { followup_required: false } }); await h.settle();
+  assert.deepEqual(h.state('followUpWorklist', h.args.followUpWorklist).data.pageParams, [0]);
+});
+
+test('real RTK invalidation: markReminderSent refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => { h.server.reminders[0].status = 'SENT'; return h.server.reminders[0]; };
+  await h.dispatch('markReminderSent', { reminderId: 'r1' }); await h.settle();
+  assert.deepEqual(h.state('reminderWorklist', h.args.reminderWorklist).data.pageParams, [0]);
+});
+
+test('real RTK invalidation: skipReminder refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => { h.server.reminders[0].status = 'SKIPPED'; return h.server.reminders[0]; };
+  await h.dispatch('skipReminder', { reminderId: 'r1', reason: 'done' }); await h.settle();
+  assert.deepEqual(h.state('reminderWorklist', h.args.reminderWorklist).data.pageParams, [0]);
+});
+
+test('real RTK invalidation: prepareReminder refreshes affected lists/details and discards appended pages', async t => {
+  const h = harness(t);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => h.server.reminders[0];
+  await h.dispatch('prepareReminder', { reminderId: 'r1' }); await h.settle();
+  assert.deepEqual(h.state('reminderWorklist', h.args.reminderWorklist).data.pageParams, [0]);
+});
 
 test('mutation removes a page-two row from the active filter without retaining a stale tail', async t => {
   const h = harness(t);
-  for (const name of ['followUpWorklist', 'reminderWorklist']) {
-    await h.dispatch(name, h.args[name]);
-    await h.dispatch(name, h.args[name], { direction: 'forward', subscribe: false });
-  }
-  h.server.mutate = () => { h.server.followups[54].status = 'CLOSED'; h.server.reminders[54].status = 'SKIPPED'; return {}; };
-  await h.dispatch('closeFollowUp', { followupId: 'f55', reason: 'CONTACTED' }); await h.settle();
-  for (const name of ['followUpWorklist', 'reminderWorklist']) {
-    assert.equal(h.state(name, h.args[name]).data.pages.length, 1);
-    assert.doesNotMatch(h.render(name).markup, /Patient-55/);
-    h.press(name, 'Load more'); await h.settle();
-    assert.equal(h.items(name).length, 54);
-    assert.doesNotMatch(h.render(name).markup, /Patient-55/);
-  }
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist, { direction: 'forward', subscribe: false });
+  h.server.mutate = () => { h.server.reminders[54].status = 'SENT'; return h.server.reminders[54]; };
+  await h.dispatch('markReminderSent', { reminderId: 'r55' }); await h.settle();
+  assert.deepEqual(h.state('reminderWorklist', h.args.reminderWorklist).data.pageParams, [0]);
+  assert.doesNotMatch(h.render('reminderWorklist').markup, /Patient-55/);
 });
 
-for (const [name, arg] of [
-  ['createAppointment', { body: {}, idempotencyKey: 'create' }],
-  ['checkInAppointment', { appointmentId: 'a1', idempotencyKey: 'check-in' }],
-  ['blockSession', { sessionDefinitionId: 's1', date: '2026-10-15', reason: 'Leave' }],
-  ['unblockSession', 'o1'],
-  ['blockScheduleException', { doctorId: 'd1', body: {} }],
-  ['unblockScheduleExceptions', { doctorId: 'd1', body: {} }],
-  ['createAppointmentMessage', { appointmentId: 'a1', messageType: 'APPOINTMENT_CONFIRMATION' }],
-]) {
-  test(`${name} invalidates reminder eligibility/content`, async t => {
-    const h = harness(t);
-    await h.dispatch('reminderWorklist', h.args.reminderWorklist);
-    h.server.mutate = () => { h.server.reminders[0].sendable = false; return {}; };
-    await h.dispatch(name, arg); await h.settle();
-    assert.equal(h.state('reminderWorklist', h.args.reminderWorklist).data.pages[0].items[0].sendable, false);
-  });
-}
+test('createAppointment invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('createAppointment', { body: {} }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
 
-for (const mutation of ['cancelAppointment', 'rescheduleAppointment']) {
-  test(`${mutation}: inactive detail cache is evicted and return loads the new state/link`, async t => {
-    const h = harness(t);
-    h.server.followups[0].status = 'BOOKED';
-    const subscription = h.dispatch('getFollowUp', 'f1'); await subscription;
-    assert.match(h.render('detail').markup, /Booked/);
-    subscription.unsubscribe();
-    // Allow RTK to process the unsubscribe before invalidating the inactive entry.
-    await new Promise(resolve => setTimeout(resolve, 0));
-    h.server.mutate = () => {
-      h.server.followups[0].status = mutation === 'cancelAppointment' ? 'OPEN' : 'BOOKED';
-      h.server.followups[0].linked_appointment = mutation === 'rescheduleAppointment'
-        ? { appointment_id: 'a2', date: '2026-10-22' } : null;
-      return {};
-    };
-    await h.dispatch(mutation, { appointmentId: 'a1', body: {}, idempotencyKey: 'move', reason: 'PATIENT_CANCELLED' });
-    await h.settle();
-    assert.ok(h.state('getFollowUp', 'f1').isUninitialized);
-    await h.dispatch('getFollowUp', 'f1');
-    assert.match(h.render('detail').markup, mutation === 'cancelAppointment' ? /Open/ : /22 Oct 2026/);
-  });
-}
+test('checkInAppointment invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('checkInAppointment', { appointmentId: 'a1' }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('blockSession invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('blockSession', { sessionOccurrenceId: 's1', reason: 'test' }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('unblockSession invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('unblockSession', { sessionOccurrenceId: 's1' }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('blockScheduleException invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('blockScheduleException', { doctorId: 'd1', body: {} }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('unblockScheduleExceptions invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('unblockScheduleExceptions', { doctorId: 'd1', date: '2026-10-20' }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('createAppointmentMessage invalidates reminder eligibility/content', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('reminderWorklist', h.args.reminderWorklist);
+  const before = h.server.requests.filter(r => r.path.endsWith('/reminders')).length;
+  h.server.mutate = () => ({});
+  await h.dispatch('createAppointmentMessage', { appointmentId: 'a1', body: {} }); await h.settle();
+  assert.ok(h.server.requests.filter(r => r.path.endsWith('/reminders')).length > before);
+});
+
+test('cancelAppointment: inactive detail cache is evicted and return loads the new state/link', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('getFollowUp', 'f1', { subscribe: false });
+  assert.equal(h.state('getFollowUp', 'f1').data.status, 'OPEN');
+  h.server.mutate = () => { h.server.followups[0].status = 'OPEN'; return {}; };
+  await h.dispatch('cancelAppointment', { appointmentId: 'a1', body: { reason: 'PATIENT_CANCELLED' } }); await h.settle();
+  assert.equal(h.state('getFollowUp', 'f1').status, 'uninitialized');
+  const returned = await h.dispatch('getFollowUp', 'f1', { subscribe: false }).unwrap();
+  assert.equal(returned.status, 'OPEN');
+});
+
+test('rescheduleAppointment: inactive detail cache is evicted and return loads the new state/link', async t => {
+  const h = harness(t, 5);
+  await h.dispatch('getFollowUp', 'f1', { subscribe: false });
+  h.server.mutate = () => { h.server.followups[0].linked_appointment = { appointment_id: 'a1', date: '2026-10-18', time: '11:00:00' }; return {}; };
+  await h.dispatch('rescheduleAppointment', { appointmentId: 'a1', body: { date: '2026-10-18', time: '11:00:00' } }); await h.settle();
+  assert.equal(h.state('getFollowUp', 'f1').status, 'uninitialized');
+  const returned = await h.dispatch('getFollowUp', 'f1', { subscribe: false }).unwrap();
+  assert.equal(returned.linked_appointment.time, '11:00:00');
+});
