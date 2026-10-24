@@ -20,7 +20,9 @@ def configure_http_boundary(app: FastAPI, config: Settings) -> None:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts)
     if config.cors_origins:
         app.add_middleware(
-            CORSMiddleware, allow_origins=config.cors_origins, allow_credentials=False,
+            CORSMiddleware,
+            allow_origins=config.cors_origins,
+            allow_credentials=False,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
             expose_headers=["X-Request-ID", "Retry-After"],
@@ -66,17 +68,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         started = perf_counter()
-        response = await call_next(request)
-        duration_ms = round((perf_counter() - started) * 1000, 2)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Do not attach exc_info here. Exception messages can contain SQL,
+            # credentials, or patient data. The safe API error handler owns the
+            # client-facing envelope; this log only records operational metadata.
+            request_logger.error(
+                "request_failed",
+                extra=self._metadata(request, started, status_code=500),
+            )
+            raise
+
         request_logger.info(
             "request_complete",
-            extra={
-                "request_id": getattr(request.state, "request_id", None),
-                "method": request.method,
-                # Route templates exclude patient identifiers and arbitrary URL text.
-                "path": getattr(request.scope.get("route"), "path", "unmatched"),
-                "status_code": response.status_code,
-                "duration_ms": duration_ms,
-            },
+            extra=self._metadata(request, started, status_code=response.status_code),
         )
         return response
+
+    @staticmethod
+    def _metadata(request: Request, started: float, *, status_code: int) -> dict[str, object]:
+        return {
+            "request_id": getattr(request.state, "request_id", None),
+            "method": request.method,
+            # Route templates exclude patient identifiers and arbitrary URL text.
+            "path": getattr(request.scope.get("route"), "path", "unmatched"),
+            "status_code": status_code,
+            "duration_ms": round((perf_counter() - started) * 1000, 2),
+        }
