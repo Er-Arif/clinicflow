@@ -1,7 +1,7 @@
 import { QueryState } from '@/components/QueryState';
 import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import {
@@ -19,6 +19,12 @@ import { AppButton } from '@/components/AppButton';
 import { BackButton } from '@/components/BackButton';
 import { useIntentIdempotencyKey } from '@/features/appointments/idempotency';
 import type { Patient } from '@/features/patients/types';
+import {
+  canSubmitWalkInCapacityOverride,
+  findActiveWalkInSession,
+  getSuggestedWalkInFee,
+  isWalkInFeeAdjustmentValid,
+} from '@/features/visits/walkInRules';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { formatClinicTime, formatClinicTimeRange } from '@/utils/dates';
 
@@ -65,16 +71,11 @@ export default function WalkInScreen() {
   );
   const isOwner = Boolean(me.data?.roles.includes('OWNER_ADMIN'));
   const canAdjust = isOwner || Boolean(fee.data?.assistant_adjustment_allowed);
-  const suggestedFee = useMemo(
-    () => !fee.data ? '' : String(appointmentType === 'REGULAR' ? fee.data.regular_fee : fee.data.followup_fee),
-    [appointmentType, fee.data],
+  const suggestedFee = getSuggestedWalkInFee(fee.data, appointmentType);
+  const activeSession = findActiveWalkInSession(
+    availability.data?.sessions,
+    clinicTime.data?.clinic_now,
   );
-  const clinicClock = clinicTime.data?.clinic_now?.slice(11, 16) ?? '';
-  const activeSession = availability.data?.sessions && clinicClock
-    ? availability.data.sessions.find(
-      session => session.start_time.slice(0, 5) <= clinicClock && clinicClock < session.end_time.slice(0, 5),
-    ) ?? null
-    : null;
 
   const walkInIntent = JSON.stringify({
     patient_id: patient?.patient_id ?? null,
@@ -137,12 +138,20 @@ export default function WalkInScreen() {
       // The current request error is rendered below.
     }
   }
+
   const sessionFull = activeSession ? activeSession.remaining_capacity <= 0 : false;
   const blocked = activeSession?.status === 'BLOCKED';
-  const canSubmitOverride = !sessionFull
-    || (isOwner && overrideEnabled && overrideReason.trim().length >= 2);
-  const adjustmentValid = !adjustFee
-    || (/^\d+(\.\d{1,2})?$/.test(adjustedAmount) && adjustReason.trim().length >= 2);
+  const canSubmitOverride = canSubmitWalkInCapacityOverride(
+    sessionFull,
+    isOwner,
+    overrideEnabled,
+    overrideReason,
+  );
+  const adjustmentValid = isWalkInFeeAdjustmentValid(
+    adjustFee,
+    adjustedAmount,
+    adjustReason,
+  );
   const activeErr = walkInRequest.resultMatchesIntent ? apiError(addState.error) : null;
 
   return (
