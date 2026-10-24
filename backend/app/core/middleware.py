@@ -24,7 +24,14 @@ def configure_http_boundary(app: FastAPI, config: Settings) -> None:
             allow_origins=config.cors_origins,
             allow_credentials=False,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "X-Request-ID",
+                "Idempotency-Key",
+                "X-ClinicFlow-Mobile-Version",
+                "X-ClinicFlow-Mobile-Version-Code",
+            ],
             expose_headers=["X-Request-ID", "Retry-After"],
         )
 
