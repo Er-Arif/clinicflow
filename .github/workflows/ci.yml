@@ -54,6 +54,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run validate:release-metadata
+      - run: npm run validate:android-security
       - run: npm test
 
   infra:
