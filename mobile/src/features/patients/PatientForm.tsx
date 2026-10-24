@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 999,
   },
-  choiceSelected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
+  choiceSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
   choiceText: { color: colors.text },
-  choiceTextSelected: { color: colors.primary, fontWeight: '700' },
+  choiceTextSelected: { color: '#FFFFFF', fontWeight: '700' },
   errorText: { color: colors.danger, fontSize: 12 },
 });
