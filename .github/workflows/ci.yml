@@ -57,6 +57,8 @@ jobs:
           java-version: '17'
           cache: gradle
       - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run validate:release-metadata
