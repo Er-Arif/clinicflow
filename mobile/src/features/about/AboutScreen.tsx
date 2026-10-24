@@ -7,16 +7,8 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { ClinicFlowLogo } from '@/components/ClinicFlowLogo';
+import { compareVersions } from '@/features/about/version';
 import { colors, radius, spacing } from '@/theme/tokens';
-
-type SystemInfoWithUpdates = {
-  service: string;
-  api_version: string;
-  build_commit: string;
-  environment: string;
-  minimum_mobile_version: string;
-  latest_mobile_version?: string | null;
-};
 
 type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'unavailable' | 'error';
 
@@ -35,13 +27,18 @@ export function AboutScreen() {
         setUpdateState('error');
         return;
       }
-      const info = result.data as SystemInfoWithUpdates | undefined;
-      const latest = info?.latest_mobile_version?.trim() || null;
+      const latest = result.data?.latest_mobile_version?.trim() || null;
       setLatestVersion(latest);
       if (!latest || appVersion === 'Unknown') {
         setUpdateState('unavailable');
+        return;
+      }
+
+      const comparison = compareVersions(latest, appVersion);
+      if (comparison === null) {
+        setUpdateState('unavailable');
       } else {
-        setUpdateState(compareVersions(latest, appVersion) > 0 ? 'available' : 'current');
+        setUpdateState(comparison > 0 ? 'available' : 'current');
       }
     } catch {
       setUpdateState('error');
@@ -108,18 +105,6 @@ function Row({ label, value }: { label: string; value: string }) {
       <Text style={styles.value}>{value}</Text>
     </View>
   );
-}
-
-function compareVersions(a: string, b: string) {
-  const normalize = (value: string) => value.replace(/^v/i, '').split('-')[0].split('.').map(part => Number(part) || 0);
-  const left = normalize(a);
-  const right = normalize(b);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0 ? 1 : -1;
-  }
-  return 0;
 }
 
 const styles = StyleSheet.create({
