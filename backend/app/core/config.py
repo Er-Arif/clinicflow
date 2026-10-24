@@ -119,8 +119,16 @@ def _validate_mobile_update_settings(config: Settings) -> None:
     apk_sha256 = config.mobile_apk_sha256.strip()
     if bool(apk_url) != bool(apk_sha256):
         raise RuntimeError("MOBILE_APK_URL and MOBILE_APK_SHA256 must be configured together.")
-    if config.mobile_update_mandatory and not apk_url:
-        raise RuntimeError("MOBILE_UPDATE_MANDATORY requires an APK URL and SHA-256.")
+
+    artifact_required = (
+        config.latest_mobile_version_code > config.minimum_mobile_version_code
+        or config.minimum_mobile_version_code > 1
+        or config.mobile_update_mandatory
+    )
+    if artifact_required and not apk_url:
+        raise RuntimeError(
+            "A newer, enforced, or mandatory mobile build requires MOBILE_APK_URL and MOBILE_APK_SHA256."
+        )
     if not apk_url:
         return
 
