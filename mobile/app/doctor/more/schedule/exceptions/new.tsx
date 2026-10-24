@@ -46,7 +46,6 @@ export default function BlockDateScreen() {
   const hasSessions = sessions.length > 0;
   const singleSession = sessions.length === 1;
 
-  // Single active session freeze: if exactly 1 session, effective scope is always FULL_DAY
   const effectiveScope = singleSession ? 'FULL_DAY' : scope;
 
   const isSelectedSessionValid = sessions.some(
@@ -58,7 +57,6 @@ export default function BlockDateScreen() {
     ? sessions[0].session_definition_id
     : null;
 
-  // Booked appointments count for warning
   const bookedAppointmentsCount = (() => {
     if (!hasSessions) return 0;
     if (effectiveScope === 'FULL_DAY') {
@@ -145,13 +143,11 @@ export default function BlockDateScreen() {
       </View>
 
       <View style={styles.formCard}>
-        {/* 1. Date */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Date</Text>
           <DatePicker value={date} onChange={setCustomDate} placeholder="YYYY-MM-DD" />
         </View>
 
-        {/* 2. Scope */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Scope</Text>
           {singleSession ? (
@@ -195,7 +191,6 @@ export default function BlockDateScreen() {
           )}
         </View>
 
-        {/* 3. Session Selector (only if Specific Session chosen and 2+ sessions) */}
         {effectiveScope === 'SESSION' && sessions.length >= 2 && (
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Select session</Text>
@@ -219,7 +214,6 @@ export default function BlockDateScreen() {
           </View>
         )}
 
-        {/* 4. Reason */}
         <View style={styles.fieldGroup}>
           <FormField
             label="Reason"
@@ -235,7 +229,6 @@ export default function BlockDateScreen() {
           <Text style={styles.charCount}>{reason.length}/300</Text>
         </View>
 
-        {/* Notice if no sessions or already blocked */}
         {!availabilityQuery.isLoading && !hasSessions && (
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
@@ -254,7 +247,6 @@ export default function BlockDateScreen() {
           </View>
         )}
 
-        {/* 5. Appointment Warning */}
         {bookedAppointmentsCount > 0 && (
           <View style={styles.warningBox}>
             <Text style={styles.warningTitle}>Existing bookings notice</Text>
@@ -308,11 +300,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   scopeChipActive: {
-    backgroundColor: colors.softPrimary,
-    borderColor: colors.primary,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   chipText: { color: colors.text, fontWeight: '600', fontSize: 13 },
-  chipTextActive: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  chipTextActive: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   helperText: { color: colors.muted, fontSize: 13 },
   reasonInput: {
     minHeight: 60,
