@@ -1,9 +1,15 @@
+import logging
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings, sqlalchemy_database_url, validate_runtime_settings
-from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    RequestIdMiddleware,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 
 def test_production_rejects_default_access_secret() -> None:
@@ -53,6 +59,31 @@ def test_api_responses_include_security_and_request_headers() -> None:
     assert response.headers["referrer-policy"] == "no-referrer"
     assert response.headers["cache-control"] == "no-store"
     assert response.headers.get("x-request-id")
+
+
+def test_unexpected_request_failure_is_logged_without_exception_details(caplog) -> None:
+    probe = FastAPI()
+    probe.add_middleware(RequestLoggingMiddleware)
+    probe.add_middleware(RequestIdMiddleware)
+
+    @probe.get("/api/explode/{patient_id}")
+    def explode(patient_id: str) -> None:
+        raise RuntimeError(f"database password=do-not-log patient={patient_id}")
+
+    caplog.set_level(logging.ERROR, logger="clinicflow.request")
+    with TestClient(probe, raise_server_exceptions=False) as client:
+        response = client.get("/api/explode/patient-secret-value")
+
+    assert response.status_code == 500
+    records = [record for record in caplog.records if record.message == "request_failed"]
+    assert len(records) == 1
+    record = records[0]
+    assert record.path == "/api/explode/{patient_id}"
+    assert record.status_code == 500
+    assert record.request_id
+    rendered = caplog.text
+    assert "do-not-log" not in rendered
+    assert "patient-secret-value" not in rendered
 
 
 def test_validation_and_unexpected_errors_use_safe_envelope() -> None:
@@ -125,7 +156,6 @@ def test_audit_service_redacts_authentication_secrets_recursively() -> None:
 
 def test_json_logging_formatter_keeps_request_metadata_structured() -> None:
     import json
-    import logging
 
     from app.core.logging import JsonFormatter
 
