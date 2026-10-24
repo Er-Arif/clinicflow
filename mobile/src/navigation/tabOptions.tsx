@@ -41,8 +41,8 @@ export function getSharedTabScreenOptions(insets: EdgeInsets) {
   return {
     headerShown: false,
     unmountOnBlur: true,
-    tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: colors.muted,
+    tabBarActiveTintColor: '#1F6BFF',
+    tabBarInactiveTintColor: '#62748D',
     tabBarShowLabel: true,
     tabBarHideOnKeyboard: true,
     tabBarStyle: {
