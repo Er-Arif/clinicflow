@@ -1,24 +1,11 @@
 import {
-  BaseQueryFn,
-  FetchArgs,
-  FetchBaseQueryError,
   createApi,
-  fetchBaseQuery,
   type TypedMutationOnQueryStarted,
 } from '@reduxjs/toolkit/query/react';
 
-import { newRequestId } from '@/api/requestId';
-import { getApiUrl } from '@/api/config';
+import { baseQueryWithReauth } from '@/api/baseQuery';
 import { WORKLIST_PAGE_SIZE, worklistOptions } from '@/api/worklists';
-import { notifySessionExpired } from '@/auth/sessionEvents';
-import {
-  AuthUser,
-  TokenPair,
-  clearSessionTokens,
-  getAccessToken,
-  getRefreshToken,
-  setSessionTokens,
-} from '@/auth/session';
+import type { AuthUser, TokenPair } from '@/auth/session';
 import {
   Patient,
   PatientCreatePayload,
@@ -78,71 +65,7 @@ import {
   ScheduleApply,
 } from '@/features/scheduling/types';
 
-const apiUrl = getApiUrl();
-
-const rawBaseQuery = fetchBaseQuery({
-  baseUrl: apiUrl,
-  prepareHeaders: (headers) => {
-    const token = getAccessToken();
-    if (token) headers.set('authorization', `Bearer ${token}`);
-    if (!headers.has('x-request-id')) headers.set('x-request-id', newRequestId());
-    return headers;
-  },
-});
-
-let refreshPromise: Promise<TokenPair | null> | null = null;
-
-async function performRefresh(): Promise<TokenPair | null> {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) return null;
-
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-request-id': newRequestId() },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-  } catch {
-    // A temporary network failure must not destroy a still-valid local session.
-    return null;
-  }
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      await clearSessionTokens();
-      notifySessionExpired();
-    }
-    return null;
-  }
-  const tokens = (await response.json()) as TokenPair;
-  await setSessionTokens(tokens);
-  return tokens;
-}
-
-export async function refreshSessionSingleFlight(): Promise<TokenPair | null> {
-  if (!refreshPromise) {
-    refreshPromise = performRefresh().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  return refreshPromise;
-}
-
-const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
-  args,
-  api,
-  extraOptions,
-) => {
-  let result = await rawBaseQuery(args, api, extraOptions);
-  const url = typeof args === 'string' ? args : args.url;
-  const isAuthBootstrap = url.includes('/auth/login') || url.includes('/auth/refresh');
-
-  if (result.error?.status === 401 && !isAuthBootstrap) {
-    const refreshed = await refreshSessionSingleFlight();
-    if (refreshed) result = await rawBaseQuery(args, api, extraOptions);
-  }
-  return result;
-};
+export { refreshSessionSingleFlight } from '@/api/baseQuery';
 
 function refreshPendingWorklists(domains: ('FollowUp' | 'Reminder')[]): TypedMutationOnQueryStarted<unknown, unknown, typeof baseQueryWithReauth> {
   return async (_arg, { dispatch, getState, queryFulfilled }) => {
