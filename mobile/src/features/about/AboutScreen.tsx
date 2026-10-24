@@ -22,8 +22,8 @@ type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'unavailable'
 
 export function AboutScreen() {
   const system = useGetSystemInfoQuery();
-  const appVersion = Constants.expoConfig?.version ?? 'unknown';
-  const buildNumber = Constants.expoConfig?.android?.versionCode?.toString() ?? 'unknown';
+  const appVersion = Constants.expoConfig?.version ?? 'Unknown';
+  const buildNumber = Constants.expoConfig?.android?.versionCode?.toString() ?? 'Unknown';
   const [updateState, setUpdateState] = useState<UpdateState>('idle');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export function AboutScreen() {
       const info = result.data as SystemInfoWithUpdates | undefined;
       const latest = info?.latest_mobile_version?.trim() || null;
       setLatestVersion(latest);
-      if (!latest || appVersion === 'unknown') {
+      if (!latest || appVersion === 'Unknown') {
         setUpdateState('unavailable');
       } else {
         setUpdateState(compareVersions(latest, appVersion) > 0 ? 'available' : 'current');
@@ -56,15 +56,10 @@ export function AboutScreen() {
       </View>
 
       <View style={styles.card}>
-        <Row label="Mobile version" value={appVersion} />
-        <Row label="Android build" value={buildNumber} />
-        <Row label="Backend version" value={system.data?.api_version ?? 'Unavailable'} />
-        <Row label="Backend commit" value={system.data?.build_commit ?? 'Unavailable'} />
-        <Row label="Environment" value={system.data?.environment ?? 'Unavailable'} />
-        <Row label="Minimum mobile version" value={system.data?.minimum_mobile_version ?? 'Unavailable'} />
+        <Row label="Version" value={appVersion} />
+        <Row label="Build" value={buildNumber} />
       </View>
 
-      {system.isError ? <Text style={styles.warning}>Backend build information could not be loaded.</Text> : null}
       <UpdateMessage state={updateState} latestVersion={latestVersion} />
       <AppButton
         label={updateState === 'checking' ? 'Checking…' : 'Check for updates'}
@@ -80,13 +75,28 @@ export function AboutScreen() {
 function UpdateMessage({ state, latestVersion }: { state: UpdateState; latestVersion: string | null }) {
   if (state === 'idle' || state === 'checking') return null;
   if (state === 'available') {
-    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update available</Text><Text style={styles.updateText}>ClinicFlow {latestVersion} is available. Update installation is not enabled in this build yet.</Text></View>;
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>Update available</Text>
+        <Text style={styles.updateText}>ClinicFlow {latestVersion} is available.</Text>
+      </View>
+    );
   }
   if (state === 'current') {
-    return <View style={styles.updateCard}><Text style={styles.updateTitle}>You’re up to date</Text><Text style={styles.updateText}>This is the latest version reported by ClinicFlow.</Text></View>;
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>You’re up to date</Text>
+        <Text style={styles.updateText}>You’re using the latest available version of ClinicFlow.</Text>
+      </View>
+    );
   }
   if (state === 'unavailable') {
-    return <View style={styles.updateCard}><Text style={styles.updateTitle}>Update information unavailable</Text><Text style={styles.updateText}>ClinicFlow couldn’t retrieve update information right now. Please try again later.</Text></View>;
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>Update information unavailable</Text>
+        <Text style={styles.updateText}>Please try again later.</Text>
+      </View>
+    );
   }
   return <Text style={styles.warning}>Unable to check for updates right now.</Text>;
 }
