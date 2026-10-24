@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from ipaddress import ip_network
 from typing import Literal
@@ -6,6 +7,11 @@ from urllib.parse import urlsplit
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
+
+MOBILE_VERSION_PATTERN = re.compile(
+    r"^v?\d+(?:\.\d+)*(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
+MOBILE_SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 class Settings(BaseSettings):
@@ -27,7 +33,13 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     build_commit: str = "development"
     minimum_mobile_version: str = "0.1.0"
+    minimum_mobile_version_code: int = Field(default=1, ge=1)
     latest_mobile_version: str = "0.1.0"
+    latest_mobile_version_code: int = Field(default=1, ge=1)
+    mobile_apk_url: str = ""
+    mobile_apk_sha256: str = ""
+    mobile_release_notes: str = ""
+    mobile_update_mandatory: bool = False
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"])
     cors_origins: list[str] = Field(default_factory=list)
     trusted_proxy_ips: list[str] = Field(default_factory=list)
@@ -65,6 +77,9 @@ def validate_runtime_settings(config: Settings) -> None:
             raise RuntimeError("CORS_ORIGINS must contain exact origins without paths or wildcards.")
         if environment in {"staging", "production"} and parsed.scheme != "https":
             raise RuntimeError("Production CORS_ORIGINS must use HTTPS.")
+
+    _validate_mobile_update_settings(config)
+
     if environment not in {"staging", "production"}:
         return
 
@@ -87,6 +102,31 @@ def validate_runtime_settings(config: Settings) -> None:
         raise RuntimeError("Production DATABASE_URL requires a non-placeholder database password.")
     if not config.allowed_hosts or any("*" in host or "/" in host for host in config.allowed_hosts):
         raise RuntimeError("Production ALLOWED_HOSTS requires explicit host names.")
+
+
+def _validate_mobile_update_settings(config: Settings) -> None:
+    for value, label in (
+        (config.minimum_mobile_version, "MINIMUM_MOBILE_VERSION"),
+        (config.latest_mobile_version, "LATEST_MOBILE_VERSION"),
+    ):
+        if not MOBILE_VERSION_PATTERN.fullmatch(value.strip()):
+            raise RuntimeError(f"{label} must use a semantic numeric version such as 1.0.0 or 1.0.0-rc.1.")
+
+    if config.minimum_mobile_version_code > config.latest_mobile_version_code:
+        raise RuntimeError("MINIMUM_MOBILE_VERSION_CODE must not exceed LATEST_MOBILE_VERSION_CODE.")
+
+    apk_url = config.mobile_apk_url.strip()
+    apk_sha256 = config.mobile_apk_sha256.strip()
+    if bool(apk_url) != bool(apk_sha256):
+        raise RuntimeError("MOBILE_APK_URL and MOBILE_APK_SHA256 must be configured together.")
+    if not apk_url:
+        return
+
+    parsed = urlsplit(apk_url)
+    if parsed.scheme != "https" or parsed.hostname != "github.com" or parsed.username or parsed.password:
+        raise RuntimeError("MOBILE_APK_URL must be an HTTPS github.com release asset URL.")
+    if not MOBILE_SHA256_PATTERN.fullmatch(apk_sha256):
+        raise RuntimeError("MOBILE_APK_SHA256 must contain exactly 64 hexadecimal characters.")
 
 
 @lru_cache
