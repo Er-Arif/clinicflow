@@ -26,7 +26,6 @@ export default function MoreScreen() {
         <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign out'} onPress={confirmSignOut} danger />
       </Section>
       <MenuCard label="About" onPress={() => router.push('/about')} />
-      <Text style={styles.version}>ClinicFlow V1</Text>
     </AppScreen>
   );
 }
@@ -54,6 +53,5 @@ const styles = StyleSheet.create({
   text: { fontSize: 15, fontWeight: '600', color: colors.text },
   danger: { color: colors.danger },
   chevron: { color: colors.muted, fontSize: 24, lineHeight: 26 },
-  version: { textAlign: 'center', color: colors.muted, fontSize: 12, marginTop: spacing.sm },
   pressed: { backgroundColor: colors.surfaceSoft },
 });
