@@ -6,6 +6,12 @@ from app.core.errors import AppError
 from app.core.mobile_compat import require_supported_mobile
 from app.main import app
 
+_VALID_APK_URL = (
+    "https://github.com/Er-Arif/clinicflow/releases/download/"
+    "v1.2.0/clinicflow-v1.2.0.apk"
+)
+_VALID_SHA256 = "a" * 64
+
 
 def test_initial_v1_baseline_allows_legacy_client_without_header(monkeypatch) -> None:
     monkeypatch.setattr(settings, "minimum_mobile_version_code", 1)
@@ -57,6 +63,8 @@ def test_business_api_enforces_build_but_update_and_auth_paths_stay_reachable(
     monkeypatch.setattr(settings, "minimum_mobile_version_code", 3)
     monkeypatch.setattr(settings, "latest_mobile_version", "1.2.0")
     monkeypatch.setattr(settings, "latest_mobile_version_code", 4)
+    monkeypatch.setattr(settings, "mobile_apk_url", _VALID_APK_URL)
+    monkeypatch.setattr(settings, "mobile_apk_sha256", _VALID_SHA256)
 
     with TestClient(app) as client:
         blocked = client.get("/api/v1/clinic/time")
