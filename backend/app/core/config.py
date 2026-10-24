@@ -12,6 +12,7 @@ MOBILE_VERSION_PATTERN = re.compile(
     r"^v?\d+(?:\.\d+)*(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
 MOBILE_SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
+MOBILE_RELEASE_PATH_PREFIX = "/Er-Arif/clinicflow/releases/download/"
 
 
 class Settings(BaseSettings):
@@ -71,9 +72,16 @@ def validate_runtime_settings(config: Settings) -> None:
             raise RuntimeError("TRUSTED_PROXY_IPS must not trust every address.")
     for origin in config.cors_origins:
         parsed = urlsplit(origin)
-        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
-                or parsed.username or parsed.password or parsed.path
-                or parsed.query or parsed.fragment or "*" in origin):
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or "*" in origin
+        ):
             raise RuntimeError("CORS_ORIGINS must contain exact origins without paths or wildcards.")
         if environment in {"staging", "production"} and parsed.scheme != "https":
             raise RuntimeError("Production CORS_ORIGINS must use HTTPS.")
@@ -98,7 +106,11 @@ def validate_runtime_settings(config: Settings) -> None:
     if not config.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
         raise RuntimeError("ClinicFlow staging/production requires PostgreSQL.")
     password = make_url(config.database_url).password or ""
-    if not password or password.lower() in {"clinicflow", "postgres", "password"} or password.lower().startswith(("replace-", "change")):
+    if (
+        not password
+        or password.lower() in {"clinicflow", "postgres", "password"}
+        or password.lower().startswith(("replace-", "change"))
+    ):
         raise RuntimeError("Production DATABASE_URL requires a non-placeholder database password.")
     if not config.allowed_hosts or any("*" in host or "/" in host for host in config.allowed_hosts):
         raise RuntimeError("Production ALLOWED_HOSTS requires explicit host names.")
@@ -110,7 +122,9 @@ def _validate_mobile_update_settings(config: Settings) -> None:
         (config.latest_mobile_version, "LATEST_MOBILE_VERSION"),
     ):
         if not MOBILE_VERSION_PATTERN.fullmatch(value.strip()):
-            raise RuntimeError(f"{label} must use a semantic numeric version such as 1.0.0 or 1.0.0-rc.1.")
+            raise RuntimeError(
+                f"{label} must use a semantic numeric version such as 1.0.0 or 1.0.0-rc.1."
+            )
 
     if config.minimum_mobile_version_code > config.latest_mobile_version_code:
         raise RuntimeError("MINIMUM_MOBILE_VERSION_CODE must not exceed LATEST_MOBILE_VERSION_CODE.")
@@ -133,7 +147,10 @@ def _validate_mobile_update_settings(config: Settings) -> None:
         return
 
     parsed = urlsplit(apk_url)
-    is_release_asset = "/releases/download/" in parsed.path and parsed.path.lower().endswith(".apk")
+    is_release_asset = (
+        parsed.path.startswith(MOBILE_RELEASE_PATH_PREFIX)
+        and parsed.path.lower().endswith(".apk")
+    )
     if (
         parsed.scheme != "https"
         or parsed.hostname != "github.com"
@@ -143,7 +160,9 @@ def _validate_mobile_update_settings(config: Settings) -> None:
         or parsed.fragment
         or not is_release_asset
     ):
-        raise RuntimeError("MOBILE_APK_URL must be a direct HTTPS github.com release APK URL.")
+        raise RuntimeError(
+            "MOBILE_APK_URL must be a direct HTTPS ClinicFlow GitHub release APK URL."
+        )
     if not MOBILE_SHA256_PATTERN.fullmatch(apk_sha256):
         raise RuntimeError("MOBILE_APK_SHA256 must contain exactly 64 hexadecimal characters.")
 
