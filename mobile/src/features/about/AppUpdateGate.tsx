@@ -88,6 +88,14 @@ export function AppUpdateGate() {
     setState('hidden');
   };
 
+  const actionLabel = state === 'permission'
+    ? 'Continue update'
+    : state === 'installing'
+      ? 'Open installer again'
+      : state === 'error'
+        ? 'Retry update'
+        : 'Update ClinicFlow';
+
   return (
     <Modal
       visible
@@ -107,7 +115,7 @@ export function AppUpdateGate() {
               : state === 'downloading'
                 ? 'Downloading and verifying the signed ClinicFlow update…'
                 : state === 'installing'
-                  ? 'Android’s installer is open. Review and confirm the system prompt to finish updating ClinicFlow.'
+                  ? 'Android’s installer was opened. Confirm the system prompt, or reopen it if you returned without installing.'
                   : state === 'error'
                     ? 'The update could not be prepared. Check your connection and try again.'
                     : `ClinicFlow ${data.latest_mobile_version} is ready to install.`}
@@ -116,15 +124,13 @@ export function AppUpdateGate() {
             <Text style={styles.notes}>{data.mobile_release_notes.trim()}</Text>
           ) : null}
 
-          {state !== 'installing' ? (
-            <AppButton
-              label={state === 'permission' ? 'Continue update' : state === 'error' ? 'Retry update' : 'Update ClinicFlow'}
-              loading={state === 'downloading'}
-              disabled={state === 'downloading'}
-              onPress={() => { void install(); }}
-            />
-          ) : null}
-          {!mandatory && state !== 'downloading' && state !== 'installing' ? (
+          <AppButton
+            label={actionLabel}
+            loading={state === 'downloading'}
+            disabled={state === 'downloading'}
+            onPress={() => { void install(); }}
+          />
+          {!mandatory && state !== 'downloading' ? (
             <AppButton label="Later" tone="secondary" onPress={closeOptional} />
           ) : null}
         </View>
