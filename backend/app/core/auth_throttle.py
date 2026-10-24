@@ -8,7 +8,7 @@ import hashlib
 import logging
 import math
 from collections import deque
-from ipaddress import ip_address, ip_network
+from ipaddress import ip_address
 from threading import Lock
 from time import monotonic
 
@@ -92,20 +92,6 @@ def _proxy_client_ip(value: str | None, *, forwarded_chain: bool = False) -> str
         return "unknown"
 
 
-def _is_trusted_proxy(peer: str | None) -> bool:
-    if not peer:
-        return False
-    try:
-        address = ip_address(peer)
-    except ValueError:
-        return False
-
-    return any(
-        address in ip_network(network, strict=False)
-        for network in settings.trusted_proxy_ips
-    )
-
-
 def auth_client_ip(request: Request) -> str:
     if settings.client_ip_source == "render":
         # Render terminates public traffic at its edge and forwards the original
@@ -115,22 +101,12 @@ def auth_client_ip(request: Request) -> str:
             forwarded_chain=True,
         )
 
-    if settings.client_ip_source == "trusted_proxy":
-        peer = request.client.host if request.client else None
-        if not _is_trusted_proxy(peer):
-            logger.warning(
-                "untrusted_client_ip_proxy",
-                extra={"request_id": request_id_var.get()},
-            )
-            return "unknown"
-        return _proxy_client_ip(
-            request.headers.get("X-Forwarded-For"),
-            forwarded_chain=True,
-        )
-
     if settings.client_ip_source == "railway":
         return _proxy_client_ip(request.headers.get("X-Real-IP"))
 
+    # For self-hosted reverse proxies, scripts.serve configures Uvicorn's
+    # forwarded_allow_ips from TRUSTED_PROXY_IPS. Uvicorn rewrites request.client
+    # only when the immediate peer is trusted, so socket mode remains safe here.
     return request.client.host if request.client else "unknown"
 
 
