@@ -30,7 +30,7 @@ export function RolePicker({ roles, selected, onChange }: { roles: RolePreset[];
 const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   item: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: colors.surface },
-  active: { borderColor: colors.primary, backgroundColor: colors.softPrimary },
+  active: { borderColor: colors.accent, backgroundColor: colors.accent },
   text: { color: colors.text, fontWeight: '700' },
-  activeText: { color: colors.primary },
+  activeText: { color: '#FFFFFF' },
 });
