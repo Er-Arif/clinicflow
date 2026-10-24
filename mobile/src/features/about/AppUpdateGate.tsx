@@ -9,6 +9,9 @@ import {
   downloadAndInstallUpdate,
   openUnknownSourcesSettings,
 } from '@/features/about/updateInstaller';
+import {
+  subscribeMobileUpdateRequired,
+} from '@/features/about/updateEvents';
 import { evaluateUpdate } from '@/features/about/updatePolicy';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -21,7 +24,7 @@ type GateState =
   | 'error';
 
 export function AppUpdateGate() {
-  const { data, isSuccess } = useGetSystemInfoQuery(undefined, {
+  const { data, isSuccess, refetch } = useGetSystemInfoQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
   const [state, setState] = useState<GateState>('hidden');
@@ -41,6 +44,14 @@ export function AppUpdateGate() {
 
   const hasInstallArtifact = Boolean(data?.mobile_apk_url && data?.mobile_apk_sha256);
   const mandatory = decision?.state === 'available' && decision.mandatory;
+
+  useEffect(
+    () => subscribeMobileUpdateRequired(() => {
+      setDismissed(false);
+      void refetch();
+    }),
+    [refetch],
+  );
 
   useEffect(() => {
     if (
