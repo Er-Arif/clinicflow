@@ -119,12 +119,23 @@ def _validate_mobile_update_settings(config: Settings) -> None:
     apk_sha256 = config.mobile_apk_sha256.strip()
     if bool(apk_url) != bool(apk_sha256):
         raise RuntimeError("MOBILE_APK_URL and MOBILE_APK_SHA256 must be configured together.")
+    if config.mobile_update_mandatory and not apk_url:
+        raise RuntimeError("MOBILE_UPDATE_MANDATORY requires an APK URL and SHA-256.")
     if not apk_url:
         return
 
     parsed = urlsplit(apk_url)
-    if parsed.scheme != "https" or parsed.hostname != "github.com" or parsed.username or parsed.password:
-        raise RuntimeError("MOBILE_APK_URL must be an HTTPS github.com release asset URL.")
+    is_release_asset = "/releases/download/" in parsed.path and parsed.path.lower().endswith(".apk")
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "github.com"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or not is_release_asset
+    ):
+        raise RuntimeError("MOBILE_APK_URL must be a direct HTTPS github.com release APK URL.")
     if not MOBILE_SHA256_PATTERN.fullmatch(apk_sha256):
         raise RuntimeError("MOBILE_APK_SHA256 must contain exactly 64 hexadecimal characters.")
 
