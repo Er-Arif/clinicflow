@@ -13,21 +13,21 @@ type Builder = EndpointBuilder<
   typeof clinicFlowReducerPath
 >;
 
+export type SystemInfo = {
+  service: string;
+  api_version: string;
+  build_commit: string;
+  environment: string;
+  minimum_mobile_version: string;
+  latest_mobile_version: string;
+};
+
 export function systemEndpoints(builder: Builder) {
   return {
     liveness: builder.query<{ status: string; utc_time: string }, void>({
       query: () => '/health/live',
     }),
-    getSystemInfo: builder.query<
-      {
-        service: string;
-        api_version: string;
-        build_commit: string;
-        environment: string;
-        minimum_mobile_version: string;
-      },
-      void
-    >({
+    getSystemInfo: builder.query<SystemInfo, void>({
       query: () => '/api/v1/system/info',
     }),
     login: builder.mutation<
