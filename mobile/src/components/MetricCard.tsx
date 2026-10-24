@@ -1,15 +1,39 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme/tokens';
 
-export function MetricCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.value}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+type Props = {
+  label: string;
+  value: string | number;
+  hint?: string;
+  compact?: boolean;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+};
+
+export function MetricCard({ label, value, hint, compact = false, onPress, accessibilityLabel }: Props) {
+  const content = (
+    <>
+      <Text style={[styles.value, compact && styles.compactValue]}>{value}</Text>
+      <Text numberOfLines={compact ? 2 : undefined} style={[styles.label, compact && styles.compactLabel]}>{label}</Text>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
+        style={({ pressed }) => [styles.card, compact && styles.compactCard, pressed && styles.pressed]}
+        onPress={onPress}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={[styles.card, compact && styles.compactCard]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -19,11 +43,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
-    gap: 3,
+    gap: 4,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.035,
+    shadowRadius: 7,
+    elevation: 1,
   },
-  value: { fontSize: 23, fontWeight: '900', color: colors.text },
-  label: { color: colors.text, fontWeight: '700' },
-  hint: { color: colors.muted, fontSize: 12 },
+  compactCard: { flexBasis: '29%', minWidth: 0, paddingHorizontal: 12, paddingVertical: 13, borderRadius: radius.md },
+  value: { fontSize: 24, lineHeight: 29, fontWeight: '800', color: colors.primaryDark },
+  compactValue: { fontSize: 21, lineHeight: 25 },
+  label: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  compactLabel: { fontSize: 12, lineHeight: 16 },
+  hint: { color: colors.muted, fontSize: 12, lineHeight: 16 },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
 });

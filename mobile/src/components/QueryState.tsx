@@ -5,21 +5,20 @@ import { colors, spacing } from '@/theme/tokens';
 
 type ReadState = { isFetching?: boolean; isLoading?: boolean; isError?: boolean; isSuccess?: boolean; data?: unknown; refetch: () => unknown };
 
-// Small presentation helper: the query continues to own fetching and retained data.
 export function QueryState({ query, label, empty, hasData = query.data !== undefined }: {
   query: ReadState; label: string; empty?: string; hasData?: boolean;
 }) {
   const loading = query.isFetching || query.isLoading;
   const showEmpty = query.isSuccess && !loading && !query.isError && Boolean(empty);
   if (!loading && !query.isError && !showEmpty) return null;
+
   return <View style={{ gap: spacing.sm }}>
     {loading ? <ActivityIndicator accessibilityLabel={`Loading ${label}`} color={colors.primary} /> : null}
     {query.isError ? <>
-      <Text accessibilityRole="alert" style={{ color: colors.danger }}>
-        {`Unable to load ${label}.${hasData ? ' Shown data may be out of date.' : ''}`}
+      <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 13 }}>
+        {hasData ? `${label} may be out of date.` : `Unable to load ${label}.`}
       </Text>
-      <AppButton label={`Retry ${label}`} tone="secondary" disabled={query.isFetching}
-        onPress={() => { void query.refetch(); }} />
-    </> : showEmpty ? <Text style={{ color: colors.muted }}>{empty}</Text> : null}
+      <AppButton compact label={`Retry ${label}`} tone="secondary" disabled={query.isFetching} onPress={() => { void query.refetch(); }} />
+    </> : showEmpty ? <Text style={{ color: colors.muted, fontSize: 13 }}>{empty}</Text> : null}
   </View>;
 }

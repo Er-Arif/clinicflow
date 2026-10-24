@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     build_commit: str = "development"
     minimum_mobile_version: str = "0.1.0"
+    latest_mobile_version: str = "0.1.0"
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"])
     cors_origins: list[str] = Field(default_factory=list)
     trusted_proxy_ips: list[str] = Field(default_factory=list)
@@ -36,6 +37,13 @@ class Settings(BaseSettings):
     db_pool_timeout: int = Field(default=10, ge=1, le=120)
     db_pool_recycle: int = Field(default=1800, ge=60)
     db_connect_timeout: int = Field(default=5, ge=1, le=60)
+
+
+def sqlalchemy_database_url(value: str) -> str:
+    """Use ClinicFlow's psycopg 3 driver for standard managed-Postgres URLs."""
+    if value.startswith("postgresql://"):
+        return f"postgresql+psycopg://{value[len('postgresql://') :]}"
+    return value
 
 
 def validate_runtime_settings(config: Settings) -> None:

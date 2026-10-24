@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
+
+import { useFocusedHardwareBack } from '@/navigation/useFocusedHardwareBack';
 import { colors, spacing } from '@/theme/tokens';
 
 interface BackButtonProps {
@@ -12,10 +14,16 @@ interface BackButtonProps {
 
 export function BackButton({ label = 'Back', onPress, style, textStyle }: BackButtonProps) {
   const router = useRouter();
+  const defaultBack = useCallback(() => router.back(), [router]);
+  const handlePress = onPress ?? defaultBack;
+
+  // A custom visible Back action is a navigation contract. Android hardware Back
+  // must honor the same contract instead of popping a stale navigator entry.
+  useFocusedHardwareBack(handlePress, Boolean(onPress));
 
   return (
     <Pressable
-      onPress={onPress ?? (() => router.back())}
+      onPress={handlePress}
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       style={[styles.button, style]}
       accessibilityRole="button"

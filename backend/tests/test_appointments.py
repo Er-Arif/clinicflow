@@ -10,6 +10,7 @@ from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
     AppointmentCancelRequest,
     AppointmentCreateRequest,
+    AppointmentPatientSummary,
     AppointmentRescheduleRequest,
     CapacityOverrideInput,
 )
@@ -39,6 +40,16 @@ def test_invalid_appointment_type_rejected() -> None:
             appointment_time=time(10, 15),
             appointment_type="EMERGENCY",
         )
+
+
+def test_appointment_patient_summary_allows_missing_mobile() -> None:
+    summary = AppointmentPatientSummary(
+        patient_id="00000000-0000-0000-0000-000000000001",
+        patient_code="PT-000001",
+        full_name="No Phone Patient",
+        mobile_number=None,
+    )
+    assert summary.mobile_number == ""
 
 
 def test_other_cancellation_requires_note() -> None:

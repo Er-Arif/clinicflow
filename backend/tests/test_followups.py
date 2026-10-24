@@ -12,6 +12,7 @@ from app.modules.followups.schemas import (
     FollowUpBookRequest,
     FollowUpCloseRequest,
     FollowUpCreateInput,
+    FollowUpPatientSummary,
     VisitCompleteRequest,
 )
 from app.modules.followups.service import FollowUpService
@@ -39,6 +40,16 @@ def test_followup_create_requires_exactly_one_due_method() -> None:
 def test_visit_complete_allows_no_followup() -> None:
     request = VisitCompleteRequest(follow_up=None)
     assert request.follow_up is None
+
+
+def test_followup_patient_summary_allows_missing_mobile() -> None:
+    patient = FollowUpPatientSummary(
+        patient_id=uuid4(),
+        patient_code="PT-000001",
+        full_name="No Phone Patient",
+        mobile_number=None,
+    )
+    assert patient.mobile_number is None
 
 
 def test_followup_close_other_requires_note() -> None:

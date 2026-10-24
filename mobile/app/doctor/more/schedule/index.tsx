@@ -4,12 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import {
-  useClinicTimeQuery,
-  useGetScheduleQuery,
-  useListDoctorsQuery,
-  useListScheduleExceptionsQuery,
-} from '@/api/api';
+import { useClinicTimeQuery, useGetScheduleQuery, useListDoctorsQuery, useListScheduleExceptionsQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
@@ -25,21 +20,9 @@ export default function ScheduleHubScreen() {
   const doctors = useListDoctorsQuery();
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const doctorId = selectedDoctor ?? doctors.data?.[0]?.doctor_id ?? '';
-
-  const scheduleQuery = useGetScheduleQuery(
-    { doctorId, effectiveOn: today },
-    { skip: !doctorId || !today }
-  );
-
-  const exceptionsQuery = useListScheduleExceptionsQuery(
-    { doctorId, fromDate: today },
-    { skip: !doctorId || !today }
-  );
-
-  const activeDayIndices = (scheduleQuery.data?.days ?? [])
-    .filter((d) => d.active && d.sessions.some((s) => s.active))
-    .map((d) => d.weekday);
-
+  const scheduleQuery = useGetScheduleQuery({ doctorId, effectiveOn: today }, { skip: !doctorId || !today });
+  const exceptionsQuery = useListScheduleExceptionsQuery({ doctorId, fromDate: today }, { skip: !doctorId || !today });
+  const activeDayIndices = (scheduleQuery.data?.days ?? []).filter(d => d.active && d.sessions.some(s => s.active)).map(d => d.weekday);
   const exceptions = exceptionsQuery.data?.exceptions ?? [];
   const exceptionCount = exceptionsQuery.data?.total_count ?? 0;
   const nextExceptions = exceptions.slice(0, 2);
@@ -50,129 +33,63 @@ export default function ScheduleHubScreen() {
       <QueryState query={clinicTime} label="clinic date" />
       <QueryState query={doctors} label="doctors" />
       <View style={styles.header}>
-        <Text style={styles.title}>Schedule & Sessions</Text>
-        <Text style={styles.subtitle}>
-          Manage your recurring weekly practice hours and upcoming date exceptions.
-        </Text>
+        <Text style={styles.title}>Schedule & sessions</Text>
+        <Text style={styles.subtitle}>Weekly clinic hours and time off</Text>
       </View>
 
-      {doctors.data && doctors.data.length > 1 && (
-        <View style={styles.section}>
-          <Text style={styles.label}>Doctor</Text>
-          <View style={styles.chips}>
-            {doctors.data.map((doctor) => (
-              <Pressable
-                key={doctor.doctor_id}
-                onPress={() => setSelectedDoctor(doctor.doctor_id)}
-                style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]}
-              >
-                <Text style={doctorId === doctor.doctor_id ? styles.chipTextActive : styles.chipText}>
-                  {doctor.display_name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+      {doctors.data && doctors.data.length > 1 ? (
+        <View style={styles.chips}>
+          {doctors.data.map(doctor => (
+            <Pressable key={doctor.doctor_id} onPress={() => setSelectedDoctor(doctor.doctor_id)} style={[styles.chip, doctorId === doctor.doctor_id && styles.chipActive]}>
+              <Text style={doctorId === doctor.doctor_id ? styles.chipTextActive : styles.chipText}>{doctor.display_name}</Text>
+            </Pressable>
+          ))}
         </View>
-      )}
+      ) : null}
 
-      {/* Section 1: Standard Weekly Hours */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Standard Weekly Hours</Text>
-        <Text style={styles.cardSubtitle}>
-          Recurring weekly operating schedule across weekdays.
-        </Text>
-
+        <View style={styles.cardHeading}>
+          <Text style={styles.cardTitle}>Weekly hours</Text>
+          <Text style={styles.cardHint}>Regular working schedule</Text>
+        </View>
         <QueryState query={scheduleQuery} label="weekly hours" />
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>Working Days:</Text>
-          <Text style={styles.summaryValue}>
-            {scheduleQuery.data ? formatWorkingDays(activeDayIndices) : 'Unavailable'}
-          </Text>
+        <View style={styles.scheduleSummary}>
+          <Text style={styles.summaryLabel}>Working days</Text>
+          <Text style={styles.summaryValue}>{scheduleQuery.data ? formatWorkingDays(activeDayIndices) : 'Unavailable'}</Text>
         </View>
-
-        <Text style={styles.noteText}>
-          Standard schedule edits apply safely without modifying past versions.
-        </Text>
-
-        <AppButton
-          label="Edit Weekly Hours"
-          tone="secondary"
-          onPress={() => router.push('/doctor/more/schedule/weekly')}
-        />
+        <AppButton label="Edit weekly hours" tone="secondary" onPress={() => router.push('/doctor/more/schedule/weekly')} />
       </View>
 
-      {/* Section 2: Exceptions & Time Off */}
       <View style={styles.card}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/doctor/more/schedule/exceptions')}
-          style={styles.cardHeaderRow}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Exceptions & Time Off</Text>
-            <Text style={styles.cardSubtitle}>
-              Specific dates or sessions blocked for conferences, leave, or holidays.
-            </Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/more/schedule/exceptions')} style={styles.cardHeaderRow}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.cardTitle}>Exceptions & time off</Text>
+            <Text style={styles.cardHint}>Block a date or individual session</Text>
           </View>
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{exceptionsQuery.data ? exceptionCount : '—'}</Text>
-          </View>
+          <View style={styles.countBadge}><Text style={styles.countBadgeText}>{exceptionsQuery.data ? exceptionCount : '—'}</Text></View>
         </Pressable>
 
         <QueryState query={exceptionsQuery} label="exceptions" />
-        {exceptionsQuery.isLoading ? (
-          <Text style={styles.loadingText}>Loading exceptions...</Text>
-        ) : !exceptionsQuery.data || (exceptionsQuery.isError && exceptionCount === 0) ? null : exceptionCount === 0 ? (
+        {exceptionsQuery.data && exceptionCount === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No upcoming blocked dates</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Doctor is available on all scheduled weekly days.
-            </Text>
+            <Text style={styles.emptyTitle}>No upcoming time off</Text>
+            <Text style={styles.subtitle}>Your regular weekly schedule is active.</Text>
           </View>
-        ) : (
-          <View style={{ gap: spacing.xs }}>
-            <Text style={styles.subheading}>Next Blocked Date(s):</Text>
-            {nextExceptions.map((item) => (
-              <Pressable
-                key={item.id}
-                accessibilityRole="button"
-                onPress={() => router.push('/doctor/more/schedule/exceptions')}
-                style={styles.exceptionRow}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.exceptionDate}>{formatClinicDate(item.date)}</Text>
-                  <Text style={styles.exceptionDetails}>
-                    {item.scope === 'FULL_DAY' ? 'Full Day' : item.session_name ?? 'Session'} • {item.reason}
-                  </Text>
-                  {item.retained_appointments_count > 0 && (
-                    <Text style={styles.retainedText}>
-                      {item.retained_appointments_count} existing booking(s) preserved
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>BLOCKED</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        )}
+        ) : null}
+        {nextExceptions.map(item => (
+          <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push('/doctor/more/schedule/exceptions')} style={styles.exceptionRow}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.exceptionDate}>{formatClinicDate(item.date)}</Text>
+              <Text style={styles.subtitle}>{item.scope === 'FULL_DAY' ? 'Full day' : item.session_name ?? 'Session'} · {item.reason}</Text>
+              {item.retained_appointments_count > 0 ? <Text style={styles.retained}>{item.retained_appointments_count} booking(s) preserved</Text> : null}
+            </View>
+            <Text style={styles.blocked}>Blocked</Text>
+          </Pressable>
+        ))}
 
         <View style={styles.buttonRow}>
-          <View style={{ flex: 1 }}>
-            <AppButton
-              label="+ Block a Date"
-              tone="primary"
-              onPress={() => router.push('/doctor/more/schedule/exceptions/new')}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppButton
-              label="View All Exceptions"
-              tone="secondary"
-              onPress={() => router.push('/doctor/more/schedule/exceptions')}
-            />
-          </View>
+          <AppButton label="+ Block a date" onPress={() => router.push('/doctor/more/schedule/exceptions/new')} />
+          <AppButton label="View all exceptions" tone="secondary" onPress={() => router.push('/doctor/more/schedule/exceptions')} />
         </View>
       </View>
     </AppScreen>
@@ -180,94 +97,30 @@ export default function ScheduleHubScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 4 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
-  section: { gap: spacing.xs },
-  label: { color: colors.text, fontWeight: '700' },
+  header: { gap: 3 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  chipActive: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  chipText: { color: colors.text },
-  chipTextActive: { color: colors.primary, fontWeight: '700' },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  cardTitle: { color: colors.text, fontWeight: '800', fontSize: 18 },
-  cardSubtitle: { color: colors.muted, fontSize: 13, lineHeight: 18 },
-  summaryBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  summaryLabel: { color: colors.muted, fontWeight: '600', fontSize: 14 },
-  summaryValue: {
-    color: colors.text,
-    fontWeight: '700',
-    fontSize: 14,
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  noteText: { color: colors.muted, fontSize: 12, fontStyle: 'italic' },
-  countBadge: {
-    backgroundColor: colors.softPrimary,
-    borderRadius: 999,
-    minWidth: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  countBadgeText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
-  loadingText: { color: colors.muted, paddingVertical: spacing.sm },
-  emptyState: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing.sm,
-    gap: 2,
-  },
-  emptyStateText: { color: colors.text, fontWeight: '700', fontSize: 14 },
-  emptyStateSubtext: { color: colors.muted, fontSize: 12 },
-  subheading: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  exceptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing.sm,
-    gap: spacing.sm,
-  },
-  exceptionDate: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  exceptionDetails: { color: colors.muted, fontSize: 13 },
-  retainedText: { color: colors.warning, fontSize: 12, fontWeight: '600' },
-  statusBadge: {
-    backgroundColor: colors.danger,
-    borderRadius: radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusBadgeText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
-  buttonRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.surface },
+  chipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' },
+  chipText: { color: colors.muted },
+  chipTextActive: { color: colors.primaryDark, fontWeight: '800' },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
+  cardHeading: { gap: 2 },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
+  headerCopy: { flex: 1, gap: 2 },
+  cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 17 },
+  cardHint: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  scheduleSummary: { backgroundColor: colors.surfaceSoft, borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  summaryLabel: { color: colors.muted, fontWeight: '600', fontSize: 12 },
+  summaryValue: { color: colors.primaryDark, fontWeight: '800', fontSize: 16, flex: 1, flexWrap: 'wrap' },
+  countBadge: { minWidth: 32, height: 32, borderRadius: 16, backgroundColor: colors.softPrimary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  countBadgeText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
+  emptyState: { backgroundColor: colors.surfaceSoft, borderRadius: radius.md, padding: spacing.md, gap: 3 },
+  emptyTitle: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  exceptionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceSoft, borderRadius: radius.md, padding: spacing.sm },
+  exceptionDate: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  retained: { color: colors.warning, fontSize: 11, fontWeight: '600' },
+  blocked: { color: colors.danger, fontWeight: '700', fontSize: 12 },
+  buttonRow: { gap: spacing.sm, marginTop: spacing.xs },
 });

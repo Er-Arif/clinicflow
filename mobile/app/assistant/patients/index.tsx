@@ -22,7 +22,8 @@ export default function PatientSearchScreen() {
   }, [navigation]);
 
   const normalizedQuery = query.trim();
-  const shouldSearch = normalizedQuery.length >= 2;
+  const isPatientNumberQuery = /^\d+$/.test(normalizedQuery);
+  const shouldSearch = isPatientNumberQuery || normalizedQuery.length >= 2;
   const patients = useSearchPatientsQuery(
     { q: normalizedQuery },
     { skip: !shouldSearch },
@@ -30,7 +31,10 @@ export default function PatientSearchScreen() {
 
   const data = patients.currentData;
 
-  const mobilePrefill = useMemo(() => query.replace(/\D/g, ''), [query]);
+  const mobilePrefill = useMemo(() => {
+    const digits = query.replace(/\D/g, '');
+    return digits.length >= 10 ? digits : '';
+  }, [query]);
 
   return (
     <KeyboardSafeFormScreen>
@@ -39,18 +43,31 @@ export default function PatientSearchScreen() {
         <Text style={styles.subtitle}>Search before creating a new patient.</Text>
       </View>
 
-      <KeyboardSafeTextInput
-        autoFocus
-        placeholder="Mobile, patient name or patient ID"
-        value={query}
-        onChangeText={setQuery}
-        style={styles.search}
-        autoCapitalize="words"
-      />
+      <View style={styles.searchField}>
+        <KeyboardSafeTextInput
+          autoFocus
+          placeholder="Mobile, name or patient number"
+          value={query}
+          onChangeText={setQuery}
+          style={[styles.search, query.length > 0 && styles.searchWithClear]}
+          autoCapitalize="words"
+        />
+        {query.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            hitSlop={8}
+            onPress={() => setQuery('')}
+            style={styles.clearSearch}
+          >
+            <Text style={styles.clearSearchText}>×</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {shouldSearch ? <QueryState query={patients} label="patients" hasData={Boolean(data)} /> : null}
       {!shouldSearch ? (
-        <Text style={styles.helper}>Enter at least 2 characters to search.</Text>
+        <Text style={styles.helper}>Enter a patient number or at least 2 characters to search.</Text>
       ) : data?.items.length ? (
         <View style={styles.list}>
           {data.items.map((patient) => (
@@ -60,8 +77,8 @@ export default function PatientSearchScreen() {
               onPress={() => router.push(`/assistant/patients/${patient.patient_id}`)}
             >
               <Text style={styles.patientName}>{patient.full_name}</Text>
-              <Text style={styles.meta}>{patient.patient_code} · Age {patient.age} · {patient.gender.replaceAll('_', ' ')}</Text>
-              <Text style={styles.meta}>{formatPhone(patient.mobile_number)}</Text>
+              <Text style={styles.meta}>{patient.patient_code} · Age {patient.age} · {formatGender(patient.gender)}</Text>
+              <Text style={styles.meta}>{patient.mobile_number ? formatPhone(patient.mobile_number) : 'No mobile number'}</Text>
               <Text style={styles.meta}>
                 {patient.previous_completed_visits > 0
                   ? `${patient.previous_completed_visits} completed visit${patient.previous_completed_visits === 1 ? '' : 's'}`
@@ -78,13 +95,18 @@ export default function PatientSearchScreen() {
       ) : null}
 
       <AppButton
-        label="Register New Patient"
+        label="Register new patient"
         onPress={() =>
           router.push({ pathname: '/assistant/patients/new', params: { mobile: mobilePrefill } })
         }
       />
     </KeyboardSafeFormScreen>
   );
+}
+
+function formatGender(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
 }
 
 function formatPhone(value: string) {
@@ -94,9 +116,10 @@ function formatPhone(value: string) {
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
+  title: { fontSize: 28, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, marginTop: 4 },
   link: { color: colors.primary, fontWeight: '700', paddingTop: 6 },
+  searchField: { position: 'relative' },
   search: {
     minHeight: 50,
     borderWidth: 1,
@@ -106,6 +129,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+  searchWithClear: { paddingRight: 50 },
+  clearSearch: { position: 'absolute', right: 8, top: 0, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' },
+  clearSearchText: { color: colors.muted, fontSize: 24, lineHeight: 26, fontWeight: '500' },
   helper: { color: colors.muted, lineHeight: 20 },
   list: { gap: spacing.sm },
   card: {
@@ -128,4 +154,3 @@ const styles = StyleSheet.create({
   },
   stateTitle: { fontWeight: '700', fontSize: 17, color: colors.text },
 });
-

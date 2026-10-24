@@ -1,77 +1,57 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useLogoutMutation, useGetSystemInfoQuery, useMeQuery } from '@/api/api';
-import { clearSessionTokens } from '@/auth/session';
+import { useMeQuery } from '@/api/api';
+import { useConfirmedSignOut } from '@/auth/useConfirmedSignOut';
 import { AppScreen } from '@/components/AppScreen';
-import { resetApiCache } from '@/store/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 export default function MoreScreen() {
   const router = useRouter();
-  const [logoutMutation] = useLogoutMutation();
-  const systemInfo = useGetSystemInfoQuery();
   const me = useMeQuery();
-
-  const handleLogout = async () => {
-    try {
-      await logoutMutation().unwrap();
-    } catch {
-      // ignore
-    }
-    await clearSessionTokens();
-    resetApiCache();
-    router.replace('/(auth)/login');
-  };
+  const { confirmSignOut, isSigningOut } = useConfirmedSignOut();
 
   return (
     <AppScreen>
-      <View style={{ gap: spacing.lg }}>
-        <View>
-          <Text style={styles.title}>More</Text>
-          <Text style={styles.subtitle}>{me.data?.display_name ?? 'Assistant'}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Operations</Text>
-          <MenuItem label="Payments" onPress={() => router.push('/assistant/payments')} />
-          <MenuItem label="Reminders" onPress={() => router.push('/assistant/reminders')} />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <MenuItem label="Change Password" onPress={() => router.push('/(auth)/change-password')} />
-          <MenuItem label="Log Out" onPress={handleLogout} textStyle={{ color: colors.danger }} />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.card}>
-            <Text style={styles.text}>ClinicFlow V1</Text>
-            {systemInfo.data ? (
-              <Text style={styles.subtitle}>API: {systemInfo.data.api_version} · {systemInfo.data.environment}</Text>
-            ) : null}
-          </View>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.title}>{me.data?.display_name ?? 'Assistant'}</Text>
+        <Text style={styles.subtitle}>Assistant workspace</Text>
       </View>
+      <Section title="Operations">
+        <MenuItem label="Payments" onPress={() => router.push('/assistant/payments')} />
+        <MenuItem label="Reminders" onPress={() => router.push('/assistant/reminders')} />
+      </Section>
+      <Section title="Account">
+        <MenuItem label="Change password" onPress={() => router.push('/(auth)/change-password')} />
+        <MenuItem label={isSigningOut ? 'Signing out…' : 'Sign out'} onPress={confirmSignOut} danger />
+      </Section>
+      <MenuCard label="About" onPress={() => router.push('/about')} />
     </AppScreen>
   );
 }
 
-function MenuItem({ label, onPress, textStyle }: { label: string; onPress: () => void; textStyle?: any }) {
-  return (
-    <Pressable accessibilityRole="button" style={styles.card} onPress={onPress}>
-      <Text style={[styles.text, textStyle]}>{label}</Text>
-    </Pressable>
-  );
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><View style={styles.sectionCard}>{children}</View></View>;
+}
+
+function MenuCard({ label, onPress }: { label: string; onPress: () => void }) {
+  return <View style={styles.sectionCard}><MenuItem label={label} onPress={onPress} /></View>;
+}
+
+function MenuItem({ label, onPress, danger = false }: { label: string; onPress: () => void; danger?: boolean }) {
+  return <Pressable accessibilityRole="button" style={({ pressed }) => [styles.item, pressed && styles.pressed]} onPress={onPress}><Text style={[styles.text, danger && styles.danger]}>{label}</Text><Text style={styles.chevron}>›</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 24, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
+  header: { gap: 3 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  subtitle: { color: colors.muted, fontSize: 13 },
   section: { gap: spacing.sm },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 4 },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  text: { fontSize: 16, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.primaryDark },
+  sectionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
+  item: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  text: { fontSize: 15, fontWeight: '600', color: colors.text },
+  danger: { color: colors.danger },
+  chevron: { color: colors.muted, fontSize: 24, lineHeight: 26 },
+  pressed: { backgroundColor: colors.surfaceSoft },
 });
-

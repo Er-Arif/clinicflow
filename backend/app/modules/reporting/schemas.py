@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class OperationalAppointmentItem(BaseModel):
@@ -42,6 +42,30 @@ class DoctorTodayResponse(BaseModel):
     upcoming: list[OperationalAppointmentItem]
 
 
+class DoctorTodayDetailItem(BaseModel):
+    appointment_id: UUID
+    patient_id: UUID
+    patient_name: str
+    mobile_number: str
+    gender: str
+    age: int | None
+    appointment_time: time | None
+    appointment_type: str
+    status: str
+
+    @field_validator("mobile_number", mode="before")
+    @classmethod
+    def normalize_optional_mobile(cls, value: str | None) -> str:
+        return value or ""
+
+
+class DoctorTodayDetailsResponse(BaseModel):
+    date: date
+    view: str
+    total: int
+    items: list[DoctorTodayDetailItem]
+
+
 class PatientSummaryBase(BaseModel):
     patient_id: UUID
     patient_code: str
@@ -49,6 +73,11 @@ class PatientSummaryBase(BaseModel):
     mobile_number: str
     gender: str
     age: int | None
+
+    @field_validator("mobile_number", mode="before")
+    @classmethod
+    def normalize_optional_mobile(cls, value: str | None) -> str:
+        return value or ""
 
 
 class UpcomingAppointmentSummary(BaseModel):

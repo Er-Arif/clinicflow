@@ -48,28 +48,28 @@ export default function PatientProfileScreen() {
       </View>
 
       <InfoCard title="Contact">
-        <InfoRow label="Mobile" value={formatPhone(patient.mobile_number)} />
-        <InfoRow label="WhatsApp" value={formatPhone(patient.whatsapp_number)} />
+        <InfoRow label="Mobile" value={patient.mobile_number ? formatPhone(patient.mobile_number) : 'Not provided'} />
+        <InfoRow label="WhatsApp" value={patient.whatsapp_number ? formatPhone(patient.whatsapp_number) : 'Not provided'} />
         <InfoRow label="Language" value={patient.preferred_language === 'HI' ? 'Hindi' : 'English'} />
         <InfoRow label="Reminders" value={patient.reminders_enabled ? 'Enabled' : 'Disabled'} />
       </InfoCard>
 
-      <InfoCard title="Patient Details">
-        <InfoRow label="Gender" value={patient.gender.replaceAll('_', ' ')} />
+      <InfoCard title="Patient details">
+        <InfoRow label="Gender" value={humanize(patient.gender)} />
         <InfoRow
           label="Age source"
           value={patient.date_of_birth ? `DOB ${formatClinicDate(patient.date_of_birth)}` : `Approx. age ${patient.approximate_age_years}`}
         />
       </InfoCard>
 
-      <InfoCard title="Visit Summary">
+      <InfoCard title="Visit summary">
         <InfoRow label="Completed visits" value={String(patient.previous_completed_visits)} />
         <InfoRow label="Last visit" value={patient.last_visit_date ? formatClinicDate(patient.last_visit_date) : 'No completed visit yet'} />
       </InfoCard>
 
       <View style={styles.actions}>
-        <AppButton label="Book Appointment" onPress={() => router.push({ pathname: '/assistant/appointments/new', params: { patientId } })} />
-        <AppButton label="Add Walk-in" tone="secondary" onPress={() => router.push({ pathname: '/assistant/walk-in', params: { patientId } })} />
+        <AppButton label="Book appointment" onPress={() => router.push({ pathname: '/assistant/appointments/new', params: { patientId } })} />
+        <AppButton label="Add walk-in" tone="secondary" onPress={() => router.push({ pathname: '/assistant/walk-in', params: { patientId } })} />
       </View>
     </AppScreen>
   );
@@ -91,6 +91,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <Text style={styles.value}>{value}</Text>
     </View>
   );
+}
+
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Not provided';
 }
 
 function formatPhone(value: string) {

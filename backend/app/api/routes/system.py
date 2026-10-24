@@ -13,4 +13,5 @@ def system_info() -> dict[str, str]:
         "build_commit": settings.build_commit,
         "environment": settings.environment,
         "minimum_mobile_version": settings.minimum_mobile_version,
+        "latest_mobile_version": settings.latest_mobile_version,
     }

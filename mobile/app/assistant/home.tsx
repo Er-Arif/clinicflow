@@ -3,83 +3,102 @@ import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useGetAssistantHomeQuery } from '@/api/api';
+import { useGetAssistantHomeQuery, useMeQuery } from '@/api/api';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { ClinicHeader } from '@/components/ClinicHeader';
 import { MetricCard } from '@/components/MetricCard';
+import { useClinicClock } from '@/features/reporting/useClinicClock';
 import { colors, radius, spacing } from '@/theme/tokens';
-import { formatClinicDate } from '@/utils/dates';
+import { formatClinicTime } from '@/utils/dates';
+
+type AppointmentFilter = 'BOOKED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED';
 
 export default function AssistantHome() {
   const router = useRouter();
   const home = useGetAssistantHomeQuery();
+  const me = useMeQuery();
+  const { clock, query: clinicTime } = useClinicClock();
   const data = home.data;
+  const refresh = () => { void home.refetch(); void clinicTime.refetch(); };
+  const firstName = me.data?.display_name?.trim().split(/\s+/)[0];
+  const openAppointments = (status?: AppointmentFilter) => {
+    if (status) {
+      router.push({ pathname: '/assistant/appointments', params: { status } });
+      return;
+    }
+    router.push('/assistant/appointments');
+  };
 
   return (
-    <AppScreen refreshing={home.isFetching} onRefresh={() => void home.refetch()}>
-      <Text style={styles.eyebrow}>ClinicFlow</Text>
-      <Text style={styles.title}>Home</Text>
-      <Text style={styles.subtitle}>{data ? formatClinicDate(data.clinic_date) : 'Clinic activity'}</Text>
-
+    <AppScreen refreshing={home.isFetching} onRefresh={refresh}>
+      <ClinicHeader
+        title="Overview"
+        subtitle={`${clock?.greeting ?? 'Welcome'}${firstName ? `, ${firstName}` : ''}`}
+        displayTime={clock?.displayTime}
+        compactDate={clock?.compactDate}
+      />
+      <QueryState query={clinicTime} label="clinic time" />
       <QueryState query={home} label="clinic activity" />
 
       {data ? (
         <>
           <View style={styles.metrics}>
-            <MetricCard label="Appointments" value={data.appointments} />
-            <MetricCard label="Checked In" value={data.checked_in} />
-            <MetricCard label="Completed" value={data.completed} />
-            <MetricCard label="Cancelled" value={data.cancelled} />
+            <MetricCard label="Appointments" value={data.appointments} onPress={() => openAppointments('BOOKED')} accessibilityLabel={`View ${data.appointments} booked appointments`} />
+            <MetricCard label="Checked in" value={data.checked_in} onPress={() => openAppointments('CHECKED_IN')} accessibilityLabel={`View ${data.checked_in} checked-in appointments`} />
+            <MetricCard label="Completed" value={data.completed} onPress={() => openAppointments('COMPLETED')} accessibilityLabel={`View ${data.completed} completed appointments`} />
+            <MetricCard label="Cancelled" value={data.cancelled} onPress={() => openAppointments('CANCELLED')} accessibilityLabel={`View ${data.cancelled} cancelled appointments`} />
           </View>
 
           <View style={styles.primaryActions}>
-            <AppButton label="New Appointment" onPress={() => router.push('/assistant/patients')} />
-            <AppButton label="Walk-in" tone="secondary" onPress={() => router.push('/assistant/walk-in')} />
+            <AppButton style={styles.actionButton} label="New appointment" onPress={() => router.push('/assistant/patients')} />
+            <AppButton style={[styles.actionButton, styles.walkInButton]} label="Add walk-in" onPress={() => router.push('/assistant/walk-in')} />
           </View>
 
           <View style={styles.attention}>
-            <Text style={styles.sectionTitle}>Attention</Text>
-            <AttentionRow label="Pending payments today" value={data.pending_payments} onPress={() => router.push('/assistant/payments')} />
-            <AttentionRow label="Due reminders" value={data.due_reminders} onPress={() => router.push('/assistant/reminders')} />
-            <AttentionRow label="Overdue follow-ups" value={data.overdue_followups} onPress={() => router.push('/assistant/followups')} />
+            <Text style={styles.sectionTitle}>Needs attention</Text>
+            <AttentionRow label="Payments" value={data.pending_payments} onPress={() => router.push('/assistant/payments')} />
+            <AttentionRow label="Reminders" value={data.due_reminders} onPress={() => router.push('/assistant/reminders')} />
+            <AttentionRow label="Follow-ups" value={data.overdue_followups} onPress={() => router.push('/assistant/followups')} />
           </View>
 
-          <Section title="Next Appointments · up to 5" empty="No upcoming booked appointments today.">
-            {data.next_appointments.map((item) => (
+          <Section title="Next appointments" empty="No upcoming appointments.">
+            {data.next_appointments.map(item => (
               <Pressable
                 accessibilityRole="button"
                 key={item.appointment_id}
-                style={styles.rowCard}
+                style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
                 onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}
               >
-                <View style={{ flex: 1 }}>
+                <View style={styles.rowCopy}>
                   <Text style={styles.name}>{item.patient_name}</Text>
-                  <Text style={styles.subtitle}>{item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular Consultation'}</Text>
+                  <Text style={styles.meta}>{item.appointment_type === 'FOLLOW_UP' ? 'Follow-up' : 'Regular consultation'}</Text>
                 </View>
-                <Text style={styles.time}>{item.appointment_time?.slice(0, 5) ?? 'Walk-in'}</Text>
+                <Text style={styles.time}>{item.appointment_time ? formatClinicTime(item.appointment_time) : 'Walk-in'}</Text>
               </Pressable>
             ))}
           </Section>
 
-          <Section title={`Checked In · ${data.checked_in} total`} empty="No patient is currently checked in.">
-            {data.checked_in_patients.map((item) => (
+          <Section title={`Checked in · ${data.checked_in}`} empty="No patients checked in.">
+            {data.checked_in_patients.map(item => (
               <Pressable
                 accessibilityRole="button"
                 key={item.appointment_id}
-                style={styles.rowCard}
+                style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
                 onPress={() => router.push(`/assistant/appointments/${item.appointment_id}`)}
               >
-                <View style={{ flex: 1 }}>
+                <View style={styles.rowCopy}>
                   <Text style={styles.name}>{item.patient_name}</Text>
-                  <Text style={styles.subtitle}>Payment {item.payment_status ?? 'PENDING'}</Text>
+                  <Text style={styles.meta}>{item.payment_status === 'CONFIRMED' ? 'Paid' : 'Payment pending'}</Text>
                 </View>
-                <Text style={styles.active}>CHECKED IN</Text>
+                <Text style={styles.checkedIn}>Checked in</Text>
               </Pressable>
             ))}
           </Section>
-          {data.checked_in > data.checked_in_patients.length ? <AppButton label="View all appointments" tone="secondary" onPress={() => router.push('/assistant/appointments')} /> : null}
 
-
+          {data.checked_in > data.checked_in_patients.length ? (
+            <AppButton label="View all appointments" compact tone="secondary" onPress={() => router.push('/assistant/appointments')} />
+          ) : null}
         </>
       ) : null}
     </AppScreen>
@@ -88,44 +107,44 @@ export default function AssistantHome() {
 
 function Section({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
   const items = Array.isArray(children) ? children : [children];
-  const hasItems = items.some(Boolean);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {hasItems ? children : <Text style={styles.subtitle}>{empty}</Text>}
+      {items.some(Boolean) ? children : <Text style={styles.empty}>{empty}</Text>}
     </View>
   );
 }
 
 function AttentionRow({ label, value, onPress }: { label: string; value: number; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" style={styles.attentionRow} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={({ pressed }) => [styles.attentionRow, pressed && styles.pressed]} onPress={onPress}>
       <Text style={styles.name}>{label}</Text>
-      <Text style={value > 0 ? styles.warning : styles.mutedStrong}>{value}</Text>
+      <View style={[styles.count, value > 0 && styles.countAlert]}>
+        <Text style={[styles.countText, value > 0 && styles.countAlertText]}>{value}</Text>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  eyebrow: { color: colors.primary, fontWeight: '800' },
-  title: { fontSize: 24, fontWeight: '900', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
-  error: { color: colors.danger, fontWeight: '700' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  primaryActions: { gap: spacing.sm },
-  section: { gap: spacing.sm, marginTop: spacing.sm },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.text },
-  rowCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md, padding: spacing.md,
-  },
-  name: { fontWeight: '800', color: colors.text },
-  time: { fontWeight: '900', color: colors.primary },
-  active: { fontWeight: '900', color: colors.primary, fontSize: 12 },
-  attention: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 48, paddingVertical: 4 },
-  warning: { color: colors.warning, fontWeight: '900', fontSize: 18 },
-  mutedStrong: { color: colors.muted, fontWeight: '900', fontSize: 18 },
+  primaryActions: { flexDirection: 'row', gap: spacing.sm },
+  actionButton: { flex: 1 },
+  walkInButton: { backgroundColor: colors.accent },
+  section: { gap: spacing.sm, marginTop: spacing.xs },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
+  rowCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md },
+  rowCopy: { flex: 1, gap: 3 },
+  name: { fontWeight: '700', color: colors.text, fontSize: 15 },
+  meta: { color: colors.muted, fontSize: 12 },
+  time: { fontWeight: '800', color: colors.primaryDark, fontSize: 14 },
+  checkedIn: { fontWeight: '700', color: colors.success, fontSize: 13 },
+  attention: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: 0 },
+  attentionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40, paddingVertical: 3 },
+  count: { minWidth: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
+  countAlert: { backgroundColor: colors.softWarning },
+  countText: { color: colors.muted, fontWeight: '800', fontSize: 13 },
+  countAlertText: { color: colors.warning },
+  empty: { color: colors.muted, fontSize: 13, paddingVertical: spacing.xs },
+  pressed: { opacity: 0.78 },
 });
-

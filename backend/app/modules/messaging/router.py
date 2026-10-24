@@ -8,6 +8,7 @@ from app.core.clock import Clock, get_clock
 from app.db.session import get_db
 from app.modules.identity.dependencies import require_permission
 from app.modules.identity.service import AuthContext
+from app.modules.messaging.contact_guard import ensure_clinic_contact
 from app.modules.messaging.schemas import (
     AppointmentMessageRequest,
     MessageTemplateResponse,
@@ -58,7 +59,8 @@ def prepare_reminder(
     clock: Clock = Depends(get_clock),
 ) -> PreparedMessageResponse:
     with db.begin():
-        return ReminderService(db, clock, context).prepare(reminder_id, request.language)
+        prepared = ReminderService(db, clock, context).prepare(reminder_id, request.language)
+        return ensure_clinic_contact(db, context, prepared)
 
 
 @router.post("/reminders/{reminder_id}/mark-sent", response_model=ReminderResponse)
@@ -93,7 +95,10 @@ def appointment_message(
     clock: Clock = Depends(get_clock),
 ) -> PreparedMessageResponse:
     with db.begin():
-        return ReminderService(db, clock, context).create_appointment_message(appointment_id, request)
+        prepared = ReminderService(db, clock, context).create_appointment_message(
+            appointment_id, request
+        )
+        return ensure_clinic_contact(db, context, prepared)
 
 
 @router.get("/message-templates", response_model=list[MessageTemplateResponse])

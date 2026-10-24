@@ -47,6 +47,42 @@ function seconds(value: string) {
   return +match[1] * 3600 + +match[2] * 60 + +(match[3] ?? 0) + +(match[4] ?? 0);
 }
 
+export function calculatedSlots(start: string, end: string, intervalValue: string) {
+  const startSeconds = seconds(start);
+  const endSeconds = seconds(end);
+  const interval = Number(intervalValue);
+  if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || endSeconds <= startSeconds) return null;
+  if (!/^\d+$/.test(intervalValue) || interval < 1 || interval > 240) return null;
+  return Math.floor((endSeconds - startSeconds) / (interval * 60));
+}
+
+export function suggestedCapacity(start: string, end: string, intervalValue: string) {
+  const slots = calculatedSlots(start, end, intervalValue);
+  if (slots == null || slots < 1) return null;
+  return Math.min(slots, 500);
+}
+
+export function applySessionPatch(session: SessionDraft, patch: Partial<SessionDraft>): SessionDraft {
+  const next = { ...session, ...patch };
+  if (patch.capacity !== undefined) return next;
+  if (patch.start === undefined && patch.end === undefined && patch.interval === undefined) return next;
+
+  const previousAuto = suggestedCapacity(session.start, session.end, session.interval);
+  const nextAuto = suggestedCapacity(next.start, next.end, next.interval);
+  if (nextAuto == null) return next;
+
+  const currentCapacity = Number(session.capacity);
+  const validCurrent = /^\d+$/.test(session.capacity) && currentCapacity >= 1;
+  const wasManualLowerLimit = validCurrent && previousAuto != null && currentCapacity < previousAuto;
+
+  if (wasManualLowerLimit) {
+    next.capacity = String(Math.min(currentCapacity, nextAuto));
+  } else {
+    next.capacity = String(nextAuto);
+  }
+  return next;
+}
+
 export function validateDraft(draft: WeeklyDraft): { errors: EditorErrors; proposal: ScheduleProposal } {
   const errors: EditorErrors = {};
   if (!draft.weekdays.length) errors.weekdays = 'Select at least one weekday.';
@@ -55,14 +91,16 @@ export function validateDraft(draft: WeeklyDraft): { errors: EditorErrors; propo
   const sessions = draft.working ? draft.sessions.map((s, index) => {
     const start = seconds(s.start), end = seconds(s.end);
     const interval = Number(s.interval), capacity = Number(s.capacity);
+    const slots = calculatedSlots(s.start, s.end, s.interval);
     const prefix = s.key + '.';
     if (!s.name.trim() || s.name.trim().length > 80) errors[prefix + 'name'] = 'Enter a name of 1–80 characters.';
     if (!Number.isFinite(start)) errors[prefix + 'start'] = 'Select a valid start time.';
     if (!Number.isFinite(end) || end <= start) errors[prefix + 'end'] = 'End time must be later than start time.';
     if (!/^\d+$/.test(s.interval) || interval < 1 || interval > 240) errors[prefix + 'interval'] = 'Enter 1–240 whole minutes.';
-    if (!/^\d+$/.test(s.capacity) || capacity < 1 || capacity > 500) errors[prefix + 'capacity'] = 'Enter a whole capacity from 1 to 500.';
-    else if (interval > 0 && capacity > Math.floor((end - start) / (interval * 60))) {
-      errors[prefix + 'capacity'] = 'Capacity cannot exceed the number of complete slots in this session.';
+    else if (slots === 0) errors[prefix + 'interval'] = 'The session must contain at least one complete slot.';
+    if (!/^\d+$/.test(s.capacity) || capacity < 1 || capacity > 500) errors[prefix + 'capacity'] = 'Enter a whole booking limit from 1 to 500.';
+    else if (slots != null && capacity > slots) {
+      errors[prefix + 'capacity'] = 'Booking capacity cannot exceed the number of complete slots.';
     }
     if (draft.sessions.some((other, i) => i !== index && start < seconds(other.end) && seconds(other.start) < end)) {
       errors[prefix + 'start'] = 'Sessions must not overlap. Adjust their start and end times.';
@@ -82,7 +120,7 @@ export function schedulingError(error: unknown, applying = false) {
     case 'UNRESOLVABLE_APPOINTMENT_CONFLICT': return 'These changes cannot currently be applied. Review existing appointments and planned hours, or adjust the proposed sessions and preview again.';
     case 'SCHEDULE_OCCUPANCY_CONFLICT': return 'Existing appointments cannot be safely matched to these sessions. Review the appointments and session times before trying again.';
     case 'PERMISSION_DENIED': return 'You do not have permission to change the weekly schedule. Contact the clinic owner.';
-    case 'VALIDATION_ERROR': return 'Check the session names, times, intervals and capacities, then preview again.';
+    case 'VALIDATION_ERROR': return 'Check the session names, times, intervals and booking capacities, then preview again.';
     case 'NETWORK_UNAVAILABLE': return applying
       ? 'The result could not be confirmed. Check the weekly schedule before trying again; the change may have been saved.'
       : 'Unable to reach ClinicFlow. Check your connection and preview again.';

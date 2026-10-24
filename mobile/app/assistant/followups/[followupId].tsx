@@ -1,7 +1,5 @@
-import { formatClinicDate } from '@/utils/dates';
+import { formatClinicDate, formatClinicTime } from '@/utils/dates';
 import { QueryState } from '@/components/QueryState';
-import { KeyboardSafeTextInput } from '@/components/KeyboardSafeTextInput';
-import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,7 +9,13 @@ import { apiError } from '@/api/errors';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
+import { FollowUpCloseModal } from '@/features/followups/FollowUpCloseModal';
 import { colors, radius, spacing } from '@/theme/tokens';
+
+function humanize(value: string) {
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
+}
 
 export default function FollowUpDetailsScreen() {
   const router = useRouter();
@@ -35,70 +39,81 @@ export default function FollowUpDetailsScreen() {
     );
   }
   const item = query.data;
+  const statusColor = item.overdue
+    ? colors.danger
+    : item.status === 'BOOKED'
+      ? colors.success
+      : item.status === 'OPEN'
+        ? colors.primary
+        : colors.muted;
 
   async function close() {
     try {
       await closeFollowUp({ followupId, reason, note: note || undefined }).unwrap();
       setShowClose(false);
     } catch {
-      // Stable API error shown below.
+      // Stable API error shown in the closure sheet.
     }
   }
 
   return (
-    <KeyboardSafeFormScreen>
+    <AppScreen>
       <QueryState query={query} label="follow-up" />
       <BackButton />
-      <Text style={styles.title}>{item.patient.full_name}</Text>
-      <Text style={[styles.status, item.overdue && { color: colors.danger }]}>{item.overdue ? 'OVERDUE' : item.status}</Text>
+      <Text style={styles.title}>Follow-up details</Text>
+      <Text style={[styles.status, { color: statusColor }]}>{item.overdue ? 'Overdue' : humanize(item.status)}</Text>
       <View style={styles.card}>
-        <Row label="Due" value={formatClinicDate(item.due_date)} />
-        <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
+        <Row label="Patient" value={item.patient.full_name} />
         <Row label="Patient ID" value={item.patient.patient_code} />
-        {item.interval_days ? <Row label="Interval" value={`${item.interval_days} days`} /> : null}
-        {item.linked_appointment ? <Row label="Appointment" value={`${formatClinicDate(item.linked_appointment.date)} ${item.linked_appointment.time?.slice(0, 5) ?? ''}`} /> : null}
-        {item.close_reason ? <Row label="Closed" value={item.close_reason.replaceAll('_', ' ')} /> : null}
+        <Row label="Source visit" value={formatClinicDate(item.source_visit_date)} />
+        {item.interval_days ? <Row label="Follow-up interval" value={`${item.interval_days} days`} /> : null}
+        <Row label="Due" value={formatClinicDate(item.due_date)} />
+        {item.linked_appointment ? <Row label="Appointment date" value={formatClinicDate(item.linked_appointment.date)} /> : null}
+        {item.linked_appointment?.time ? <Row label="Appointment time" value={formatClinicTime(item.linked_appointment.time)} /> : null}
+        {item.close_reason ? <Row label="Closure reason" value={humanize(item.close_reason)} /> : null}
       </View>
 
       {item.status === 'OPEN' ? (
         <>
           <AppButton
-            label="Book Appointment"
-            onPress={() =>
-              router.push({
-                pathname: '/assistant/appointments/new',
-                params: {
-                  patientId: item.patient.patient_id,
-                  appointmentType: 'FOLLOW_UP',
-                  followupId: item.followup_id,
-                  dueDate: item.due_date,
-                  doctorId: item.doctor_id,
-                },
-              })
-            }
+            label="Book appointment"
+            onPress={() => router.push({ pathname: '/assistant/followups/book', params: { followupId: item.followup_id } })}
           />
           {reminderQuery.data?.items[0] ? (
-            <AppButton label="Send WhatsApp Reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
+            <AppButton label="Send WhatsApp reminder" tone="secondary" onPress={() => router.push({ pathname: '/assistant/reminders/preview', params: { reminderId: reminderQuery.data!.items[0].reminder_id } })} />
           ) : null}
-          <AppButton label="Close Follow-up" tone="danger" onPress={() => setShowClose((v) => !v)} />
+          <AppButton label="Close follow-up" tone="danger" onPress={() => setShowClose(true)} />
         </>
       ) : null}
       {item.status === 'BOOKED' && item.linked_appointment ? (
-        <AppButton label="Open Appointment" onPress={() => router.push({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId: item.linked_appointment!.appointment_id } })} />
+        <AppButton
+          label="Open appointment"
+          onPress={() => router.push({
+            pathname: '/assistant/appointments/[appointmentId]',
+            params: {
+              appointmentId: item.linked_appointment!.appointment_id,
+              returnToFollowupId: item.followup_id,
+            },
+          })}
+        />
       ) : null}
 
-      {showClose ? (
-        <View style={styles.card}>
-          {['PATIENT_DECLINED', 'NO_LONGER_REQUIRED', 'CONTACTED', 'OTHER'].map((value) => (
-            <AppButton key={value} label={value.replaceAll('_', ' ')} tone={reason === value ? 'primary' : 'secondary'} onPress={() => setReason(value)} />
-          ))}
-          {reason === 'OTHER' ? <KeyboardSafeTextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Reason" /> : null}
-          {closeState.error ? <Text style={styles.error}>{apiError(closeState.error)?.message ?? 'Unable to close follow-up.'}</Text> : null}
-          <AppButton label="Confirm Close" tone="danger" loading={closeState.isLoading} disabled={reason === 'OTHER' && note.trim().length < 2} onPress={() => void close()} />
-        </View>
+      {item.status === 'OPEN' && showClose ? (
+        <FollowUpCloseModal
+          visible
+          patientName={item.patient.full_name}
+          dueDate={formatClinicDate(item.due_date)}
+          selectedReason={reason}
+          note={note}
+          error={closeState.error ? apiError(closeState.error)?.message ?? 'Unable to close follow-up.' : null}
+          loading={closeState.isLoading}
+          onReasonChange={setReason}
+          onNoteChange={setNote}
+          onConfirm={() => void close()}
+          onClose={() => setShowClose(false)}
+        />
       ) : null}
-      <AppButton label="Back" tone="secondary" onPress={() => router.back()} />
-    </KeyboardSafeFormScreen>
+    </AppScreen>
   );
 }
 
@@ -108,11 +123,9 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
-  status: { color: colors.primary, fontWeight: '900' },
+  status: { fontWeight: '900' },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.muted },
   value: { color: colors.text, fontWeight: '700', flex: 1, textAlign: 'right' },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, backgroundColor: colors.background },
-  error: { color: colors.danger },
 });

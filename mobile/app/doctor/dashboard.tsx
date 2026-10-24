@@ -1,49 +1,81 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useClinicTimeQuery, useGetOwnerDashboardQuery } from '@/api/api';
 import { AppScreen } from '@/components/AppScreen';
-import { DateRangeControls, useReportRange } from '@/components/DateRangeControls';
-import { QueryState } from '@/components/QueryState';
 import { MetricCard } from '@/components/MetricCard';
-import { colors, spacing } from '@/theme/tokens';
+import { QueryState } from '@/components/QueryState';
+import { colors, radius, spacing } from '@/theme/tokens';
+import { formatClinicDate } from '@/utils/dates';
+
+type DashboardPeriod = 'Today' | '7Days' | '30Days';
 
 export default function OwnerDashboardScreen() {
   const clinicTime = useClinicTimeQuery();
-  const selection = useReportRange(clinicTime.data?.clinic_date);
-  const validRange = !selection.error;
-  const dashboard = useGetOwnerDashboardQuery(selection.range, { skip: !validRange });
+  const [period, setPeriod] = useState<DashboardPeriod>('Today');
+  const today = clinicTime.data?.clinic_date;
+  const range = today ? dashboardRange(period, today) : { from: '', to: '' };
+  const dashboard = useGetOwnerDashboardQuery(range, { skip: !today });
   const data = dashboard.currentData;
-  const refresh = () => { if (validRange) void dashboard.refetch(); else void clinicTime.refetch(); };
+  const refresh = () => { if (today) void dashboard.refetch(); else void clinicTime.refetch(); };
 
   return (
     <AppScreen refreshing={dashboard.isFetching} onRefresh={refresh}>
-      <Text style={styles.title}>Dashboard</Text>
-      <Text style={styles.subtitle}>Clinic activity and confirmed financial totals.</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.subtitle}>Clinic snapshot</Text>
+      </View>
 
       <QueryState query={clinicTime} label="clinic date" />
-      <DateRangeControls today={clinicTime.data?.clinic_date} selection={selection} />
+      <View style={styles.periods}>
+        {(['Today', '7Days', '30Days'] as const).map(value => (
+          <Pressable
+            key={value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: period === value }}
+            onPress={() => setPeriod(value)}
+            style={[styles.period, period === value && styles.periodActive]}
+          >
+            <Text style={[styles.periodText, period === value && styles.periodTextActive]}>
+              {value === '7Days' ? 'Last 7 days' : value === '30Days' ? 'Last 30 days' : 'Today'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {today ? <Text style={styles.range}>{formatClinicDate(range.from)}{range.from !== range.to ? ` – ${formatClinicDate(range.to)}` : ''}</Text> : null}
       <QueryState query={dashboard} label="dashboard" hasData={Boolean(data)} />
 
       {data ? (
         <>
-          <Text style={styles.sectionTitle}>Operations</Text>
+          <View style={styles.revenueCard}>
+            <Text style={styles.revenueLabel}>Confirmed revenue</Text>
+            <Text style={styles.revenueValue}>₹{data.confirmed_revenue}</Text>
+            <View style={styles.revenueMeta}>
+              <Text style={styles.revenueMetaText}>Cash ₹{data.cash}</Text>
+              <Text style={styles.revenueDot}>•</Text>
+              <Text style={styles.revenueMetaText}>UPI ₹{data.upi}</Text>
+              {Number(data.pending_amount) > 0 ? <>
+                <Text style={styles.revenueDot}>•</Text>
+                <Text style={styles.pending}>₹{data.pending_amount} pending</Text>
+              </> : null}
+            </View>
+          </View>
+
           <View style={styles.metrics}>
             <MetricCard label="Appointments" value={data.appointments} />
-            <MetricCard label="Completed" value={data.completed} />
-            <MetricCard label="Cancelled" value={data.cancelled} />
-            <MetricCard label="No-shows" value={data.no_show} />
+            <MetricCard label="Completed visits" value={data.completed} />
             <MetricCard label="New patients" value={data.new_patients} />
-            <MetricCard label="Returning visits" value={data.returning_patient_visits} />
-            <MetricCard label="Follow-up appts" value={data.followup_appointments} />
             <MetricCard label="Unique patients" value={data.unique_patients} />
           </View>
 
-          <Text style={styles.sectionTitle}>Financial</Text>
-          <View style={styles.metrics}>
-            <MetricCard label="Confirmed Revenue" value={`₹${data.confirmed_revenue}`} />
-            <MetricCard label="Cash" value={`₹${data.cash}`} />
-            <MetricCard label="UPI" value={`₹${data.upi}`} />
-            <MetricCard label="Pending" value={`₹${data.pending_amount}`} />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Operations</Text>
+            <View style={styles.compactGrid}>
+              <CompactMetric label="Cancelled" value={data.cancelled} />
+              <CompactMetric label="No-shows" value={data.no_show} />
+              <CompactMetric label="Returning visits" value={data.returning_patient_visits} />
+              <CompactMetric label="Follow-up appointments" value={data.followup_appointments} />
+            </View>
           </View>
         </>
       ) : null}
@@ -51,17 +83,40 @@ export default function OwnerDashboardScreen() {
   );
 }
 
+function dashboardRange(period: DashboardPeriod, today: string) {
+  if (period === 'Today') return { from: today, to: today };
+  const days = period === '7Days' ? 7 : 30;
+  const date = new Date(`${today}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - (days - 1));
+  return { from: date.toISOString().slice(0, 10), to: today };
+}
+
+function CompactMetric({ label, value }: { label: string; value: string | number }) {
+  return <View style={styles.compactMetric}><Text style={styles.compactValue}>{value}</Text><Text style={styles.compactLabel}>{label}</Text></View>;
+}
 
 const styles = StyleSheet.create({
-  link: { color: colors.primary, fontWeight: '800' },
-  title: { fontSize: 24, fontWeight: '900', color: colors.text },
-  subtitle: { color: colors.muted, lineHeight: 20 },
-  error: { color: colors.danger, fontWeight: '700' },
-  chips: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  chip: { backgroundColor: colors.softPrimary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipText: { color: colors.primary, fontWeight: '800' },
-  dateRow: { flexDirection: 'row', gap: spacing.sm },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginTop: spacing.sm },
+  header: { gap: 3 },
+  title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark },
+  subtitle: { color: colors.muted, fontSize: 14 },
+  periods: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 4, borderWidth: 1, borderColor: colors.border },
+  period: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, paddingHorizontal: 6 },
+  periodActive: { backgroundColor: colors.softPrimary },
+  periodText: { color: colors.muted, fontWeight: '600', fontSize: 12, textAlign: 'center' },
+  periodTextActive: { color: colors.primaryDark, fontWeight: '800' },
+  range: { color: colors.muted, fontSize: 12, textAlign: 'right' },
+  revenueCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
+  revenueLabel: { color: '#CFE0F7', fontSize: 13, fontWeight: '600' },
+  revenueValue: { color: colors.surface, fontSize: 34, lineHeight: 40, fontWeight: '800' },
+  revenueMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 },
+  revenueMetaText: { color: '#E8F1FB', fontSize: 12, fontWeight: '600' },
+  revenueDot: { color: '#7EA2CC', fontSize: 12 },
+  pending: { color: '#FFDCA8', fontSize: 12, fontWeight: '700' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  section: { gap: spacing.sm },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
+  compactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  compactMetric: { flexGrow: 1, flexBasis: '46%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 3 },
+  compactValue: { color: colors.primaryDark, fontSize: 20, fontWeight: '800' },
+  compactLabel: { color: colors.muted, fontSize: 13, fontWeight: '600' },
 });
-

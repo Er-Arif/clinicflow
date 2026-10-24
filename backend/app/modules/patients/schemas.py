@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class PatientCreateRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=160)
-    mobile_number: str = Field(min_length=10, max_length=32)
+    mobile_number: str | None = Field(default=None, min_length=10, max_length=32)
     whatsapp_same_as_mobile: bool = True
     whatsapp_number: str | None = Field(default=None, max_length=32)
     date_of_birth: date | None = None
@@ -19,11 +19,23 @@ class PatientCreateRequest(BaseModel):
     allow_shared_mobile: bool = False
 
     @model_validator(mode="after")
-    def validate_age_and_whatsapp(self) -> PatientCreateRequest:
+    def validate_age_and_contacts(self) -> PatientCreateRequest:
         if (self.date_of_birth is None) == (self.approximate_age_years is None):
             raise ValueError("Provide either date of birth or approximate age, not both.")
-        if not self.whatsapp_same_as_mobile and not self.whatsapp_number:
-            raise ValueError("Enter the patient's WhatsApp number.")
+
+        has_mobile = bool(self.mobile_number and self.mobile_number.strip())
+        has_separate_whatsapp = bool(self.whatsapp_number and self.whatsapp_number.strip())
+
+        if not has_mobile:
+            self.mobile_number = None
+            self.whatsapp_same_as_mobile = False
+        if not self.whatsapp_same_as_mobile and not has_separate_whatsapp:
+            self.whatsapp_number = None
+
+        has_message_contact = (self.whatsapp_same_as_mobile and has_mobile) or has_separate_whatsapp
+        if not has_message_contact:
+            self.reminders_enabled = False
+
         if self.gender not in {"MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"}:
             raise ValueError("Select a valid gender.")
         if self.preferred_language not in {"EN", "HI"}:

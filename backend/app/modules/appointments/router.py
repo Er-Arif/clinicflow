@@ -8,6 +8,10 @@ from app.core.clock import Clock, get_clock
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.modules.appointments.availability import AppointmentAvailabilityService
+from app.modules.appointments.cancellation_guard import (
+    require_payment_correction_before_cancellation,
+    require_valid_cancellation_reason,
+)
 from app.modules.appointments.schemas import (
     AppointmentAdjustFeeRequest,
     AppointmentCancelRequest,
@@ -18,6 +22,7 @@ from app.modules.appointments.schemas import (
     AppointmentResponse,
 )
 from app.modules.appointments.service import AppointmentService
+from app.modules.appointments.time_guard import require_future_slot
 from app.modules.identity.dependencies import (
     ensure_password_ready,
     get_auth_context,
@@ -83,6 +88,7 @@ def create_appointment(
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
+    require_future_slot(clock, request.appointment_date, request.appointment_time)
     with db.begin():
         return AppointmentService(db, clock, context).create(
             request, idempotency_key=_idempotency_key(idempotency_key)
@@ -97,8 +103,6 @@ def get_appointment(
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
     return AppointmentService(db, clock, context).get(appointment_id)
-
-
 
 
 @router.post("/appointments/{appointment_id}/check-in", response_model=CheckInResponse)
@@ -124,6 +128,10 @@ def cancel_appointment(
     clock: Clock = Depends(get_clock),
 ) -> AppointmentResponse:
     with db.begin():
+        require_valid_cancellation_reason(
+            db, context.clinic_id, appointment_id, request.reason, clock
+        )
+        require_payment_correction_before_cancellation(db, context.clinic_id, appointment_id)
         return AppointmentService(db, clock, context).cancel(appointment_id, request)
 
 
@@ -138,6 +146,7 @@ def reschedule_appointment(
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> AppointmentRescheduleResponse:
+    require_future_slot(clock, request.new_appointment_date, request.new_appointment_time)
     with db.begin():
         return AppointmentService(db, clock, context).reschedule(
             appointment_id,

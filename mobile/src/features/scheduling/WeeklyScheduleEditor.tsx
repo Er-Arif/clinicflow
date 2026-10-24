@@ -6,10 +6,11 @@ import { BackButton } from '@/components/BackButton';
 import { FormField } from '@/components/FormField';
 import { KeyboardSafeFormScreen } from '@/components/KeyboardSafeFormScreen';
 import { TimePicker } from '@/components/TimePicker';
+import { useFocusedHardwareBack } from '@/navigation/useFocusedHardwareBack';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { ScheduleReview } from './ScheduleReview';
 import type { ScheduleOverview } from './types';
-import { daySummary, defaultSession, weekdays } from './weeklyEditor';
+import { applySessionPatch, calculatedSlots, daySummary, defaultSession, weekdays } from './weeklyEditor';
 import type { EditorErrors, SessionDraft, WeeklyDraft, WeeklyEditor } from './weeklyEditor';
 
 function SessionCard({ session, index, count, errors, busy, onChange, onRemove, onMove }: {
@@ -17,6 +18,9 @@ function SessionCard({ session, index, count, errors, busy, onChange, onRemove, 
   onChange: (patch: Partial<SessionDraft>) => void; onRemove: () => void; onMove: (offset: number) => void;
 }) {
   const error = (field: string) => errors[session.key + '.' + field];
+  const slots = calculatedSlots(session.start, session.end, session.interval);
+  const capacity = Number(session.capacity);
+  const lowerLimit = slots != null && Number.isFinite(capacity) && capacity > 0 && capacity < slots;
   return (
     <View style={styles.card}>
       <Text style={styles.heading}>Session {index + 1}</Text>
@@ -31,14 +35,24 @@ function SessionCard({ session, index, count, errors, busy, onChange, onRemove, 
       <FormField label="Slot interval (minutes)" accessibilityLabel={`Session ${index + 1} slot interval`}
         keyboardType="number-pad" value={session.interval} editable={!busy}
         onChangeText={interval => onChange({ interval })} error={error('interval')} />
-      <FormField label="Maximum capacity" accessibilityLabel={`Session ${index + 1} maximum capacity`}
-        keyboardType="number-pad" value={session.capacity} editable={!busy}
-        onChangeText={capacity => onChange({ capacity })} error={error('capacity')} />
-      <View style={styles.row}>
-        <AppButton label="Move up" tone="secondary" disabled={busy || index === 0} onPress={() => onMove(-1)} />
-        <AppButton label="Move down" tone="secondary" disabled={busy || index === count - 1} onPress={() => onMove(1)} />
+      <FormField label="Booking capacity" accessibilityLabel={`Session ${index + 1} booking capacity`}
+        keyboardType="number-pad" value={session.capacity} editable={!busy} maxLength={3}
+        onChangeText={capacityValue => onChange({ capacity: capacityValue })} error={error('capacity')} />
+      <View style={styles.capacityInfo}>
+        <Text style={styles.capacityTitle}>{slots == null ? 'Capacity will calculate automatically' : `${slots} complete slot${slots === 1 ? '' : 's'} available`}</Text>
+        <Text style={styles.capacityHint}>
+          {slots == null
+            ? 'Set valid start/end times and a slot interval.'
+            : lowerLimit
+              ? `Booking limit is lowered to ${session.capacity}.`
+              : 'Capacity follows the session automatically. Lower it only if you want booking buffer.'}
+        </Text>
       </View>
-      <AppButton label={`Remove session ${index + 1}`} tone="danger" disabled={busy} onPress={onRemove} />
+      <View style={styles.row}>
+        <AppButton compact label="Move up" tone="secondary" disabled={busy || index === 0} onPress={() => onMove(-1)} />
+        <AppButton compact label="Move down" tone="secondary" disabled={busy || index === count - 1} onPress={() => onMove(1)} />
+      </View>
+      <AppButton compact label={`Remove session ${index + 1}`} tone="danger" disabled={busy} onPress={onRemove} />
     </View>
   );
 }
@@ -50,6 +64,11 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
   const nextKey = useRef(0);
   const busy = state.phase === 'previewing' || state.phase === 'applying' || state.phase === 'saved';
   const change = (update: (draft: WeeklyDraft) => WeeklyDraft) => editor.edit(update(editor.getSnapshot().draft));
+
+  // The UI intentionally removes/disables Back while preview/apply is in flight.
+  // Android hardware Back must obey the same lock instead of escaping the route.
+  useFocusedHardwareBack(() => {}, busy);
+
   const add = () => change(draft => {
     if (draft.sessions.length >= 12) return draft;
     const session = defaultSession(`added-${++nextKey.current}`);
@@ -65,13 +84,12 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       {state.message ? <Text accessibilityRole="alert" style={styles.error}>{state.message}</Text> : null}
       <AppButton label="Preview changes" loading={state.phase === 'previewing'} disabled={busy}
         onPress={() => { Keyboard.dismiss(); void editor.preview(); }} />
-      {Object.keys(state.errors).length ? <Text accessibilityRole="alert" style={styles.error}>Check the highlighted fields above before previewing.</Text> : null}
-      <AppButton label="Cancel" tone="secondary" disabled={busy} onPress={onBack} />
+      {Object.keys(state.errors).length ? <Text accessibilityRole="alert" style={styles.error}>Check the highlighted fields above.</Text> : null}
+      <AppButton compact label="Cancel" tone="secondary" disabled={busy} onPress={onBack} />
     </View>}>
       {!busy ? <BackButton onPress={onBack} /> : null}
       <Text accessibilityRole="header" style={styles.title}>Edit weekly hours</Text>
-      <Text style={styles.hint}>Started from {loadedFrom}. Changes apply only after review and confirmation.</Text>
-      <Text style={styles.hint}>Choose weekdays that should share these hours. Selecting another day keeps the sessions below.</Text>
+      <Text style={styles.hint}>Based on {loadedFrom}. Select the days that should share this schedule, then review before saving.</Text>
       <View style={styles.row}>
         {weekdays.map((name, day) => {
           const selected = state.draft.weekdays.includes(day);
@@ -86,7 +104,7 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       </View>
       {state.errors.weekdays ? <Text style={styles.error}>{state.errors.weekdays}</Text> : null}
       {overview.days.filter(day => state.draft.weekdays.includes(day.weekday)).map(day => (
-        <Text key={day.weekday} style={styles.hint}>{day.weekday_name}: {daySummary(day)}</Text>
+        <Text key={day.weekday} style={styles.daySummary}>{day.weekday_name}: {daySummary(day)}</Text>
       ))}
       <View style={styles.row}>
         {[true, false].map(working => <Pressable key={String(working)} accessibilityRole="radio"
@@ -103,7 +121,7 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
       {state.draft.working ? <>
         {state.draft.sessions.map((session, index) => <SessionCard key={session.key} session={session}
           index={index} count={state.draft.sessions.length} errors={state.errors} busy={busy}
-          onChange={patch => change(draft => ({ ...draft, sessions: draft.sessions.map(s => s.key === session.key ? { ...s, ...patch } : s) }))}
+          onChange={patch => change(draft => ({ ...draft, sessions: draft.sessions.map(s => s.key === session.key ? applySessionPatch(s, patch) : s) }))}
           onRemove={() => change(draft => ({ ...draft, sessions: draft.sessions.filter(s => s.key !== session.key) }))}
           onMove={offset => change(draft => {
             const sessions = [...draft.sessions];
@@ -114,8 +132,8 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
             return { ...draft, sessions };
           })} />)}
         {state.errors.sessions ? <Text style={styles.error}>{state.errors.sessions}</Text> : null}
-        <AppButton label="Add session" tone="secondary" disabled={busy || state.draft.sessions.length >= 12} onPress={add} />
-      </> : <Text style={styles.hint}>No working sessions will be proposed. Existing appointments and history remain protected.</Text>}
+        <AppButton compact label="Add session" tone="secondary" disabled={busy || state.draft.sessions.length >= 12} onPress={add} />
+      </> : <Text style={styles.hint}>No sessions will be proposed for these days.</Text>}
       {state.review ? <ScheduleReview review={state.review} applying={state.phase === 'applying'}
         onEdit={() => editor.edit(state.draft)} onApply={() => { void editor.apply(); }} /> : null}
     </KeyboardSafeFormScreen>
@@ -123,16 +141,20 @@ export function WeeklyScheduleEditor({ editor, overview, loadedFrom, onBack }: {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '700', color: colors.text },
-  heading: { fontSize: 17, fontWeight: '700', color: colors.text },
-  text: { color: colors.text, fontSize: 15 },
-  hint: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 21 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
+  heading: { fontSize: 16, fontWeight: '800', color: colors.primaryDark },
+  text: { color: colors.text, fontSize: 14 },
+  hint: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  daySummary: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  label: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface },
-  selected: { backgroundColor: colors.softPrimary, borderColor: colors.primary },
-  selectedText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  chip: { minHeight: 42, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface },
+  selected: { backgroundColor: colors.accent, borderColor: colors.accent },
+  selectedText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   card: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
-  footer: { padding: spacing.md, gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  capacityInfo: { backgroundColor: colors.surfaceSoft, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 9, gap: 2 },
+  capacityTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: '700' },
+  capacityHint: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  footer: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });

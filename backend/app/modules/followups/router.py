@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock, get_clock
 from app.core.errors import AppError
 from app.db.session import get_db
+from app.modules.appointments.time_guard import require_future_slot
 from app.modules.followups.schemas import (
     FollowUpBookRequest,
     FollowUpBookResponse,
@@ -60,6 +61,7 @@ def book_followup(
     db: Session = Depends(get_db),
     clock: Clock = Depends(get_clock),
 ) -> FollowUpBookResponse:
+    require_future_slot(clock, request.appointment_date, request.appointment_time)
     with db.begin():
         return FollowUpService(db, clock, context).book(
             followup_id, request, idempotency_key=_idempotency_key(idempotency_key)

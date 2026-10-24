@@ -46,7 +46,6 @@ export default function BlockDateScreen() {
   const hasSessions = sessions.length > 0;
   const singleSession = sessions.length === 1;
 
-  // Single active session freeze: if exactly 1 session, effective scope is always FULL_DAY
   const effectiveScope = singleSession ? 'FULL_DAY' : scope;
 
   const isSelectedSessionValid = sessions.some(
@@ -58,7 +57,6 @@ export default function BlockDateScreen() {
     ? sessions[0].session_definition_id
     : null;
 
-  // Booked appointments count for warning
   const bookedAppointmentsCount = (() => {
     if (!hasSessions) return 0;
     if (effectiveScope === 'FULL_DAY') {
@@ -122,7 +120,7 @@ export default function BlockDateScreen() {
       footer={
         <View style={styles.actionFooter}>
           <AppButton
-            label="Save Blocked Date"
+            label="Save blocked date"
             tone="primary"
             loading={blockState.isLoading}
             disabled={isAlreadyBlocked || !hasSessions}
@@ -138,27 +136,25 @@ export default function BlockDateScreen() {
     >
       <BackButton />
       <View style={styles.header}>
-        <Text style={styles.title}>Block a Date</Text>
+        <Text style={styles.title}>Block a date</Text>
         <Text style={styles.subtitle}>
           Prevent new bookings for a full day or specific session without altering past schedules.
         </Text>
       </View>
 
       <View style={styles.formCard}>
-        {/* 1. Date */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Date</Text>
           <DatePicker value={date} onChange={setCustomDate} placeholder="YYYY-MM-DD" />
         </View>
 
-        {/* 2. Scope */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Scope</Text>
           {singleSession ? (
             <View style={{ gap: spacing.xs }}>
               <View style={styles.chipsRow}>
                 <View style={[styles.scopeChip, styles.scopeChipActive]}>
-                  <Text style={styles.chipTextActive}>Full Day</Text>
+                  <Text style={styles.chipTextActive}>Full day</Text>
                 </View>
               </View>
               <Text style={styles.helperText}>
@@ -173,7 +169,7 @@ export default function BlockDateScreen() {
                 style={[styles.scopeChip, scope === 'FULL_DAY' && styles.scopeChipActive]}
               >
                 <Text style={scope === 'FULL_DAY' ? styles.chipTextActive : styles.chipText}>
-                  Full Day
+                  Full day
                 </Text>
               </Pressable>
               <Pressable
@@ -182,23 +178,22 @@ export default function BlockDateScreen() {
                 style={[styles.scopeChip, scope === 'SESSION' && styles.scopeChipActive]}
               >
                 <Text style={scope === 'SESSION' ? styles.chipTextActive : styles.chipText}>
-                  Specific Session
+                  Specific session
                 </Text>
               </Pressable>
             </View>
           ) : (
             <View style={styles.chipsRow}>
               <View style={[styles.scopeChip, styles.scopeChipActive]}>
-                <Text style={styles.chipTextActive}>Full Day</Text>
+                <Text style={styles.chipTextActive}>Full day</Text>
               </View>
             </View>
           )}
         </View>
 
-        {/* 3. Session Selector (only if Specific Session chosen and 2+ sessions) */}
         {effectiveScope === 'SESSION' && sessions.length >= 2 && (
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Select Session</Text>
+            <Text style={styles.label}>Select session</Text>
             <View style={styles.chipsRow}>
               {sessions.map((sess) => {
                 const isSelected = effectiveSessionDefId === sess.session_definition_id;
@@ -219,13 +214,12 @@ export default function BlockDateScreen() {
           </View>
         )}
 
-        {/* 4. Reason */}
         <View style={styles.fieldGroup}>
           <FormField
             label="Reason"
             value={reason}
             onChangeText={(text) => setReason(text.slice(0, 300))}
-            placeholder="e.g. Doctor unavailable, Medical conference"
+            placeholder="e.g. Doctor unavailable, medical conference"
             multiline
             numberOfLines={2}
             maxLength={300}
@@ -235,7 +229,6 @@ export default function BlockDateScreen() {
           <Text style={styles.charCount}>{reason.length}/300</Text>
         </View>
 
-        {/* Notice if no sessions or already blocked */}
         {!availabilityQuery.isLoading && !hasSessions && (
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
@@ -254,10 +247,9 @@ export default function BlockDateScreen() {
           </View>
         )}
 
-        {/* 5. Appointment Warning */}
         {bookedAppointmentsCount > 0 && (
           <View style={styles.warningBox}>
-            <Text style={styles.warningTitle}>Existing Bookings Notice</Text>
+            <Text style={styles.warningTitle}>Existing bookings notice</Text>
             <Text style={styles.warningBody}>
               {bookedAppointmentsCount}{' '}
               {bookedAppointmentsCount === 1 ? 'patient is' : 'patients are'} already booked on this date.
@@ -308,11 +300,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   scopeChipActive: {
-    backgroundColor: colors.softPrimary,
-    borderColor: colors.primary,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   chipText: { color: colors.text, fontWeight: '600', fontSize: 13 },
-  chipTextActive: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  chipTextActive: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   helperText: { color: colors.muted, fontSize: 13 },
   reasonInput: {
     minHeight: 60,

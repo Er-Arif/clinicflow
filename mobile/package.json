@@ -11,6 +11,13 @@
     "test": "node --test __tests__/**/*.test.js",
     "postinstall": "patch-package"
   },
+  "expo": {
+    "autolinking": {
+      "exclude": [
+        "expo-keep-awake"
+      ]
+    }
+  },
   "dependencies": {
     "@react-native-community/datetimepicker": "^9.2.1",
     "@reduxjs/toolkit": "^2.9.0",

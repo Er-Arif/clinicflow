@@ -23,15 +23,25 @@ function mobileRuntime(overrides = {}) {
   native.StyleSheet = { create: styles => styles, flatten: style => Object.assign({}, ...[style].flat().filter(Boolean)) };
   native.Platform = { OS: 'android' };
   native.Keyboard = { dismiss() {}, metrics: () => undefined };
+  native.BackHandler = { addEventListener: () => ({ remove() {} }) };
+  const expoRouter = {
+    useRouter: () => ({ back() {}, push() {}, replace() {}, dismissTo() {}, dismissAll() {} }),
+    useLocalSearchParams: () => ({}),
+    useFocusEffect: () => {},
+  };
   const mocks = {
     '@/api/config': { getApiUrl: () => 'https://api.test.invalid' },
     'react-native': native,
-    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    'react-native-safe-area-context': {
+      SafeAreaView: host('SafeAreaView'),
+      useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+    },
     '@react-native-community/datetimepicker': host('DateTimePicker'),
-    'expo-router': { useRouter: () => ({ back() {}, push() {}, dismissTo() {} }), useLocalSearchParams: () => ({}) },
+    'expo-router': expoRouter,
     'expo-secure-store': { getItemAsync: async () => null },
     ...overrides,
   };
+  if (overrides['expo-router']) mocks['expo-router'] = { ...expoRouter, ...overrides['expo-router'] };
   function load(file) {
     let resolved = path.resolve(root, file);
     if (!fs.existsSync(resolved)) resolved = [resolved + '.ts', resolved + '.tsx', resolved + '.js'].find(fs.existsSync);
