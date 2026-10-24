@@ -76,16 +76,15 @@ requireText(
   'android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="NEVER"',
   'disabled Expo update launch checks',
 );
-
-forbidText(
+requireText(
   mainManifest,
-  'android.permission.READ_EXTERNAL_STORAGE',
-  'legacy external-storage read permission',
+  '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>',
+  'READ_EXTERNAL_STORAGE removal directive',
 );
-forbidText(
+requireText(
   mainManifest,
-  'android.permission.WRITE_EXTERNAL_STORAGE',
-  'legacy external-storage write permission',
+  '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>',
+  'WRITE_EXTERNAL_STORAGE removal directive',
 );
 forbidText(
   mainManifest,
