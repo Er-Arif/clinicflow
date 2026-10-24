@@ -95,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           export ENV_FILE="$PWD/infra/.env.production.example"
-          export BACKUP_DIR="$RUNNER_TEMP/clinicflow-backups"
+          export BACKUP_ROOT="$RUNNER_TEMP/clinicflow-backups"
           compose=(docker compose --env-file "$ENV_FILE" -f infra/docker-compose.production.yml)
           cleanup() {
             "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -115,17 +115,25 @@ jobs:
           done
 
           "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U clinicflow -d clinicflow <<'SQL'
+          CREATE TABLE alembic_version (version_num varchar(32) NOT NULL);
+          CREATE TABLE clinics (id integer);
           CREATE TABLE patient_identifiers (id integer);
           CREATE TABLE appointments (id integer);
           CREATE TABLE payments (id integer);
           CREATE TABLE audit_events (id integer);
+          INSERT INTO alembic_version VALUES ('ci_smoke');
+          INSERT INTO clinics VALUES (1), (2);
           INSERT INTO patient_identifiers VALUES (1), (2);
           INSERT INTO appointments VALUES (1), (2), (3);
           INSERT INTO payments VALUES (1);
           INSERT INTO audit_events VALUES (1), (2), (3), (4);
           SQL
 
-          ENV_FILE="$ENV_FILE" BACKUP_DIR="$BACKUP_DIR" BACKUP_KEEP=2 sh scripts/backup_postgres.sh
-          dump="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'clinicflow-*.dump' | sort | tail -n 1)"
+          ENV_FILE="$ENV_FILE" BACKUP_ROOT="$BACKUP_ROOT" sh scripts/backup_postgres.sh
+          dump="$(find "$BACKUP_ROOT/daily" -maxdepth 1 -type f -name 'clinicflow-*.dump' | sort | tail -n 1)"
           test -n "$dump"
-          ENV_FILE="$ENV_FILE" RESTORE_DB=clinicflow_restore_ci sh scripts/verify_restore.sh "$dump"
+          restore_output="$(ENV_FILE="$ENV_FILE" sh scripts/verify_restore.sh "$dump")"
+          printf '%s\n' "$restore_output"
+          grep -q '^alembic=ci_smoke$' <<< "$restore_output"
+          grep -q '^clinics=2$' <<< "$restore_output"
+          grep -q '^audit=4$' <<< "$restore_output"
