@@ -53,6 +53,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run validate:release-metadata
       - run: npm test
 
   infra:
