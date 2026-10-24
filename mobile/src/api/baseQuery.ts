@@ -5,6 +5,7 @@ import {
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
 
+import { applyMobileClientHeaders } from '@/api/clientMetadata';
 import { getApiUrl } from '@/api/config';
 import { newRequestId } from '@/api/requestId';
 import { notifySessionExpired } from '@/auth/sessionEvents';
@@ -24,7 +25,7 @@ const rawBaseQuery = fetchBaseQuery({
     const token = getAccessToken();
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (!headers.has('x-request-id')) headers.set('x-request-id', newRequestId());
-    return headers;
+    return applyMobileClientHeaders(headers);
   },
 });
 
@@ -34,11 +35,16 @@ async function performRefresh(): Promise<TokenPair | null> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) return null;
 
+  const headers = applyMobileClientHeaders(new Headers({
+    'content-type': 'application/json',
+    'x-request-id': newRequestId(),
+  }));
+
   let response: Response;
   try {
     response = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-request-id': newRequestId() },
+      headers,
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
   } catch {
