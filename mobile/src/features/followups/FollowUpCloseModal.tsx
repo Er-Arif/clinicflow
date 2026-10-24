@@ -87,7 +87,7 @@ export function FollowUpCloseModal({
                   key={value}
                   compact
                   label={label}
-                  tone={selectedReason === value ? 'primary' : 'secondary'}
+                  tone={selectedReason === value ? 'selection' : 'secondary'}
                   onPress={() => onReasonChange(value)}
                   style={styles.reasonButton}
                 />
