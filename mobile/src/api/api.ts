@@ -13,6 +13,10 @@ import { paymentEndpoints } from '@/api/paymentEndpoints';
 import { reportingEndpoints } from '@/api/reportingEndpoints';
 import { schedulingEndpoints } from '@/api/schedulingEndpoints';
 import { systemEndpoints } from '@/api/systemEndpoints';
+import {
+  clinicFlowReducerPath,
+  clinicFlowTagTypes,
+} from '@/api/tagTypes';
 
 export { refreshSessionSingleFlight } from '@/api/baseQuery';
 
@@ -55,26 +59,9 @@ function refreshPendingWorklists(
 }
 
 export const api = createApi({
-  reducerPath: 'clinicflowApi',
+  reducerPath: clinicFlowReducerPath,
   baseQuery: baseQueryWithReauth,
-  tagTypes: [
-    'Patient',
-    'Doctor',
-    'Schedule',
-    'Fee',
-    'Appointment',
-    'Visit',
-    'Payment',
-    'Upi',
-    'FollowUp',
-    'Reminder',
-    'MessageTemplate',
-    'Report',
-    'User',
-    'ClinicSettings',
-    'DoctorSettings',
-    'Audit',
-  ],
+  tagTypes: clinicFlowTagTypes,
   endpoints: (builder) => ({
     ...reportingEndpoints(builder),
     ...systemEndpoints(builder),
