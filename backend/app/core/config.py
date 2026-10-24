@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     build_commit: str = "development"
     minimum_mobile_version: str = "0.1.0"
+    latest_mobile_version: str = "0.1.0"
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"])
     cors_origins: list[str] = Field(default_factory=list)
     trusted_proxy_ips: list[str] = Field(default_factory=list)
