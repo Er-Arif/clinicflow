@@ -116,7 +116,7 @@ export default function BookFollowUpScreen() {
                 <Text style={session.status === 'BLOCKED' || isFull ? styles.danger : styles.success}>{session.status === 'BLOCKED' ? 'Blocked' : isFull ? 'Full' : 'Available'}</Text>
               </View>
             </Pressable>
-            {selected ? <AppButton compact label={appointmentTime ? formatClinicTime(appointmentTime) : 'Select time'} onPress={() => setSlotModalVisible(true)} tone={appointmentTime ? 'primary' : 'secondary'} /> : null}
+            {selected ? <AppButton compact label={appointmentTime ? formatClinicTime(appointmentTime) : 'Select time'} onPress={() => setSlotModalVisible(true)} tone={appointmentTime ? 'selection' : 'secondary'} /> : null}
           </View>
         );
       })}
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   copy: { flex: 1, gap: 3 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
-  cardSelected: { borderColor: colors.primary, backgroundColor: '#FBFDFF' },
+  cardSelected: { borderColor: colors.accent, backgroundColor: '#FBFDFF' },
   disabledCard: { opacity: 0.5 },
   cardTitle: { color: colors.primaryDark, fontWeight: '800', fontSize: 16 },
   success: { color: colors.success, fontWeight: '700', fontSize: 12 },
