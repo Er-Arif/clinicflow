@@ -90,3 +90,42 @@ jobs:
             echo "Tampered backup unexpectedly passed verification" >&2
             exit 1
           fi
+      - name: Smoke-test PostgreSQL backup and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ENV_FILE="$PWD/infra/.env.production.example"
+          export BACKUP_DIR="$RUNNER_TEMP/clinicflow-backups"
+          compose=(docker compose --env-file "$ENV_FILE" -f infra/docker-compose.production.yml)
+          cleanup() {
+            "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          "${compose[@]}" up -d postgres
+          for attempt in {1..30}; do
+            if "${compose[@]}" exec -T postgres pg_isready -U clinicflow -d clinicflow >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "PostgreSQL did not become ready" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U clinicflow -d clinicflow <<'SQL'
+          CREATE TABLE patient_identifiers (id integer);
+          CREATE TABLE appointments (id integer);
+          CREATE TABLE payments (id integer);
+          CREATE TABLE audit_events (id integer);
+          INSERT INTO patient_identifiers VALUES (1), (2);
+          INSERT INTO appointments VALUES (1), (2), (3);
+          INSERT INTO payments VALUES (1);
+          INSERT INTO audit_events VALUES (1), (2), (3), (4);
+          SQL
+
+          ENV_FILE="$ENV_FILE" BACKUP_DIR="$BACKUP_DIR" BACKUP_KEEP=2 sh scripts/backup_postgres.sh
+          dump="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'clinicflow-*.dump' | sort | tail -n 1)"
+          test -n "$dump"
+          ENV_FILE="$ENV_FILE" RESTORE_DB=clinicflow_restore_ci sh scripts/verify_restore.sh "$dump"
