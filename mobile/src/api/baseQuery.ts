@@ -16,6 +16,7 @@ import {
   getRefreshToken,
   setSessionTokens,
 } from '@/auth/session';
+import { notifyMobileUpdateRequired } from '@/features/about/updateEvents';
 
 const apiUrl = getApiUrl();
 
@@ -80,6 +81,11 @@ export const baseQueryWithReauth: BaseQueryFn<
   let result = await rawBaseQuery(args, api, extraOptions);
   const url = typeof args === 'string' ? args : args.url;
   const isAuthBootstrap = url.includes('/auth/login') || url.includes('/auth/refresh');
+
+  if (result.error?.status === 426) {
+    notifyMobileUpdateRequired();
+    return result;
+  }
 
   if (result.error?.status === 401 && !isAuthBootstrap) {
     const refreshed = await refreshSessionSingleFlight();
