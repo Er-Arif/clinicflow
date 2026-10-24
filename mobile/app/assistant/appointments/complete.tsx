@@ -141,8 +141,8 @@ export default function CompleteVisitScreen() {
       <View style={styles.card}>
         <Text style={styles.strong}>Follow-up required?</Text>
         <View style={styles.actions}>
-          <AppButton label="No" tone={!followUpRequired ? 'primary' : 'secondary'} onPress={() => setFollowUpRequired(false)} />
-          <AppButton label="Yes" tone={followUpRequired ? 'primary' : 'secondary'} onPress={() => setFollowUpRequired(true)} />
+          <AppButton label="No" tone={!followUpRequired ? 'selection' : 'secondary'} onPress={() => setFollowUpRequired(false)} />
+          <AppButton label="Yes" tone={followUpRequired ? 'selection' : 'secondary'} onPress={() => setFollowUpRequired(true)} />
         </View>
       </View>
 
@@ -150,8 +150,8 @@ export default function CompleteVisitScreen() {
         <View style={styles.card}>
           <Text style={styles.strong}>Follow-up timing</Text>
           <View style={styles.actions}>
-            <AppButton label="After N days" tone={mode === 'INTERVAL' ? 'primary' : 'secondary'} onPress={() => setMode('INTERVAL')} />
-            <AppButton label="Specific date" tone={mode === 'DATE' ? 'primary' : 'secondary'} onPress={() => setMode('DATE')} />
+            <AppButton label="After N days" tone={mode === 'INTERVAL' ? 'selection' : 'secondary'} onPress={() => setMode('INTERVAL')} />
+            <AppButton label="Specific date" tone={mode === 'DATE' ? 'selection' : 'secondary'} onPress={() => setMode('DATE')} />
           </View>
           {mode === 'INTERVAL' ? (
             <>
