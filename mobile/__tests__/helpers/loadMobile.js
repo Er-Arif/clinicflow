@@ -38,6 +38,15 @@ function mobileRuntime(overrides = {}) {
     },
     '@react-native-community/datetimepicker': host('DateTimePicker'),
     'expo-router': expoRouter,
+    'expo-constants': {
+      __esModule: true,
+      default: {
+        expoConfig: {
+          version: '1.0.0-rc.1',
+          android: { versionCode: 1 },
+        },
+      },
+    },
     'expo-secure-store': { getItemAsync: async () => null },
     ...overrides,
   };
