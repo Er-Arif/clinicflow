@@ -27,9 +27,7 @@ def _settings(**overrides) -> Settings:
 
 
 def test_update_policy_accepts_github_release_apk_with_sha256() -> None:
-    validate_runtime_settings(
-        _settings(mobile_release_notes="Production release")
-    )
+    validate_runtime_settings(_settings(mobile_release_notes="Production release"))
 
 
 def test_v1_baseline_can_run_without_published_update_artifact() -> None:
@@ -47,9 +45,7 @@ def test_v1_baseline_can_run_without_published_update_artifact() -> None:
 
 def test_advertised_newer_build_requires_download_artifact() -> None:
     with pytest.raises(RuntimeError, match="requires MOBILE_APK_URL"):
-        validate_runtime_settings(
-            _settings(mobile_apk_url="", mobile_apk_sha256="")
-        )
+        validate_runtime_settings(_settings(mobile_apk_url="", mobile_apk_sha256=""))
 
 
 def test_enforced_minimum_above_v1_requires_download_artifact() -> None:
@@ -87,9 +83,7 @@ def test_update_policy_rejects_minimum_code_above_latest_code() -> None:
 )
 def test_update_policy_requires_apk_url_and_sha_together(apk_url: str, sha256: str) -> None:
     with pytest.raises(RuntimeError, match="configured together"):
-        validate_runtime_settings(
-            _settings(mobile_apk_url=apk_url, mobile_apk_sha256=sha256)
-        )
+        validate_runtime_settings(_settings(mobile_apk_url=apk_url, mobile_apk_sha256=sha256))
 
 
 @pytest.mark.parametrize(
@@ -97,16 +91,16 @@ def test_update_policy_requires_apk_url_and_sha_together(apk_url: str, sha256: s
     [
         "http://github.com/Er-Arif/clinicflow/releases/download/v1.0.0/app.apk",
         "https://example.com/Er-Arif/clinicflow/releases/download/v1.0.0/app.apk",
+        "https://github.com/someone-else/clinicflow/releases/download/v1.0.0/app.apk",
+        "https://github.com/Er-Arif/other-repo/releases/download/v1.0.0/app.apk",
         "https://github.com/Er-Arif/clinicflow/releases/tag/v1.0.0",
         "https://github.com/Er-Arif/clinicflow/releases/download/v1.0.0/app.zip",
         "https://github.com/Er-Arif/clinicflow/releases/download/v1.0.0/app.apk?token=secret",
     ],
 )
 def test_update_policy_rejects_non_release_apk_urls(apk_url: str) -> None:
-    with pytest.raises(RuntimeError, match="release APK URL"):
-        validate_runtime_settings(
-            _settings(mobile_apk_url=apk_url, mobile_apk_sha256=VALID_SHA256)
-        )
+    with pytest.raises(RuntimeError, match="ClinicFlow GitHub release APK URL"):
+        validate_runtime_settings(_settings(mobile_apk_url=apk_url, mobile_apk_sha256=VALID_SHA256))
 
 
 def test_update_policy_rejects_invalid_sha256() -> None:
