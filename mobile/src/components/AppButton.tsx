@@ -8,7 +8,7 @@ type Props = {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  tone?: 'primary' | 'secondary' | 'danger';
+  tone?: 'primary' | 'secondary' | 'selection' | 'danger';
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -25,6 +25,7 @@ export function AppButton({ label, onPress, disabled, loading, tone = 'primary',
         styles.button,
         compact && styles.compact,
         tone === 'secondary' && styles.secondary,
+        tone === 'selection' && styles.selection,
         tone === 'danger' && styles.danger,
         (disabled || loading) && styles.disabled,
         pressed && styles.pressed,
@@ -32,11 +33,12 @@ export function AppButton({ label, onPress, disabled, loading, tone = 'primary',
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={tone === 'primary' ? colors.surface : tone === 'danger' ? colors.danger : colors.primary} />
+        <ActivityIndicator color={tone === 'primary' || tone === 'selection' ? '#FFFFFF' : tone === 'danger' ? colors.danger : colors.primary} />
       ) : (
         <Text style={[
           styles.label,
           tone === 'secondary' && styles.secondaryLabel,
+          tone === 'selection' && styles.selectionLabel,
           tone === 'danger' && styles.dangerLabel,
           compact && styles.compactLabel,
         ]}>{label}</Text>
@@ -57,10 +59,12 @@ const styles = StyleSheet.create({
   },
   compact: { minHeight: 40, paddingHorizontal: 14, paddingVertical: 8 },
   secondary: { backgroundColor: colors.softPrimary, borderWidth: 1, borderColor: colors.border },
+  selection: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.accent },
   danger: { backgroundColor: colors.softDanger, borderWidth: 1, borderColor: '#F0C5C5' },
   label: { color: colors.surface, fontWeight: '700', fontSize: 15 },
   compactLabel: { fontSize: 14 },
   secondaryLabel: { color: colors.primaryDark },
+  selectionLabel: { color: '#FFFFFF' },
   dangerLabel: { color: colors.danger },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.78 },
