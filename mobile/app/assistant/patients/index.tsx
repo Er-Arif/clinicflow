@@ -116,7 +116,7 @@ function formatPhone(value: string) {
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text },
+  title: { fontSize: 28, fontWeight: '800', color: colors.primaryDark },
   subtitle: { color: colors.muted, marginTop: 4 },
   link: { color: colors.primary, fontWeight: '700', paddingTop: 6 },
   searchField: { position: 'relative' },
