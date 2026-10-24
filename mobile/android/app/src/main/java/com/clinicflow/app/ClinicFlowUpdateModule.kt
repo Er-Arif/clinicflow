@@ -1,6 +1,9 @@
 package com.clinicflow.app
 
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -60,7 +63,12 @@ class ClinicFlowUpdateModule(
   }
 
   @ReactMethod
-  fun downloadAndInstall(apkUrl: String, expectedSha256: String, promise: Promise) {
+  fun downloadAndInstall(
+    apkUrl: String,
+    expectedSha256: String,
+    expectedVersionCode: Double,
+    promise: Promise,
+  ) {
     if (!isPackageInstallAllowed()) {
       promise.reject(
         "UPDATE_INSTALL_PERMISSION_REQUIRED",
@@ -82,14 +90,29 @@ class ClinicFlowUpdateModule(
       return
     }
 
+    val expectedCode = expectedVersionCode.toLong()
+    if (
+      !expectedVersionCode.isFinite()
+      || expectedVersionCode < 1.0
+      || expectedVersionCode % 1.0 != 0.0
+      || expectedCode > Int.MAX_VALUE
+    ) {
+      promise.reject("UPDATE_METADATA_INVALID", "The update version code is invalid.")
+      return
+    }
+
     executor.execute {
+      var apk: File? = null
       try {
-        val apk = downloadVerifiedApk(validatedUrl, expectedHash)
+        apk = downloadVerifiedApk(validatedUrl, expectedHash)
+        verifyApkIdentity(apk, expectedCode)
         launchInstaller(apk)
         promise.resolve(true)
       } catch (error: UpdateException) {
+        apk?.delete()
         promise.reject(error.code, error.message)
       } catch (_: Exception) {
+        apk?.delete()
         promise.reject(
           "UPDATE_DOWNLOAD_FAILED",
           "Unable to download and verify the ClinicFlow update.",
@@ -211,6 +234,102 @@ class ClinicFlowUpdateModule(
       connection.disconnect()
     }
   }
+
+  private fun verifyApkIdentity(apk: File, expectedVersionCode: Long) {
+    val packageManager = reactApplicationContext.packageManager
+    val archive = packageInfoForArchive(packageManager, apk)
+      ?: throw UpdateException(
+        "UPDATE_APK_INVALID",
+        "The downloaded file is not a valid Android package.",
+      )
+    val installed = installedPackageInfo(packageManager)
+
+    if (archive.packageName != reactApplicationContext.packageName) {
+      throw UpdateException(
+        "UPDATE_PACKAGE_MISMATCH",
+        "The downloaded package is not a ClinicFlow update.",
+      )
+    }
+
+    val archiveCode = versionCodeOf(archive)
+    val installedCode = versionCodeOf(installed)
+    if (archiveCode != expectedVersionCode || archiveCode <= installedCode) {
+      throw UpdateException(
+        "UPDATE_VERSION_MISMATCH",
+        "The downloaded package version does not match the ClinicFlow update policy.",
+      )
+    }
+
+    val archiveSigners = signerDigests(archive)
+    val installedSigners = signerDigests(installed)
+    if (archiveSigners.isEmpty() || archiveSigners != installedSigners) {
+      throw UpdateException(
+        "UPDATE_SIGNATURE_MISMATCH",
+        "The downloaded package is not signed by the installed ClinicFlow signing key.",
+      )
+    }
+  }
+
+  @Suppress("DEPRECATION")
+  private fun packageInfoForArchive(packageManager: PackageManager, apk: File): PackageInfo? {
+    val flags =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        PackageManager.GET_SIGNING_CERTIFICATES
+      } else {
+        PackageManager.GET_SIGNATURES
+      }
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.getPackageArchiveInfo(
+        apk.absolutePath,
+        PackageManager.PackageInfoFlags.of(flags.toLong()),
+      )
+    } else {
+      packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
+    }
+  }
+
+  @Suppress("DEPRECATION")
+  private fun installedPackageInfo(packageManager: PackageManager): PackageInfo {
+    val flags =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        PackageManager.GET_SIGNING_CERTIFICATES
+      } else {
+        PackageManager.GET_SIGNATURES
+      }
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.getPackageInfo(
+        reactApplicationContext.packageName,
+        PackageManager.PackageInfoFlags.of(flags.toLong()),
+      )
+    } else {
+      packageManager.getPackageInfo(reactApplicationContext.packageName, flags)
+    }
+  }
+
+  @Suppress("DEPRECATION")
+  private fun versionCodeOf(info: PackageInfo): Long =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode
+    else info.versionCode.toLong()
+
+  @Suppress("DEPRECATION")
+  private fun signaturesOf(info: PackageInfo): Array<Signature> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      val signingInfo = info.signingInfo ?: return emptyArray()
+      if (signingInfo.hasMultipleSigners()) {
+        signingInfo.apkContentsSigners
+      } else {
+        signingInfo.signingCertificateHistory
+      }
+    } else {
+      info.signatures ?: emptyArray()
+    }
+
+  private fun signerDigests(info: PackageInfo): Set<String> =
+    signaturesOf(info).mapTo(mutableSetOf()) { signature ->
+      MessageDigest.getInstance("SHA-256")
+        .digest(signature.toByteArray())
+        .joinToString("") { byte -> "%02x".format(byte) }
+    }
 
   private fun launchInstaller(apk: File) {
     val contentUri = FileProvider.getUriForFile(
