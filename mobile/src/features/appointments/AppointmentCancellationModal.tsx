@@ -92,7 +92,7 @@ export function AppointmentCancellationModal({
                   key={value}
                   compact
                   label={humanize(value)}
-                  tone={selectedReason === value ? 'primary' : 'secondary'}
+                  tone={selectedReason === value ? 'selection' : 'secondary'}
                   onPress={() => onReasonChange(value)}
                   style={styles.reasonButton}
                 />
