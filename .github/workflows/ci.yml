@@ -61,11 +61,12 @@ jobs:
       - run: npm run validate:release-metadata
       - run: npm run validate:android-security
       - run: npm test
-      - name: Compile Android Kotlin bridge
+      - name: Compile Android Kotlin bridge and merge staging manifest
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew :app:compileDebugKotlin --no-daemon -PreactNativeArchitectures=arm64-v8a
+          ./gradlew :app:compileDebugKotlin :app:processStagingMainManifest --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - run: npm run validate:merged-android-security
 
   infra:
     runs-on: ubuntu-latest
