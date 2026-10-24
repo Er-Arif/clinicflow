@@ -7,7 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { ClinicFlowLogo } from '@/components/ClinicFlowLogo';
-import { compareVersions } from '@/features/about/version';
+import { evaluateUpdate } from '@/features/about/updatePolicy';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'unavailable' | 'error';
@@ -15,7 +15,8 @@ type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'unavailable'
 export function AboutScreen() {
   const system = useGetSystemInfoQuery();
   const appVersion = Constants.expoConfig?.version ?? 'Unknown';
-  const buildNumber = Constants.expoConfig?.android?.versionCode?.toString() ?? 'Unknown';
+  const versionCode = Constants.expoConfig?.android?.versionCode ?? null;
+  const buildNumber = versionCode?.toString() ?? 'Unknown';
   const [updateState, setUpdateState] = useState<UpdateState>('idle');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
@@ -27,19 +28,19 @@ export function AboutScreen() {
         setUpdateState('error');
         return;
       }
-      const latest = result.data?.latest_mobile_version?.trim() || null;
+      const info = result.data;
+      const latest = info?.latest_mobile_version?.trim() || null;
       setLatestVersion(latest);
-      if (!latest || appVersion === 'Unknown') {
+      if (!info || appVersion === 'Unknown') {
         setUpdateState('unavailable');
         return;
       }
 
-      const comparison = compareVersions(latest, appVersion);
-      if (comparison === null) {
-        setUpdateState('unavailable');
-      } else {
-        setUpdateState(comparison > 0 ? 'available' : 'current');
-      }
+      const decision = evaluateUpdate(
+        { version: appVersion, versionCode },
+        info,
+      );
+      setUpdateState(decision.state);
     } catch {
       setUpdateState('error');
     }
