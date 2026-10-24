@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   header: { gap: 3 }, row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' }, copy: { flex: 1, gap: 3 },
   title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, subtitle: { color: colors.muted, lineHeight: 19, fontSize: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surface },
-  chipActive: { backgroundColor: colors.softPrimary, borderColor: '#C8DCF9' }, chipText: { color: colors.muted, fontWeight: '600' }, chipTextActive: { color: colors.primaryDark, fontWeight: '800' },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent }, chipText: { color: colors.muted, fontWeight: '600' }, chipTextActive: { color: '#FFFFFF', fontWeight: '800' },
   list: { gap: spacing.sm }, card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md }, pressed: { opacity: 0.78 },
   name: { fontSize: 16, fontWeight: '800', color: colors.text }, statusPill: { backgroundColor: colors.softSuccess, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, statusText: { color: colors.success, fontWeight: '700', fontSize: 11 },
   statusChecked: { backgroundColor: colors.softPrimary }, statusCheckedText: { color: colors.primary }, statusMuted: { backgroundColor: colors.surfaceSoft }, statusMutedText: { color: colors.muted },
