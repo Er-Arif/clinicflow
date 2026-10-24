@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 
 import { subscribeSessionExpired } from '@/auth/sessionEvents';
+import { AppUpdateGate } from '@/features/about/AppUpdateGate';
 import { resetApiCache, store } from '@/store/store';
 import { colors } from '@/theme/tokens';
 
@@ -22,6 +23,7 @@ export default function RootLayout() {
     <Provider store={store}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+      <AppUpdateGate />
     </Provider>
   );
 }
