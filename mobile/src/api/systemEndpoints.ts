@@ -19,7 +19,13 @@ export type SystemInfo = {
   build_commit: string;
   environment: string;
   minimum_mobile_version: string;
+  minimum_mobile_version_code: number;
   latest_mobile_version: string;
+  latest_mobile_version_code: number;
+  mobile_apk_url: string | null;
+  mobile_apk_sha256: string | null;
+  mobile_release_notes: string;
+  mobile_update_mandatory: boolean;
 };
 
 export function systemEndpoints(builder: Builder) {
