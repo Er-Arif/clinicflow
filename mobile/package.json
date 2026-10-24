@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "validate:release-metadata": "node scripts/validate-release-metadata.mjs",
     "validate:android-security": "node scripts/validate-android-security.mjs",
+    "validate:merged-android-security": "node scripts/validate-merged-android-manifest.mjs",
     "test": "node --test __tests__/**/*.test.js",
     "postinstall": "patch-package"
   },
