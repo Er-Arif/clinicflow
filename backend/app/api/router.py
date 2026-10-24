@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.api.routes.health import router as health_router
 from app.api.routes.system import router as system_router
 from app.core.config import settings
+from app.core.mobile_compat import require_supported_mobile
 from app.modules.appointments.router import router as appointments_router
 from app.modules.clinic.router import context_router as clinic_context_router
 from app.modules.clinic.router import router as clinic_router
@@ -17,17 +18,27 @@ from app.modules.scheduling.router import router as scheduling_router
 from app.modules.visits.router import router as visits_router
 
 api_router = APIRouter()
+mobile_guard = [Depends(require_supported_mobile)]
+
+# Update/recovery endpoints stay reachable even when the installed app is too old.
 api_router.include_router(health_router)
 api_router.include_router(system_router, prefix=settings.api_prefix)
 api_router.include_router(auth_router, prefix=settings.api_prefix)
-api_router.include_router(admin_router, prefix=settings.api_prefix)
-api_router.include_router(clinic_router, prefix=settings.api_prefix)
-api_router.include_router(clinic_context_router, prefix=settings.api_prefix)
-api_router.include_router(scheduling_router, prefix=settings.api_prefix)
-api_router.include_router(appointments_router, prefix=settings.api_prefix)
-api_router.include_router(visits_router, prefix=settings.api_prefix)
-api_router.include_router(payments_router, prefix=settings.api_prefix)
-api_router.include_router(followups_router, prefix=settings.api_prefix)
-api_router.include_router(messaging_router, prefix=settings.api_prefix)
-api_router.include_router(reporting_router, prefix=settings.api_prefix)
-api_router.include_router(patients_router, prefix=settings.api_prefix)
+
+# Clinic business APIs require a supported Android build once the configured
+# minimum advances beyond the original V1 compatibility baseline.
+api_router.include_router(admin_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(clinic_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(
+    clinic_context_router,
+    prefix=settings.api_prefix,
+    dependencies=mobile_guard,
+)
+api_router.include_router(scheduling_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(appointments_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(visits_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(payments_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(followups_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(messaging_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(reporting_router, prefix=settings.api_prefix, dependencies=mobile_guard)
+api_router.include_router(patients_router, prefix=settings.api_prefix, dependencies=mobile_guard)
