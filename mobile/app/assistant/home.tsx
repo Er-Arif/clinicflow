@@ -52,7 +52,7 @@ export default function AssistantHome() {
 
           <View style={styles.primaryActions}>
             <AppButton style={styles.actionButton} label="New appointment" onPress={() => router.push('/assistant/patients')} />
-            <AppButton style={styles.actionButton} label="Add walk-in" tone="secondary" onPress={() => router.push('/assistant/walk-in')} />
+            <AppButton style={[styles.actionButton, styles.walkInButton]} label="Add walk-in" onPress={() => router.push('/assistant/walk-in')} />
           </View>
 
           <View style={styles.attention}>
@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   primaryActions: { flexDirection: 'row', gap: spacing.sm },
   actionButton: { flex: 1 },
+  walkInButton: { backgroundColor: colors.accent },
   section: { gap: spacing.sm, marginTop: spacing.xs },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md },
