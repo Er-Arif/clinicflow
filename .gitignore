@@ -18,6 +18,11 @@ web-build/
 !.env.example
 agy.txt
 sha.txt
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
 
 # IDE / OS
 .vscode/
@@ -30,5 +35,3 @@ Thumbs.db
 *.aab
 !.env.*.example
 backups/
-*.jks
-*.keystore
