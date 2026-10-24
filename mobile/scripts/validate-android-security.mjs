@@ -31,6 +31,21 @@ const mainApplication = fs.readFileSync(
   ),
   'utf8',
 );
+const updateModule = fs.readFileSync(
+  path.join(
+    mobileRoot,
+    'android',
+    'app',
+    'src',
+    'main',
+    'java',
+    'com',
+    'clinicflow',
+    'app',
+    'ClinicFlowUpdateModule.kt',
+  ),
+  'utf8',
+);
 
 function requireText(source, text, label) {
   if (!source.includes(text)) {
@@ -104,6 +119,26 @@ requireText(
   'add(ClinicFlowUpdatePackage())',
   'ClinicFlow update package registration',
 );
+requireText(
+  updateModule,
+  'private const val CLINICFLOW_RELEASE_PATH_PREFIX = "/Er-Arif/clinicflow/releases/download/"',
+  'ClinicFlow GitHub Release repository allowlist',
+);
+requireText(
+  updateModule,
+  'url.path.startsWith(CLINICFLOW_RELEASE_PATH_PREFIX)',
+  'native updater repository path validation',
+);
+requireText(
+  updateModule,
+  'archive.packageName != reactApplicationContext.packageName',
+  'APK package identity validation',
+);
+requireText(
+  updateModule,
+  'archiveSigners != installedSigners',
+  'APK signer identity validation',
+);
 
 // The dev client may keep overlay/cleartext capability without widening production.
 requireText(
@@ -117,4 +152,4 @@ requireText(
   'debug-only cleartext traffic',
 );
 
-console.log('Android production manifest hardening is intact.');
+console.log('Android production manifest and updater hardening are intact.');
