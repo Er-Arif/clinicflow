@@ -5,8 +5,8 @@ import {
 
 import { baseQueryWithReauth } from '@/api/baseQuery';
 import { reportingEndpoints } from '@/api/reportingEndpoints';
+import { systemEndpoints } from '@/api/systemEndpoints';
 import { WORKLIST_PAGE_SIZE, worklistOptions } from '@/api/worklists';
-import type { AuthUser, TokenPair } from '@/auth/session';
 import {
   Patient,
   PatientCreatePayload,
@@ -89,28 +89,7 @@ export const api = createApi({
   tagTypes: ['Patient', 'Doctor', 'Schedule', 'Fee', 'Appointment', 'Visit', 'Payment', 'Upi', 'FollowUp', 'Reminder', 'MessageTemplate', 'Report', 'User', 'ClinicSettings', 'DoctorSettings', 'Audit'],
   endpoints: (builder) => ({
     ...reportingEndpoints(builder),
-    liveness: builder.query<{ status: string; utc_time: string }, void>({
-      query: () => '/health/live',
-    }),
-    getSystemInfo: builder.query<{ service: string; api_version: string; build_commit: string; environment: string; minimum_mobile_version: string }, void>({
-      query: () => '/api/v1/system/info',
-    }),
-    login: builder.mutation<
-      TokenPair,
-      { login_identifier: string; password: string; device_label?: string }
-    >({
-      query: (body) => ({ url: '/api/v1/auth/login', method: 'POST', body }),
-    }),
-    me: builder.query<AuthUser, void>({
-      query: () => '/api/v1/auth/me',
-      providesTags: ['User'],
-    }),
-    logout: builder.mutation<void, void>({
-      query: () => ({ url: '/api/v1/auth/logout', method: 'POST' }),
-    }),
-    changePassword: builder.mutation<void, { current_password: string; new_password: string }>({
-      query: (body) => ({ url: '/api/v1/auth/change-password', method: 'POST', body }),
-    }),
+    ...systemEndpoints(builder),
     searchPatients: builder.query<PatientList, { q: string; limit?: number; offset?: number }>({
       query: ({ q, limit = 50, offset = 0 }) => ({
         url: '/api/v1/patients',
