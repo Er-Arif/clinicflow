@@ -135,7 +135,9 @@ class ClinicFlowUpdateModule(
       throw UpdateException("UPDATE_METADATA_INVALID", "The update download address is invalid.")
     }
 
-    val validPath = url.path.contains("/releases/download/") && url.path.lowercase().endsWith(".apk")
+    val validPath =
+      url.path.startsWith(CLINICFLOW_RELEASE_PATH_PREFIX) &&
+        url.path.lowercase().endsWith(".apk")
     if (
       url.protocol != "https"
       || url.host != "github.com"
@@ -146,7 +148,7 @@ class ClinicFlowUpdateModule(
     ) {
       throw UpdateException(
         "UPDATE_METADATA_INVALID",
-        "The update download address is not an approved GitHub Release APK.",
+        "The update download address is not an approved ClinicFlow GitHub Release APK.",
       )
     }
     return url
@@ -355,6 +357,7 @@ class ClinicFlowUpdateModule(
 
   companion object {
     private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
+    private const val CLINICFLOW_RELEASE_PATH_PREFIX = "/Er-Arif/clinicflow/releases/download/"
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 60_000
     private const val BUFFER_SIZE = 64 * 1024
