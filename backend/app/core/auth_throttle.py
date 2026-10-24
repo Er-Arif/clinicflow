@@ -8,7 +8,7 @@ import hashlib
 import logging
 import math
 from collections import deque
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 from threading import Lock
 from time import monotonic
 
@@ -92,10 +92,37 @@ def _proxy_client_ip(value: str | None, *, forwarded_chain: bool = False) -> str
         return "unknown"
 
 
+def _is_trusted_proxy(peer: str | None) -> bool:
+    if not peer:
+        return False
+    try:
+        address = ip_address(peer)
+    except ValueError:
+        return False
+
+    return any(
+        address in ip_network(network, strict=False)
+        for network in settings.trusted_proxy_ips
+    )
+
+
 def auth_client_ip(request: Request) -> str:
     if settings.client_ip_source == "render":
         # Render terminates public traffic at its edge and forwards the original
         # client address in X-Forwarded-For. The left-most value is the client.
+        return _proxy_client_ip(
+            request.headers.get("X-Forwarded-For"),
+            forwarded_chain=True,
+        )
+
+    if settings.client_ip_source == "trusted_proxy":
+        peer = request.client.host if request.client else None
+        if not _is_trusted_proxy(peer):
+            logger.warning(
+                "untrusted_client_ip_proxy",
+                extra={"request_id": request_id_var.get()},
+            )
+            return "unknown"
         return _proxy_client_ip(
             request.headers.get("X-Forwarded-For"),
             forwarded_chain=True,
