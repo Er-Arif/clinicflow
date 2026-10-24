@@ -73,7 +73,8 @@ export function AboutScreen() {
   const installUpdate = async () => {
     const apkUrl = updateInfo?.mobile_apk_url;
     const sha256 = updateInfo?.mobile_apk_sha256;
-    if (!apkUrl || !sha256) {
+    const expectedVersionCode = updateInfo?.latest_mobile_version_code;
+    if (!apkUrl || !sha256 || !expectedVersionCode) {
       setUpdateState('unavailable');
       return;
     }
@@ -87,7 +88,7 @@ export function AboutScreen() {
       }
 
       setUpdateState('downloading');
-      await downloadAndInstallUpdate(apkUrl, sha256);
+      await downloadAndInstallUpdate(apkUrl, sha256, expectedVersionCode);
       setUpdateState('installing');
     } catch {
       setUpdateState('error');
