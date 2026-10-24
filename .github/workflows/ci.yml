@@ -31,7 +31,7 @@ jobs:
       CLINICFLOW_ACCESS_TOKEN_SECRET: ci-only-secret-that-is-long-enough-1234567890
       CLINICFLOW_RUN_INTEGRATION: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
         with:
           version: '0.13.5'
@@ -47,11 +47,11 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -72,7 +72,7 @@ jobs:
   infra:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build production backend image
         run: docker build --tag clinicflow-backend-ci backend
       - name: Validate production Compose
