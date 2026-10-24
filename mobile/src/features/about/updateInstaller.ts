@@ -3,7 +3,11 @@ import { NativeModules, Platform } from 'react-native';
 type NativeUpdateInstaller = {
   canRequestPackageInstalls(): Promise<boolean>;
   openUnknownSourcesSettings(): Promise<boolean>;
-  downloadAndInstall(apkUrl: string, sha256: string): Promise<boolean>;
+  downloadAndInstall(
+    apkUrl: string,
+    sha256: string,
+    expectedVersionCode: number,
+  ): Promise<boolean>;
 };
 
 function installer(): NativeUpdateInstaller {
@@ -28,6 +32,7 @@ export async function openUnknownSourcesSettings(): Promise<void> {
 export async function downloadAndInstallUpdate(
   apkUrl: string,
   sha256: string,
+  expectedVersionCode: number,
 ): Promise<void> {
-  await installer().downloadAndInstall(apkUrl, sha256);
+  await installer().downloadAndInstall(apkUrl, sha256, expectedVersionCode);
 }
