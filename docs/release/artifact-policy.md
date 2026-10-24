@@ -32,7 +32,18 @@ An installed build below the minimum supported version code is treated as requir
 
 Within `/api/v1`, backend changes should remain compatible with the currently deployed mobile build whenever practical. Prefer additive API/schema changes before removals. If a future backend truly requires a newer app, use the update-policy contract and a stable compatibility response rather than allowing unrelated API failures to become the first sign that the client is obsolete.
 
-Do not raise the minimum supported mobile version until the replacement signed APK has been published, its checksum verified, and the in-app update path tested on a physical Android device.
+ClinicFlow sends `X-ClinicFlow-Mobile-Version` and `X-ClinicFlow-Mobile-Version-Code` with API requests. Business APIs enforce the configured minimum version code and return HTTP 426 with `MOBILE_UPDATE_REQUIRED` when the installed build is too old. Health, `/api/v1/system/info`, and authentication remain reachable so an obsolete device can recover its session and learn how to update. The mobile client reacts to a 426 by refreshing the update policy and opening the global update gate; this is event-driven and does not add polling.
+
+For V1 compatibility, a client that predates the build-code header is tolerated while the minimum supported version code remains `1`. Once the minimum is raised above `1`, missing build metadata is treated as unsupported. Therefore **do not raise the minimum above 1 until updater-enabled signed builds have been deployed to all active ClinicFlow devices**.
+
+Before raising the minimum supported build:
+
+1. publish the replacement APK to GitHub Releases;
+2. verify its production signing certificate, package name, versionCode and SHA-256;
+3. configure the backend latest version/code, direct APK URL, checksum and release notes;
+4. prove the in-app updater on a physical Android device, including the first-time “Allow from this source” flow;
+5. confirm current devices have received an updater-enabled build;
+6. only then advance `CLINICFLOW_MINIMUM_MOBILE_VERSION_CODE` and its matching display version.
 
 ## Signing-key custody
 
