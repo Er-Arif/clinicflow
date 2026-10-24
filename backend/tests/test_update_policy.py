@@ -17,8 +17,8 @@ def _settings(**overrides) -> Settings:
         "minimum_mobile_version_code": 1,
         "latest_mobile_version": "1.0.0",
         "latest_mobile_version_code": 2,
-        "mobile_apk_url": "",
-        "mobile_apk_sha256": "",
+        "mobile_apk_url": VALID_APK_URL,
+        "mobile_apk_sha256": VALID_SHA256,
         "mobile_release_notes": "",
         "mobile_update_mandatory": False,
     }
@@ -28,12 +28,42 @@ def _settings(**overrides) -> Settings:
 
 def test_update_policy_accepts_github_release_apk_with_sha256() -> None:
     validate_runtime_settings(
+        _settings(mobile_release_notes="Production release")
+    )
+
+
+def test_v1_baseline_can_run_without_published_update_artifact() -> None:
+    validate_runtime_settings(
         _settings(
-            mobile_apk_url=VALID_APK_URL,
-            mobile_apk_sha256=VALID_SHA256,
-            mobile_release_notes="Production release",
+            minimum_mobile_version="1.0.0-rc.1",
+            minimum_mobile_version_code=1,
+            latest_mobile_version="1.0.0-rc.1",
+            latest_mobile_version_code=1,
+            mobile_apk_url="",
+            mobile_apk_sha256="",
         )
     )
+
+
+def test_advertised_newer_build_requires_download_artifact() -> None:
+    with pytest.raises(RuntimeError, match="requires MOBILE_APK_URL"):
+        validate_runtime_settings(
+            _settings(mobile_apk_url="", mobile_apk_sha256="")
+        )
+
+
+def test_enforced_minimum_above_v1_requires_download_artifact() -> None:
+    with pytest.raises(RuntimeError, match="requires MOBILE_APK_URL"):
+        validate_runtime_settings(
+            _settings(
+                minimum_mobile_version="1.0.0",
+                minimum_mobile_version_code=2,
+                latest_mobile_version="1.0.0",
+                latest_mobile_version_code=2,
+                mobile_apk_url="",
+                mobile_apk_sha256="",
+            )
+        )
 
 
 def test_update_policy_rejects_invalid_versions() -> None:
@@ -87,8 +117,14 @@ def test_update_policy_rejects_invalid_sha256() -> None:
 
 
 def test_mandatory_update_requires_download_metadata() -> None:
-    with pytest.raises(RuntimeError, match="MOBILE_UPDATE_MANDATORY"):
-        validate_runtime_settings(_settings(mobile_update_mandatory=True))
+    with pytest.raises(RuntimeError, match="requires MOBILE_APK_URL"):
+        validate_runtime_settings(
+            _settings(
+                mobile_apk_url="",
+                mobile_apk_sha256="",
+                mobile_update_mandatory=True,
+            )
+        )
 
 
 def test_system_info_exposes_normalized_update_contract(monkeypatch) -> None:
