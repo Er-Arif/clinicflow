@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "testserver"])
     cors_origins: list[str] = Field(default_factory=list)
     trusted_proxy_ips: list[str] = Field(default_factory=list)
-    client_ip_source: Literal["socket", "trusted_proxy", "railway", "render"] = "socket"
+    client_ip_source: Literal["socket", "railway", "render"] = "socket"
     db_pool_size: int = Field(default=5, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
     db_pool_timeout: int = Field(default=10, ge=1, le=120)
@@ -57,8 +57,6 @@ def validate_runtime_settings(config: Settings) -> None:
             raise RuntimeError("TRUSTED_PROXY_IPS must contain explicit IPs or CIDRs.") from exc
         if network.prefixlen == 0:
             raise RuntimeError("TRUSTED_PROXY_IPS must not trust every address.")
-    if config.client_ip_source == "trusted_proxy" and not config.trusted_proxy_ips:
-        raise RuntimeError("TRUSTED_PROXY_IPS is required when CLIENT_IP_SOURCE is trusted_proxy.")
     for origin in config.cors_origins:
         parsed = urlsplit(origin)
         if (parsed.scheme not in {"http", "https"} or not parsed.hostname
