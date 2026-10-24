@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   slots: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   slot: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSoft, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 10 },
   slotDisabled: { opacity: 0.35 },
-  slotSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  slotSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
   slotText: { color: colors.text, fontWeight: '600', fontSize: 12 },
-  slotSelectedText: { color: colors.surface, fontWeight: '800', fontSize: 12 },
+  slotSelectedText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
 });
