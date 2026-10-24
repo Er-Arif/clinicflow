@@ -125,7 +125,7 @@ export default function RescheduleAppointmentScreen() {
               </View>
             </View>
           </Pressable>
-          {sessionDefinitionId === session.session_definition_id ? <AppButton compact label={appointmentTime ? formatClinicTime(appointmentTime) : 'Select time'} onPress={() => setSlotModalVisible(true)} tone={appointmentTime ? 'primary' : 'secondary'} /> : null}
+          {sessionDefinitionId === session.session_definition_id ? <AppButton compact label={appointmentTime ? formatClinicTime(appointmentTime) : 'Select time'} onPress={() => setSlotModalVisible(true)} tone={appointmentTime ? 'selection' : 'secondary'} /> : null}
         </View>
       ))}
       <TimeSlotPickerModal
@@ -152,5 +152,5 @@ export default function RescheduleAppointmentScreen() {
 
 const styles = StyleSheet.create({
   header: { gap: 3 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, copy: { flex: 1, gap: 3 }, title: { fontSize: 27, fontWeight: '800', color: colors.primaryDark }, patientContext: { color: colors.text, fontSize: 14, fontWeight: '700' }, subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: 14 },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, cardSelected: { borderColor: colors.primary }, cardTitle: { color: colors.primaryDark, fontWeight: '800' }, error: { color: colors.danger },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm }, cardSelected: { borderColor: colors.accent }, cardTitle: { color: colors.primaryDark, fontWeight: '800' }, error: { color: colors.danger },
 });
