@@ -86,7 +86,11 @@ export function AppUpdateGate() {
       }
 
       setState('downloading');
-      await downloadAndInstallUpdate(data.mobile_apk_url, data.mobile_apk_sha256);
+      await downloadAndInstallUpdate(
+        data.mobile_apk_url,
+        data.mobile_apk_sha256,
+        data.latest_mobile_version_code,
+      );
       setState('installing');
     } catch {
       setState('error');
