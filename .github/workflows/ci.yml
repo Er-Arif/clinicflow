@@ -73,6 +73,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Build production backend image
+        run: docker build --tag clinicflow-backend-ci backend
       - name: Validate production Compose
         run: docker compose --env-file infra/.env.production.example -f infra/docker-compose.production.yml config --quiet
       - name: Validate backup script syntax
