@@ -3,14 +3,29 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useGetSystemInfoQuery } from '@/api/api';
+import type { SystemInfo } from '@/api/systemEndpoints';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { BackButton } from '@/components/BackButton';
 import { ClinicFlowLogo } from '@/components/ClinicFlowLogo';
+import {
+  canRequestPackageInstalls,
+  downloadAndInstallUpdate,
+  openUnknownSourcesSettings,
+} from '@/features/about/updateInstaller';
 import { evaluateUpdate } from '@/features/about/updatePolicy';
 import { colors, radius, spacing } from '@/theme/tokens';
 
-type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'unavailable' | 'error';
+type UpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'current'
+  | 'unavailable'
+  | 'permission'
+  | 'downloading'
+  | 'installing'
+  | 'error';
 
 export function AboutScreen() {
   const system = useGetSystemInfoQuery();
@@ -18,10 +33,12 @@ export function AboutScreen() {
   const versionCode = Constants.expoConfig?.android?.versionCode ?? null;
   const buildNumber = versionCode?.toString() ?? 'Unknown';
   const [updateState, setUpdateState] = useState<UpdateState>('idle');
-  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<SystemInfo | null>(null);
+  const [mandatory, setMandatory] = useState(false);
 
   const checkForUpdates = async () => {
     setUpdateState('checking');
+    setMandatory(false);
     try {
       const result = await system.refetch();
       if ('error' in result && result.error) {
@@ -29,8 +46,7 @@ export function AboutScreen() {
         return;
       }
       const info = result.data;
-      const latest = info?.latest_mobile_version?.trim() || null;
-      setLatestVersion(latest);
+      setUpdateInfo(info ?? null);
       if (!info || appVersion === 'Unknown') {
         setUpdateState('unavailable');
         return;
@@ -40,11 +56,47 @@ export function AboutScreen() {
         { version: appVersion, versionCode },
         info,
       );
+      setMandatory(decision.mandatory);
+      if (
+        decision.state === 'available'
+        && (!info.mobile_apk_url || !info.mobile_apk_sha256)
+      ) {
+        setUpdateState('unavailable');
+        return;
+      }
       setUpdateState(decision.state);
     } catch {
       setUpdateState('error');
     }
   };
+
+  const installUpdate = async () => {
+    const apkUrl = updateInfo?.mobile_apk_url;
+    const sha256 = updateInfo?.mobile_apk_sha256;
+    if (!apkUrl || !sha256) {
+      setUpdateState('unavailable');
+      return;
+    }
+
+    try {
+      const allowed = await canRequestPackageInstalls();
+      if (!allowed) {
+        await openUnknownSourcesSettings();
+        setUpdateState('permission');
+        return;
+      }
+
+      setUpdateState('downloading');
+      await downloadAndInstallUpdate(apkUrl, sha256);
+      setUpdateState('installing');
+    } catch {
+      setUpdateState('error');
+    }
+  };
+
+  const latestVersion = updateInfo?.latest_mobile_version?.trim() || null;
+  const releaseNotes = updateInfo?.mobile_release_notes?.trim() || null;
+  const canInstall = updateState === 'available' || updateState === 'permission';
 
   return (
     <AppScreen>
@@ -58,25 +110,76 @@ export function AboutScreen() {
         <Row label="Build" value={buildNumber} />
       </View>
 
-      <UpdateMessage state={updateState} latestVersion={latestVersion} />
+      <UpdateMessage
+        state={updateState}
+        latestVersion={latestVersion}
+        releaseNotes={releaseNotes}
+        mandatory={mandatory}
+      />
+      {canInstall ? (
+        <AppButton
+          label={updateState === 'permission' ? 'Continue update' : 'Install update'}
+          tone="primary"
+          onPress={() => { void installUpdate(); }}
+        />
+      ) : null}
       <AppButton
         label={updateState === 'checking' ? 'Checking…' : 'Check for updates'}
         tone="secondary"
         loading={updateState === 'checking'}
-        disabled={updateState === 'checking'}
+        disabled={updateState === 'checking' || updateState === 'downloading'}
         onPress={() => { void checkForUpdates(); }}
       />
     </AppScreen>
   );
 }
 
-function UpdateMessage({ state, latestVersion }: { state: UpdateState; latestVersion: string | null }) {
+function UpdateMessage({
+  state,
+  latestVersion,
+  releaseNotes,
+  mandatory,
+}: {
+  state: UpdateState;
+  latestVersion: string | null;
+  releaseNotes: string | null;
+  mandatory: boolean;
+}) {
   if (state === 'idle' || state === 'checking') return null;
   if (state === 'available') {
     return (
       <View style={styles.updateCard}>
-        <Text style={styles.updateTitle}>Update available</Text>
+        <Text style={styles.updateTitle}>
+          {mandatory ? 'Update required' : 'Update available'}
+        </Text>
         <Text style={styles.updateText}>ClinicFlow {latestVersion} is available.</Text>
+        {releaseNotes ? <Text style={styles.updateText}>{releaseNotes}</Text> : null}
+      </View>
+    );
+  }
+  if (state === 'permission') {
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>Allow ClinicFlow updates</Text>
+        <Text style={styles.updateText}>
+          Enable “Allow from this source” in Android settings, return here, then tap Continue update.
+        </Text>
+      </View>
+    );
+  }
+  if (state === 'downloading') {
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>Downloading update…</Text>
+        <Text style={styles.updateText}>ClinicFlow will verify the APK before Android opens the installer.</Text>
+      </View>
+    );
+  }
+  if (state === 'installing') {
+    return (
+      <View style={styles.updateCard}>
+        <Text style={styles.updateTitle}>Android installer opened</Text>
+        <Text style={styles.updateText}>Review and confirm the system installation prompt to finish updating ClinicFlow.</Text>
       </View>
     );
   }
@@ -96,7 +199,7 @@ function UpdateMessage({ state, latestVersion }: { state: UpdateState; latestVer
       </View>
     );
   }
-  return <Text style={styles.warning}>Unable to check for updates right now.</Text>;
+  return <Text style={styles.warning}>Unable to check for or install updates right now.</Text>;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
