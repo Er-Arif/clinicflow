@@ -77,20 +77,32 @@ class AuthThrottle:
 auth_throttle = AuthThrottle()
 
 
-def auth_client_ip(request: Request) -> str:
-    if settings.client_ip_source == "railway":
-        forwarded = request.headers.get("X-Real-IP")
-        if not forwarded:
-            return "unknown"
+def _proxy_client_ip(value: str | None, *, forwarded_chain: bool = False) -> str:
+    if not value:
+        return "unknown"
 
-        try:
-            return ip_address(forwarded.strip()).compressed
-        except ValueError:
-            logger.warning(
-                "invalid_client_ip_header",
-                extra={"request_id": request_id_var.get()},
-            )
-            return "unknown"
+    candidate = value.split(",", 1)[0].strip() if forwarded_chain else value.strip()
+    try:
+        return ip_address(candidate).compressed
+    except ValueError:
+        logger.warning(
+            "invalid_client_ip_header",
+            extra={"request_id": request_id_var.get()},
+        )
+        return "unknown"
+
+
+def auth_client_ip(request: Request) -> str:
+    if settings.client_ip_source == "render":
+        # Render terminates public traffic at its edge and forwards the original
+        # client address in X-Forwarded-For. The left-most value is the client.
+        return _proxy_client_ip(
+            request.headers.get("X-Forwarded-For"),
+            forwarded_chain=True,
+        )
+
+    if settings.client_ip_source == "railway":
+        return _proxy_client_ip(request.headers.get("X-Real-IP"))
 
     return request.client.host if request.client else "unknown"
 
