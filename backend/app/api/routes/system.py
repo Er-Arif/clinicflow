@@ -9,8 +9,6 @@ router = APIRouter(tags=["system"])
 class SystemInfoResponse(BaseModel):
     service: str
     api_version: str
-    build_commit: str
-    environment: str
     minimum_mobile_version: str
     minimum_mobile_version_code: int
     latest_mobile_version: str
@@ -28,8 +26,6 @@ def system_info() -> SystemInfoResponse:
     return SystemInfoResponse(
         service="clinicflow-api",
         api_version=settings.app_version,
-        build_commit=settings.build_commit,
-        environment=settings.environment,
         minimum_mobile_version=settings.minimum_mobile_version,
         minimum_mobile_version_code=settings.minimum_mobile_version_code,
         latest_mobile_version=settings.latest_mobile_version,
