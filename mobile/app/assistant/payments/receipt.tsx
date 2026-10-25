@@ -19,7 +19,10 @@ export default function ReceiptScreen() {
 
   function finish() {
     if (appointmentId) {
-      router.replace({ pathname: '/assistant/appointments/[appointmentId]', params: { appointmentId } });
+      router.push({
+        pathname: '/assistant/appointments/[appointmentId]',
+        params: { appointmentId, returnToAppointments: '1' },
+      });
       return;
     }
     router.replace('/assistant/payments');
