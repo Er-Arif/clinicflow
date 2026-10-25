@@ -109,6 +109,62 @@ test('appointment Back returns to the originating follow-up instead of stale app
   assert.equal(backed, false);
 });
 
+test('appointment Back returns to the appointments list after a cross-tab receipt return', () => {
+  let dismissed;
+  let backed = false;
+  const runtime = appointmentRuntime({
+    push() {},
+    replace() {},
+    dismissTo: value => { dismissed = value; },
+    back: () => { backed = true; },
+  }, { appointmentId: 'appointment-1', returnToAppointments: '1' });
+
+  const output = runtime.render(runtime.load('app/assistant/appointments/[appointmentId].tsx').default);
+  output.controls.find(control => control.accessibilityLabel === 'Back').onPress();
+
+  assert.equal(dismissed, '/assistant/appointments');
+  assert.equal(backed, false);
+});
+
+test('receipt Done opens the appointment with an explicit list return target', () => {
+  let pushed;
+  let replaced = false;
+  const runtime = mobileRuntime({
+    'expo-router': {
+      useLocalSearchParams: () => ({ paymentId: 'payment-1', appointmentId: 'appointment-1' }),
+      useRouter: () => ({
+        push: value => { pushed = value; },
+        replace: () => { replaced = true; },
+        back() {},
+      }),
+    },
+    '@/api/api': {
+      useClinicTimeQuery: () => ready({ timezone: 'Asia/Kolkata' }),
+      useGetReceiptQuery: () => ready({
+        receipt_number: 'R-1',
+        clinic_name: 'ClinicFlow',
+        patient_name: 'No Phone UAT',
+        doctor_name: 'Arif Ali',
+        visit_date: '2026-10-28',
+        appointment_type: 'FOLLOW_UP',
+        amount: '300.00',
+        payment_method: 'CASH',
+        issued_at: '2026-10-28T15:00:00+05:30',
+        voided: false,
+      }),
+    },
+  });
+
+  const output = runtime.render(runtime.load('app/assistant/payments/receipt.tsx').default);
+  output.controls.find(control => control.label === 'Done').onPress();
+
+  assert.deepEqual(pushed, {
+    pathname: '/assistant/appointments/[appointmentId]',
+    params: { appointmentId: 'appointment-1', returnToAppointments: '1' },
+  });
+  assert.equal(replaced, false);
+});
+
 test('rescheduling a linked follow-up appointment preserves its follow-up return target', () => {
   let destination;
   const runtime = appointmentRuntime({
