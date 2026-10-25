@@ -19,9 +19,11 @@ import {
 import { notifyMobileUpdateRequired } from '@/features/about/updateEvents';
 
 const apiUrl = getApiUrl();
+const API_REQUEST_TIMEOUT_MS = 20_000;
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
+  timeout: API_REQUEST_TIMEOUT_MS,
   prepareHeaders: (headers) => {
     const token = getAccessToken();
     if (token) headers.set('authorization', `Bearer ${token}`);
@@ -40,6 +42,8 @@ async function performRefresh(): Promise<TokenPair | null> {
     'content-type': 'application/json',
     'x-request-id': newRequestId(),
   }));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
 
   let response: Response;
   try {
@@ -47,10 +51,13 @@ async function performRefresh(): Promise<TokenPair | null> {
       method: 'POST',
       headers,
       body: JSON.stringify({ refresh_token: refreshToken }),
+      signal: controller.signal,
     });
   } catch {
-    // A temporary network failure must not destroy a still-valid local session.
+    // A temporary network failure or timeout must not destroy a still-valid local session.
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
