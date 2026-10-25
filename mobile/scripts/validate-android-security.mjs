@@ -59,6 +59,18 @@ function forbidText(source, text, label) {
   }
 }
 
+function requireFileProviderBlock(source) {
+  const match = source.match(
+    /<provider\b[^>]*android:name="androidx\.core\.content\.FileProvider"[^>]*>[\s\S]*?<\/provider>/,
+  );
+  if (!match) {
+    throw new Error('Android hardening drift: missing private FileProvider block.');
+  }
+  return match[0];
+}
+
+const fileProvider = requireFileProviderBlock(mainManifest);
+
 requireText(
   mainManifest,
   'android.permission.REQUEST_INSTALL_PACKAGES',
@@ -70,14 +82,11 @@ requireText(
   'android:usesCleartextTraffic="false"',
   'usesCleartextTraffic=false',
 );
+requireText(fileProvider, 'android:exported="false"', 'non-exported FileProvider');
+requireText(fileProvider, 'android:grantUriPermissions="true"', 'grant-only FileProvider access');
+forbidText(fileProvider, 'android:exported="true"', 'exported FileProvider');
 requireText(
-  mainManifest,
-  'android:name="androidx.core.content.FileProvider"',
-  'private FileProvider',
-);
-requireText(mainManifest, 'android:exported="false"', 'non-exported FileProvider');
-requireText(
-  mainManifest,
+  fileProvider,
   'android:resource="@xml/update_file_paths"',
   'restricted update FileProvider paths',
 );
