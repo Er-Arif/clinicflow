@@ -17,9 +17,10 @@ const tokenPair = {
   },
 };
 
-function loadApiWithSession(fetchImpl) {
+function loadApiWithSession(fetchImpl, refreshTokens = ['refresh-current']) {
   let cleared = 0;
   let expired = 0;
+  let refreshReads = 0;
   const stored = [];
   const runtime = mobileRuntime({
     '@/api/config': { getApiUrl: () => 'https://api.test.invalid' },
@@ -27,7 +28,11 @@ function loadApiWithSession(fetchImpl) {
     '@/auth/sessionEvents': { notifySessionExpired: () => { expired += 1; } },
     '@/auth/session': {
       getAccessToken: () => null,
-      getRefreshToken: async () => 'refresh-current',
+      getRefreshToken: async () => {
+        const index = Math.min(refreshReads, refreshTokens.length - 1);
+        refreshReads += 1;
+        return refreshTokens[index];
+      },
       setSessionTokens: async (tokens) => { stored.push(tokens); },
       clearSessionTokens: async () => { cleared += 1; },
     },
@@ -131,7 +136,51 @@ test('refresh timeout abort preserves the local session', async () => {
   }
 });
 
-test('rejected refresh clears tokens and reports session expiry', async () => {
+test('successful stale refresh does not restore a replaced local session', async () => {
+  const harness = loadApiWithSession(
+    async () => ({
+      ok: true,
+      status: 200,
+      json: async () => tokenPair,
+    }),
+    ['refresh-current', null],
+  );
+
+  try {
+    const result = await harness.loaded.refreshSessionSingleFlight();
+
+    assert.equal(result, null);
+    assert.deepEqual(harness.stored, []);
+    assert.equal(harness.cleared, 0);
+    assert.equal(harness.expired, 0);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('stale refresh rejection does not clear a newer local session', async () => {
+  const harness = loadApiWithSession(
+    async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+    }),
+    ['refresh-current', 'refresh-new-session'],
+  );
+
+  try {
+    const result = await harness.loaded.refreshSessionSingleFlight();
+
+    assert.equal(result, null);
+    assert.deepEqual(harness.stored, []);
+    assert.equal(harness.cleared, 0);
+    assert.equal(harness.expired, 0);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('rejected current refresh clears tokens and reports session expiry', async () => {
   const harness = loadApiWithSession(async () => ({
     ok: false,
     status: 401,
