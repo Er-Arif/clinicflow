@@ -16,8 +16,6 @@ type Builder = EndpointBuilder<
 export type SystemInfo = {
   service: string;
   api_version: string;
-  build_commit: string;
-  environment: string;
   minimum_mobile_version: string;
   minimum_mobile_version_code: number;
   latest_mobile_version: string;
