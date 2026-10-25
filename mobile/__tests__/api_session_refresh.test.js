@@ -96,6 +96,41 @@ test('temporary refresh network failure preserves the local session', async () =
   }
 });
 
+test('refresh timeout abort preserves the local session', async () => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  let aborted = false;
+
+  global.setTimeout = (callback) => {
+    queueMicrotask(callback);
+    return 1;
+  };
+  global.clearTimeout = () => {};
+
+  const harness = loadApiWithSession((_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => {
+      aborted = true;
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  }));
+
+  try {
+    const result = await harness.loaded.refreshSessionSingleFlight();
+
+    assert.equal(aborted, true);
+    assert.equal(result, null);
+    assert.deepEqual(harness.stored, []);
+    assert.equal(harness.cleared, 0);
+    assert.equal(harness.expired, 0);
+  } finally {
+    harness.restore();
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+});
+
 test('rejected refresh clears tokens and reports session expiry', async () => {
   const harness = loadApiWithSession(async () => ({
     ok: false,
