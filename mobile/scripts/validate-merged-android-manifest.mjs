@@ -29,27 +29,41 @@ const preferred = manifests.find((file) =>
 
 const manifest = fs.readFileSync(preferred, 'utf8');
 
-function requireText(text, label) {
-  if (!manifest.includes(text)) {
+function requireText(source, text, label) {
+  if (!source.includes(text)) {
     throw new Error(`Merged Android manifest hardening drift: missing ${label}.`);
   }
 }
 
-function forbidText(text, label) {
-  if (manifest.includes(text)) {
+function forbidText(source, text, label) {
+  if (source.includes(text)) {
     throw new Error(`Merged Android manifest hardening drift: contains ${label}.`);
   }
 }
 
-requireText('android.permission.INTERNET', 'INTERNET permission');
-requireText('android.permission.REQUEST_INSTALL_PACKAGES', 'REQUEST_INSTALL_PACKAGES permission');
-requireText('android:allowBackup="false"', 'allowBackup=false');
-requireText('android:usesCleartextTraffic="false"', 'usesCleartextTraffic=false');
-requireText('androidx.core.content.FileProvider', 'ClinicFlow FileProvider');
-requireText('${applicationId}.fileprovider'.replace('${applicationId}', 'com.clinicflow.app'), 'ClinicFlow FileProvider authority');
+function requireFileProviderBlock(source) {
+  const match = source.match(
+    /<provider\b[^>]*android:name="androidx\.core\.content\.FileProvider"[^>]*>[\s\S]*?<\/provider>/,
+  );
+  if (!match) {
+    throw new Error('Merged Android manifest hardening drift: missing ClinicFlow FileProvider block.');
+  }
+  return match[0];
+}
 
-forbidText('android.permission.READ_EXTERNAL_STORAGE', 'legacy external-storage read permission');
-forbidText('android.permission.WRITE_EXTERNAL_STORAGE', 'legacy external-storage write permission');
-forbidText('android.permission.SYSTEM_ALERT_WINDOW', 'overlay permission');
+const fileProvider = requireFileProviderBlock(manifest);
+
+requireText(manifest, 'android.permission.INTERNET', 'INTERNET permission');
+requireText(manifest, 'android.permission.REQUEST_INSTALL_PACKAGES', 'REQUEST_INSTALL_PACKAGES permission');
+requireText(manifest, 'android:allowBackup="false"', 'allowBackup=false');
+requireText(manifest, 'android:usesCleartextTraffic="false"', 'usesCleartextTraffic=false');
+requireText(fileProvider, 'android:authorities="com.clinicflow.app.fileprovider"', 'ClinicFlow FileProvider authority');
+requireText(fileProvider, 'android:exported="false"', 'non-exported FileProvider');
+requireText(fileProvider, 'android:grantUriPermissions="true"', 'grant-only FileProvider access');
+forbidText(fileProvider, 'android:exported="true"', 'exported FileProvider');
+
+forbidText(manifest, 'android.permission.READ_EXTERNAL_STORAGE', 'legacy external-storage read permission');
+forbidText(manifest, 'android.permission.WRITE_EXTERNAL_STORAGE', 'legacy external-storage write permission');
+forbidText(manifest, 'android.permission.SYSTEM_ALERT_WINDOW', 'overlay permission');
 
 console.log(`Merged Android manifest hardening is intact: ${path.relative(mobileRoot, preferred)}`);
