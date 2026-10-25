@@ -270,7 +270,6 @@ class ReportingService:
 
     def owner_dashboard(self, date_from: date, date_to: date) -> OwnerDashboardResponse:
         date_from, date_to = self._validate_range(date_from, date_to)
-        appt = self._appointment_status_counts(date_from, date_to)
         appointment_report = self.appointment_report(date_from, date_to)
         patient_report = self.patient_report(date_from, date_to)
         payment_report = self.payment_report(date_from, date_to)
@@ -289,9 +288,9 @@ class ReportingService:
         return OwnerDashboardResponse(
             date_from=date_from,
             date_to=date_to,
-            appointments=sum(appt.values()),
-            checked_in=appt.get("CHECKED_IN", 0),
-            completed=appt.get("COMPLETED", 0),
+            appointments=appointment_report.total_appointments,
+            checked_in=appointment_report.checked_in,
+            completed=appointment_report.completed,
             cancelled=appointment_report.cancelled,
             no_show=appointment_report.no_show,
             new_patients=patient_report.new_patients,

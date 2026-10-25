@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-import jwt
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
-from app.core.config import settings
 from app.core.context import request_id_var
 from app.core.errors import AppError
 from app.modules.appointments.models import Appointment
@@ -32,6 +28,11 @@ from app.modules.scheduling.occupancy import (
     effective_occupancy,
     effective_sessions,
     timed_session_indices,
+)
+from app.modules.scheduling.proposal_tokens import (
+    create_proposal_token,
+    decode_and_verify_proposal_token,
+    normalize_proposal_hash,
 )
 from app.modules.scheduling.schemas import (
     AvailabilityResponse,
@@ -66,108 +67,6 @@ def _request_id() -> UUID:
         raise RuntimeError("request id missing")
     return UUID(value)
 
-
-def _normalize_proposal_hash(weekdays: list[int], sessions: list[SessionWrite]) -> str:
-    sorted_weekdays = sorted(weekdays)
-    sorted_sessions = sorted(sessions, key=lambda s: s.display_order)
-    canonical = {
-        "weekdays": sorted_weekdays,
-        "sessions": [
-            {
-                "display_order": s.display_order,
-                "session_name": s.session_name.strip(),
-                "start_time": s.start_time.isoformat(),
-                "end_time": s.end_time.isoformat(),
-                "slot_interval_minutes": s.slot_interval_minutes,
-                "maximum_capacity": s.maximum_capacity,
-                "active": s.active,
-            }
-            for s in sorted_sessions
-        ],
-    }
-    dumped = json.dumps(canonical, separators=(",", ":"), sort_keys=True)
-    return hashlib.sha256(dumped.encode("utf-8")).hexdigest()
-
-
-def _proposal_token_secret() -> str:
-    # Purpose-separated signing key derived from access_token_secret to isolate proposal tokens from auth tokens
-    return hashlib.sha256(f"schedule_proposal_v1:{settings.access_token_secret}".encode()).hexdigest()
-
-
-def _create_proposal_token(
-    clinic_id: UUID,
-    doctor_id: UUID,
-    payload_hash: str,
-    weekdays: list[int],
-    expected_states: dict[str, Any],
-    now: datetime,
-) -> str:
-    expires = now + timedelta(minutes=10)
-    claims = {
-        "sub": str(doctor_id),
-        "cid": str(clinic_id),
-        "phash": payload_hash,
-        "weekdays": sorted(weekdays),
-        "expected_states": expected_states,
-        "iat": now,
-        "exp": expires,
-        "typ": "schedule_proposal",
-    }
-    return jwt.encode(claims, _proposal_token_secret(), algorithm=settings.jwt_algorithm)
-
-
-def _decode_and_verify_proposal_token(
-    token: str,
-    clinic_id: UUID,
-    doctor_id: UUID,
-    expected_payload_hash: str,
-    now: datetime,
-) -> dict[str, Any]:
-    try:
-        claims = jwt.decode(
-            token,
-            _proposal_token_secret(),
-            algorithms=[settings.jwt_algorithm],
-            options={
-                "verify_exp": False,
-                "verify_iat": False,
-                "require": ["sub", "cid", "phash", "weekdays", "expected_states", "exp", "iat"],
-            },
-        )
-    except jwt.PyJWTError as exc:
-        raise AppError(
-            code="STALE_SCHEDULE_PREVIEW",
-            message="Invalid schedule proposal token.",
-            status_code=409,
-        ) from exc
-
-    exp = claims.get("exp")
-    if exp is not None and int(now.timestamp()) > exp:
-        raise AppError(
-            code="STALE_SCHEDULE_PREVIEW",
-            message="Schedule proposal has expired. Please review and apply again.",
-            status_code=409,
-        )
-
-    if claims.get("typ") != "schedule_proposal":
-        raise AppError(
-            code="STALE_SCHEDULE_PREVIEW",
-            message="Invalid token type.",
-            status_code=409,
-        )
-    if claims.get("cid") != str(clinic_id) or claims.get("sub") != str(doctor_id):
-        raise AppError(
-            code="STALE_SCHEDULE_PREVIEW",
-            message="Proposal token does not match doctor or clinic.",
-            status_code=409,
-        )
-    if claims.get("phash") != expected_payload_hash:
-        raise AppError(
-            code="STALE_SCHEDULE_PREVIEW",
-            message="Proposal payload does not match preview.",
-            status_code=409,
-        )
-    return claims
 
 
 class SchedulingService:
@@ -565,7 +464,7 @@ class SchedulingService:
     ) -> SchedulePreviewImpactResponse:
         self._doctor(doctor_id)
         now = self.clock.now_utc()
-        payload_hash = _normalize_proposal_hash(request.weekdays, request.sessions)
+        payload_hash = normalize_proposal_hash(request.weekdays, request.sessions)
 
         impacts: list[DayImpactResponse] = []
         expected_states: dict[str, Any] = {}
@@ -616,7 +515,7 @@ class SchedulingService:
                 "stored_state_fingerprint": stored_fingerprint,
             }
 
-        token = _create_proposal_token(
+        token = create_proposal_token(
             clinic_id=self.context.clinic_id,
             doctor_id=doctor_id,
             payload_hash=payload_hash,
@@ -635,12 +534,12 @@ class SchedulingService:
         self, doctor_id: UUID, request: SmartScheduleApplyRequest
     ) -> ScheduleOverviewResponse:
         self._doctor(doctor_id)
-        payload_hash = _normalize_proposal_hash(request.weekdays, request.sessions)
+        payload_hash = normalize_proposal_hash(request.weekdays, request.sessions)
 
         now = self.clock.now_utc()
 
         # 1. Verify token signature, expiry, clinic, doctor, payload hash
-        token_claims = _decode_and_verify_proposal_token(
+        token_claims = decode_and_verify_proposal_token(
             token=request.proposal_token,
             clinic_id=self.context.clinic_id,
             doctor_id=doctor_id,
