@@ -2036,7 +2036,7 @@ def test_cross_token_misuse_proposal_token_rejected_as_auth_token():
     clock = MockClock(instant=datetime(2026, 10, 12, 8, 0, tzinfo=UTC), current_date=date(2026, 10, 12))
 
     # Create real proposal token
-    from app.modules.scheduling.service import _create_proposal_token
+    from app.modules.scheduling.proposal_tokens import create_proposal_token as _create_proposal_token
     prop_token = _create_proposal_token(
         clinic_id=redesign_case.clinic_id,
         doctor_id=redesign_case.doctor_id,

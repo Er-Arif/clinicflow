@@ -537,7 +537,7 @@ def test_signed_preview_tampering_expiry_and_missing_fingerprint_rejected(scenar
     elif mode == "expired":
         s.clock = replace(s.clock, instant=s.clock.instant + timedelta(minutes=11))
     else:
-        from app.modules.scheduling.service import _proposal_token_secret
+        from app.modules.scheduling.proposal_tokens import _proposal_token_secret
 
         claims = jwt.decode(preview.proposal_token, options={"verify_signature": False})
         del claims["expected_states"]["0"]["stored_state_fingerprint"]
