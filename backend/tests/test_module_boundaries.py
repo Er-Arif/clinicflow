@@ -85,3 +85,21 @@ def test_http_routers_do_not_write_directly_through_db_session() -> None:
     assert not violations, "HTTP routers must delegate writes to application services:\n" + "\n".join(
         violations
     )
+
+
+def test_schedule_proposal_tokens_remain_persistence_free() -> None:
+    path = MODULES_DIR / "scheduling" / "proposal_tokens.py"
+    violations: list[str] = []
+
+    for node in ast.walk(_parse(path)):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module == "sqlalchemy" or node.module.startswith("app.db"):
+                violations.append(f"{path.name}:{node.lineno} imports {node.module}")
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "sqlalchemy" or alias.name.startswith("sqlalchemy.") or alias.name.startswith("app.db"):
+                    violations.append(f"{path.name}:{node.lineno} imports {alias.name}")
+
+    assert not violations, "Schedule proposal tokens must stay persistence-free:\n" + "\n".join(
+        violations
+    )
