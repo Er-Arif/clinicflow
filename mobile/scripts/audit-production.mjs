@@ -12,7 +12,7 @@ const sourceRoots = [
 
 const allowedAdvisories = {
   'node-forge': {
-    advisory: 'GHSA-86w9-cpqp-85rv',
+    advisory: normalizeAdvisoryId('GHSA-86w9-cpqp-85rv'),
     reason: 'Expo CLI/code-signing build tooling; upstream currently has no patched node-forge release.',
     validate(vulnerability) {
       if (vulnerability.isDirect) return false;
@@ -22,7 +22,7 @@ const allowedAdvisories = {
     },
   },
   zod: {
-    advisory: 'GHSA-mrhx-c7xc-m3w5',
+    advisory: normalizeAdvisoryId('GHSA-mrhx-c7xc-m3w5'),
     reason: 'Expo CLI includes an affected nested Zod release; ClinicFlow does not import Zod at runtime.',
     validate() {
       return !sourceImportsPackage('zod');
@@ -55,22 +55,21 @@ if (report.error) {
 
 const blocked = [];
 const accepted = [];
+const vulnerabilities = report.vulnerabilities ?? {};
 
-for (const [name, vulnerability] of Object.entries(report.vulnerabilities ?? {})) {
+for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
   if (!['high', 'critical'].includes(vulnerability.severity)) continue;
 
-  const advisoryIds = advisoryIdsOf(vulnerability);
-  const exception = allowedAdvisories[name];
-  const allowed =
-    exception
-    && advisoryIds.size === 1
-    && advisoryIds.has(exception.advisory)
-    && exception.validate(vulnerability);
-
-  if (allowed) {
-    accepted.push(`${name} (${exception.advisory}): ${exception.reason}`);
+  const resolution = resolveAllowedVulnerability(name, new Set());
+  if (resolution.allowed) {
+    accepted.push(`${name}: ${resolution.reason}`);
   } else {
-    blocked.push({ name, vulnerability, advisoryIds: [...advisoryIds] });
+    blocked.push({
+      name,
+      vulnerability,
+      advisoryIds: [...resolution.advisoryIds],
+      reason: resolution.reason,
+    });
   }
 }
 
@@ -82,7 +81,7 @@ if (blocked.length > 0) {
   console.error('Blocking high/critical production dependency advisories:');
   for (const item of blocked) {
     console.error(
-      `- ${item.name}: severity=${item.vulnerability.severity}; advisories=${item.advisoryIds.join(', ') || 'unknown'}; nodes=${(item.vulnerability.nodes ?? []).join(', ') || 'unknown'}`,
+      `- ${item.name}: severity=${item.vulnerability.severity}; advisories=${item.advisoryIds.join(', ') || 'unknown'}; nodes=${(item.vulnerability.nodes ?? []).join(', ') || 'unknown'}; reason=${item.reason}`,
     );
   }
   process.exit(1);
@@ -92,15 +91,81 @@ console.log(
   `Production dependency audit passed with ${accepted.length} narrowly scoped temporary exception(s).`,
 );
 
+function resolveAllowedVulnerability(name, seen) {
+  if (seen.has(name)) {
+    return {
+      allowed: false,
+      advisoryIds: new Set(),
+      reason: `cyclic vulnerability chain detected at ${name}`,
+    };
+  }
+
+  const vulnerability = vulnerabilities[name];
+  if (!vulnerability) {
+    return {
+      allowed: false,
+      advisoryIds: new Set(),
+      reason: `npm audit referenced missing vulnerability ${name}`,
+    };
+  }
+
+  const nextSeen = new Set(seen);
+  nextSeen.add(name);
+
+  const directAdvisories = advisoryIdsOf(vulnerability);
+  const dependencyNames = (vulnerability.via ?? []).filter((item) => typeof item === 'string');
+  const advisoryIds = new Set(directAdvisories);
+  const reasons = [];
+
+  let directAllowed = true;
+  if (directAdvisories.size > 0) {
+    const exception = allowedAdvisories[name];
+    directAllowed = Boolean(
+      exception
+      && directAdvisories.size === 1
+      && directAdvisories.has(exception.advisory)
+      && exception.validate(vulnerability),
+    );
+
+    if (directAllowed) {
+      reasons.push(`${name} (${exception.advisory}): ${exception.reason}`);
+    } else {
+      reasons.push(`no valid direct exception for ${name}`);
+    }
+  }
+
+  let dependenciesAllowed = true;
+  for (const dependencyName of dependencyNames) {
+    const dependency = vulnerabilities[dependencyName];
+    if (!dependency || !['high', 'critical'].includes(dependency.severity)) continue;
+
+    const resolution = resolveAllowedVulnerability(dependencyName, nextSeen);
+    for (const advisoryId of resolution.advisoryIds) advisoryIds.add(advisoryId);
+    dependenciesAllowed &&= resolution.allowed;
+    reasons.push(resolution.reason);
+  }
+
+  const hasTraceableCause = directAdvisories.size > 0 || dependencyNames.length > 0;
+  return {
+    allowed: hasTraceableCause && directAllowed && dependenciesAllowed,
+    advisoryIds,
+    reason: reasons.filter(Boolean).join(' -> ') || `no traceable advisory cause for ${name}`,
+  };
+}
+
 function advisoryIdsOf(vulnerability) {
   const ids = new Set();
   for (const item of vulnerability.via ?? []) {
     if (typeof item === 'string') continue;
     const url = item?.url ?? '';
     const match = url.match(/GHSA-[0-9a-z-]+/i);
-    if (match) ids.add(match[0].toUpperCase());
+    if (match) ids.add(normalizeAdvisoryId(match[0]));
   }
   return ids;
+}
+
+function normalizeAdvisoryId(value) {
+  return value.toUpperCase();
 }
 
 function sourceImportsPackage(packageName) {
