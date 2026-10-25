@@ -41,10 +41,15 @@ class AuthThrottle:
             # Bound memory without evicting active attacker budgets.
             if len(self._attempts) + len(budgets) > self.max_keys:
                 self._attempts = {
-                    key: values for key, values in self._attempts.items()
+                    key: values
+                    for key, values in self._attempts.items()
                     if values and values[-1] > now - 900
                 }
-            if len(self._attempts) + sum(key not in self._attempts for key, _, _ in budgets) > self.max_keys:
+            if (
+                len(self._attempts)
+                + sum(key not in self._attempts for key, _, _ in budgets)
+                > self.max_keys
+            ):
                 self._deny(60)
             retry = 0
             for key, burst, sustained in budgets:
@@ -69,7 +74,9 @@ class AuthThrottle:
     def _deny(retry: int) -> None:
         logger.warning("auth_throttled", extra={"request_id": request_id_var.get()})
         raise AppError(
-            "AUTH_RATE_LIMITED", "Too many sign-in attempts. Try again later.", 429,
+            "AUTH_RATE_LIMITED",
+            "Too many sign-in attempts. Try again later.",
+            429,
             {"retry_after_seconds": retry},
         )
 
@@ -77,21 +84,34 @@ class AuthThrottle:
 auth_throttle = AuthThrottle()
 
 
+def _proxy_client_ip(value: str | None) -> str:
+    if not value:
+        return "unknown"
+
+    candidate = value.strip()
+    try:
+        return ip_address(candidate).compressed
+    except ValueError:
+        logger.warning(
+            "invalid_client_ip_header",
+            extra={"request_id": request_id_var.get()},
+        )
+        return "unknown"
+
+
 def auth_client_ip(request: Request) -> str:
+    if settings.client_ip_source == "render":
+        # Render public traffic passes through Cloudflare. CF-Connecting-IP is
+        # overwritten at that edge, unlike the left-most X-Forwarded-For value,
+        # which a caller can influence by supplying their own forwarding chain.
+        return _proxy_client_ip(request.headers.get("CF-Connecting-IP"))
+
     if settings.client_ip_source == "railway":
-        forwarded = request.headers.get("X-Real-IP")
-        if not forwarded:
-            return "unknown"
+        return _proxy_client_ip(request.headers.get("X-Real-IP"))
 
-        try:
-            return ip_address(forwarded.strip()).compressed
-        except ValueError:
-            logger.warning(
-                "invalid_client_ip_header",
-                extra={"request_id": request_id_var.get()},
-            )
-            return "unknown"
-
+    # For self-hosted reverse proxies, scripts.serve configures Uvicorn's
+    # forwarded_allow_ips from TRUSTED_PROXY_IPS. Uvicorn rewrites request.client
+    # only when the immediate peer is trusted, so socket mode remains safe here.
     return request.client.host if request.client else "unknown"
 
 

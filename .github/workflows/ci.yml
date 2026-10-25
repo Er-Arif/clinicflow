@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_DB: clinicflow_test
           POSTGRES_USER: clinicflow
@@ -31,9 +31,10 @@ jobs:
       CLINICFLOW_ACCESS_TOKEN_SECRET: ci-only-secret-that-is-long-enough-1234567890
       CLINICFLOW_RUN_INTEGRATION: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
         with:
+          version: '0.13.5'
           python-version: '3.13'
       - run: uv sync --frozen --dev
       - run: uv run --frozen ruff check .
@@ -46,11 +47,108 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
       - run: npm ci
+      - name: Audit production dependencies
+        run: npm run audit:production
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run validate:release-metadata
+      - run: npm run validate:android-security
       - run: npm test
+      - name: Compile Android Kotlin bridge and merge staging manifest
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew :app:compileDebugKotlin :app:processStagingMainManifest --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - run: npm run validate:merged-android-security
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build production backend image
+        run: docker build --tag clinicflow-backend-ci backend
+      - name: Validate production Compose
+        run: docker compose --env-file infra/.env.production.example -f infra/docker-compose.production.yml config --quiet
+      - name: Validate backup script syntax
+        run: sh -n scripts/backup_postgres.sh scripts/verify_restore.sh
+      - name: Verify backup checksum tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          dump="$tmp_dir/clinicflow-test.dump"
+          printf 'clinicflow-backup-test\n' > "$dump"
+          python3 scripts/backup_integrity.py write "$dump"
+          python3 scripts/backup_integrity.py verify "$dump"
+          printf 'tampered\n' >> "$dump"
+          if python3 scripts/backup_integrity.py verify "$dump"; then
+            echo "Tampered backup unexpectedly passed verification" >&2
+            exit 1
+          fi
+      - name: Smoke-test PostgreSQL backup and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ENV_FILE="$PWD/infra/.env.production.example"
+          export BACKUP_ROOT="$RUNNER_TEMP/clinicflow-backups"
+          compose=(docker compose --env-file "$ENV_FILE" -f infra/docker-compose.production.yml)
+          cleanup() {
+            "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          "${compose[@]}" up -d postgres
+          container_id="$("${compose[@]}" ps -q postgres)"
+          test -n "$container_id"
+          for attempt in {1..30}; do
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
+            if [ "$health" = "healthy" ]; then
+              break
+            fi
+            if [ "$health" = "unhealthy" ]; then
+              "${compose[@]}" logs postgres >&2 || true
+              echo "PostgreSQL became unhealthy" >&2
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              "${compose[@]}" logs postgres >&2 || true
+              echo "PostgreSQL did not become healthy" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U clinicflow -d clinicflow <<'SQL'
+          CREATE TABLE alembic_version (version_num varchar(32) NOT NULL);
+          CREATE TABLE clinics (id integer);
+          CREATE TABLE patient_identifiers (id integer);
+          CREATE TABLE appointments (id integer);
+          CREATE TABLE payments (id integer);
+          CREATE TABLE audit_events (id integer);
+          INSERT INTO alembic_version VALUES ('ci_smoke');
+          INSERT INTO clinics VALUES (1), (2);
+          INSERT INTO patient_identifiers VALUES (1), (2);
+          INSERT INTO appointments VALUES (1), (2), (3);
+          INSERT INTO payments VALUES (1);
+          INSERT INTO audit_events VALUES (1), (2), (3), (4);
+          SQL
+
+          ENV_FILE="$ENV_FILE" BACKUP_ROOT="$BACKUP_ROOT" sh scripts/backup_postgres.sh
+          dump="$(find "$BACKUP_ROOT/daily" -maxdepth 1 -type f -name 'clinicflow-*.dump' | sort | tail -n 1)"
+          test -n "$dump"
+          restore_output="$(ENV_FILE="$ENV_FILE" sh scripts/verify_restore.sh "$dump")"
+          printf '%s\n' "$restore_output"
+          grep -q '^alembic=ci_smoke$' <<< "$restore_output"
+          grep -q '^clinics=2$' <<< "$restore_output"
+          grep -q '^audit=4$' <<< "$restore_output"

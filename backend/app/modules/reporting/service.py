@@ -19,6 +19,7 @@ from app.modules.identity.service import AuthContext
 from app.modules.messaging.models import Reminder
 from app.modules.patients.models import Patient
 from app.modules.payments.models import Payment
+from app.modules.reporting.aggregation import summarize_appointment_status_rows
 from app.modules.reporting.schemas import (
     AppointmentReportResponse,
     AssistantHomeResponse,
@@ -269,7 +270,6 @@ class ReportingService:
 
     def owner_dashboard(self, date_from: date, date_to: date) -> OwnerDashboardResponse:
         date_from, date_to = self._validate_range(date_from, date_to)
-        appt = self._appointment_status_counts(date_from, date_to)
         appointment_report = self.appointment_report(date_from, date_to)
         patient_report = self.patient_report(date_from, date_to)
         payment_report = self.payment_report(date_from, date_to)
@@ -288,9 +288,9 @@ class ReportingService:
         return OwnerDashboardResponse(
             date_from=date_from,
             date_to=date_to,
-            appointments=sum(appt.values()),
-            checked_in=appt.get("CHECKED_IN", 0),
-            completed=appt.get("COMPLETED", 0),
+            appointments=appointment_report.total_appointments,
+            checked_in=appointment_report.checked_in,
+            completed=appointment_report.completed,
             cancelled=appointment_report.cancelled,
             no_show=appointment_report.no_show,
             new_patients=patient_report.new_patients,
@@ -314,32 +314,17 @@ class ReportingService:
             )
             .group_by(Appointment.status, Appointment.cancellation_reason)
         ).all()
-        status_counts: dict[str, int] = {}
-        ordinary_cancelled = 0
-        no_show = 0
-        rescheduled = 0
-        total = 0
-        for status, reason, count in rows:
-            value = int(count)
-            total += value
-            status_counts[status] = status_counts.get(status, 0) + value
-            if status == "CANCELLED":
-                if reason == "NO_SHOW":
-                    no_show += value
-                elif reason == "RESCHEDULED":
-                    rescheduled += value
-                else:
-                    ordinary_cancelled += value
+        summary = summarize_appointment_status_rows(rows)
         return AppointmentReportResponse(
             date_from=date_from,
             date_to=date_to,
-            total_appointments=total,
-            booked=status_counts.get("BOOKED", 0),
-            checked_in=status_counts.get("CHECKED_IN", 0),
-            completed=status_counts.get("COMPLETED", 0),
-            cancelled=ordinary_cancelled,
-            no_show=no_show,
-            rescheduled=rescheduled,
+            total_appointments=summary.total,
+            booked=summary.booked,
+            checked_in=summary.checked_in,
+            completed=summary.completed,
+            cancelled=summary.cancelled,
+            no_show=summary.no_show,
+            rescheduled=summary.rescheduled,
         )
 
     def patient_report(self, date_from: date, date_to: date) -> PatientReportResponse:

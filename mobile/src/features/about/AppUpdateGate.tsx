@@ -1,0 +1,192 @@
+import Constants from 'expo-constants';
+import { useEffect, useMemo, useState } from 'react';
+import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
+
+import { useGetSystemInfoQuery } from '@/api/api';
+import { AppButton } from '@/components/AppButton';
+import {
+  canRequestPackageInstalls,
+  downloadAndInstallUpdate,
+  openUnknownSourcesSettings,
+} from '@/features/about/updateInstaller';
+import {
+  subscribeMobileUpdateRequired,
+} from '@/features/about/updateEvents';
+import { evaluateUpdate } from '@/features/about/updatePolicy';
+import { colors, radius, spacing } from '@/theme/tokens';
+
+type GateState =
+  | 'hidden'
+  | 'available'
+  | 'permission'
+  | 'downloading'
+  | 'installing'
+  | 'error';
+
+export function AppUpdateGate() {
+  const { data, isSuccess, refetch } = useGetSystemInfoQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const [state, setState] = useState<GateState>('hidden');
+  const [dismissed, setDismissed] = useState(false);
+
+  const installedVersion = Constants.expoConfig?.version ?? '';
+  const installedVersionCode = Constants.expoConfig?.android?.versionCode ?? null;
+  const decision = useMemo(
+    () => data
+      ? evaluateUpdate(
+          { version: installedVersion, versionCode: installedVersionCode },
+          data,
+        )
+      : null,
+    [data, installedVersion, installedVersionCode],
+  );
+
+  const hasInstallArtifact = Boolean(data?.mobile_apk_url && data?.mobile_apk_sha256);
+  const mandatory = decision?.state === 'available' && decision.mandatory;
+
+  useEffect(
+    () => subscribeMobileUpdateRequired(() => {
+      setDismissed(false);
+      void refetch();
+    }),
+    [refetch],
+  );
+
+  useEffect(() => {
+    if (
+      Platform.OS !== 'android'
+      || !isSuccess
+      || !decision
+      || decision.state !== 'available'
+      || !hasInstallArtifact
+      || dismissed
+    ) {
+      return;
+    }
+    setState((current) => current === 'hidden' ? 'available' : current);
+  }, [decision, dismissed, hasInstallArtifact, isSuccess]);
+
+  if (Platform.OS !== 'android' || state === 'hidden' || !data || !decision) {
+    return null;
+  }
+
+  const install = async () => {
+    if (!data.mobile_apk_url || !data.mobile_apk_sha256) {
+      setState('error');
+      return;
+    }
+
+    try {
+      const allowed = await canRequestPackageInstalls();
+      if (!allowed) {
+        await openUnknownSourcesSettings();
+        setState('permission');
+        return;
+      }
+
+      setState('downloading');
+      await downloadAndInstallUpdate(
+        data.mobile_apk_url,
+        data.mobile_apk_sha256,
+        data.latest_mobile_version_code,
+      );
+      setState('installing');
+    } catch {
+      setState('error');
+    }
+  };
+
+  const closeOptional = () => {
+    if (mandatory) return;
+    setDismissed(true);
+    setState('hidden');
+  };
+
+  const actionLabel = state === 'permission'
+    ? 'Continue update'
+    : state === 'installing'
+      ? 'Open installer again'
+      : state === 'error'
+        ? 'Retry update'
+        : 'Update ClinicFlow';
+
+  return (
+    <Modal
+      visible
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      onRequestClose={closeOptional}
+    >
+      <View style={styles.backdrop}>
+        <View style={styles.card}>
+          <Text style={styles.title}>
+            {mandatory ? 'ClinicFlow update required' : 'ClinicFlow update available'}
+          </Text>
+          <Text style={styles.body}>
+            {state === 'permission'
+              ? 'Enable “Allow from this source” in Android settings, return to ClinicFlow, then continue the update.'
+              : state === 'downloading'
+                ? 'Downloading and verifying the signed ClinicFlow update…'
+                : state === 'installing'
+                  ? 'Android’s installer was opened. Confirm the system prompt, or reopen it if you returned without installing.'
+                  : state === 'error'
+                    ? 'The update could not be prepared. Check your connection and try again.'
+                    : `ClinicFlow ${data.latest_mobile_version} is ready to install.`}
+          </Text>
+          {data.mobile_release_notes.trim() && state === 'available' ? (
+            <Text style={styles.notes}>{data.mobile_release_notes.trim()}</Text>
+          ) : null}
+
+          <AppButton
+            label={actionLabel}
+            loading={state === 'downloading'}
+            disabled={state === 'downloading'}
+            onPress={() => { void install(); }}
+          />
+          {!mandatory && state !== 'downloading' ? (
+            <AppButton label="Later" tone="secondary" onPress={closeOptional} />
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(9, 30, 66, 0.42)',
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    gap: spacing.md,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  title: {
+    color: colors.primaryDark,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  body: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  notes: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+});

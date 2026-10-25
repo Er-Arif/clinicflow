@@ -9,6 +9,7 @@ from app.core.errors import AppError
 from app.main import app
 from app.modules.identity.service import AuthContext
 from app.modules.patients.models import Patient
+from app.modules.reporting.aggregation import summarize_appointment_status_rows
 from app.modules.reporting.schemas import DoctorTodayDetailItem, PatientSummaryBase
 from app.modules.reporting.service import ReportingService, _money
 
@@ -29,6 +30,28 @@ def _service() -> ReportingService:
 def test_reporting_money_is_fixed_precision() -> None:
     assert _money(Decimal("500")) == Decimal("500.00")
     assert _money(None) == Decimal("0.00")
+
+
+def test_appointment_report_aggregation_distinguishes_cancel_outcomes() -> None:
+    summary = summarize_appointment_status_rows(
+        [
+            ("BOOKED", None, 2),
+            ("CHECKED_IN", None, 3),
+            ("COMPLETED", None, 4),
+            ("CANCELLED", None, 5),
+            ("CANCELLED", "PATIENT_REQUEST", 6),
+            ("CANCELLED", "NO_SHOW", 7),
+            ("CANCELLED", "RESCHEDULED", 8),
+        ]
+    )
+
+    assert summary.total == 35
+    assert summary.booked == 2
+    assert summary.checked_in == 3
+    assert summary.completed == 4
+    assert summary.cancelled == 11
+    assert summary.no_show == 7
+    assert summary.rescheduled == 8
 
 
 def test_reporting_summaries_allow_missing_mobile() -> None:

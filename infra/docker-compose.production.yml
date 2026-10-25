@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
@@ -8,7 +8,7 @@ services:
     expose:
       - "5432"
     volumes:
-      - clinicflow_prod_pgdata:/var/lib/postgresql/data
+      - clinicflow_prod_pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -25,7 +25,8 @@ services:
       CLINICFLOW_ENVIRONMENT: production
       CLINICFLOW_ALLOWED_HOSTS: ${CLINICFLOW_ALLOWED_HOSTS:?Set CLINICFLOW_ALLOWED_HOSTS as a JSON array}
       CLINICFLOW_CORS_ORIGINS: ${CLINICFLOW_CORS_ORIGINS:-[]}
-      CLINICFLOW_TRUSTED_PROXY_IPS: ${CLINICFLOW_TRUSTED_PROXY_IPS:-[]}
+      CLINICFLOW_TRUSTED_PROXY_IPS: '${CLINICFLOW_TRUSTED_PROXY_IPS:-["172.30.0.10/32"]}'
+      CLINICFLOW_CLIENT_IP_SOURCE: socket
       CLINICFLOW_DB_POOL_SIZE: ${CLINICFLOW_DB_POOL_SIZE:-5}
       CLINICFLOW_DB_MAX_OVERFLOW: ${CLINICFLOW_DB_MAX_OVERFLOW:-5}
       CLINICFLOW_DB_POOL_TIMEOUT: ${CLINICFLOW_DB_POOL_TIMEOUT:-10}
@@ -42,6 +43,13 @@ services:
       CLINICFLOW_APP_VERSION: ${CLINICFLOW_APP_VERSION:-0.1.0}
       CLINICFLOW_BUILD_COMMIT: ${CLINICFLOW_BUILD_COMMIT:-unknown}
       CLINICFLOW_MINIMUM_MOBILE_VERSION: ${CLINICFLOW_MINIMUM_MOBILE_VERSION:-0.1.0}
+      CLINICFLOW_MINIMUM_MOBILE_VERSION_CODE: ${CLINICFLOW_MINIMUM_MOBILE_VERSION_CODE:-1}
+      CLINICFLOW_LATEST_MOBILE_VERSION: ${CLINICFLOW_LATEST_MOBILE_VERSION:-0.1.0}
+      CLINICFLOW_LATEST_MOBILE_VERSION_CODE: ${CLINICFLOW_LATEST_MOBILE_VERSION_CODE:-1}
+      CLINICFLOW_MOBILE_APK_URL: "${CLINICFLOW_MOBILE_APK_URL:-}"
+      CLINICFLOW_MOBILE_APK_SHA256: "${CLINICFLOW_MOBILE_APK_SHA256:-}"
+      CLINICFLOW_MOBILE_RELEASE_NOTES: "${CLINICFLOW_MOBILE_RELEASE_NOTES:-}"
+      CLINICFLOW_MOBILE_UPDATE_MANDATORY: "${CLINICFLOW_MOBILE_UPDATE_MANDATORY:-false}"
     expose:
       - "8000"
     depends_on:
@@ -85,8 +93,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - edge
-      - backend
+      edge:
+      backend:
+        ipv4_address: 172.30.0.10
 
 volumes:
   clinicflow_prod_pgdata:
@@ -97,3 +106,6 @@ networks:
   edge:
   backend:
     internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
