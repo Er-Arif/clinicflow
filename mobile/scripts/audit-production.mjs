@@ -1,14 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const mobileRoot = path.resolve(scriptDir, '..');
-const sourceRoots = [
-  path.join(mobileRoot, 'app'),
-  path.join(mobileRoot, 'src'),
-];
 
 const allowedAdvisories = {
   'node-forge': {
@@ -169,31 +164,4 @@ function advisoryIdsOf(vulnerability) {
 
 function normalizeAdvisoryId(value) {
   return value.toUpperCase();
-}
-
-function sourceImportsPackage(packageName) {
-  const importPattern = new RegExp(
-    String.raw`(?:from\s*['"]${escapeRegex(packageName)}['"]|require\(\s*['"]${escapeRegex(packageName)}['"]\s*\)|import\(\s*['"]${escapeRegex(packageName)}['"]\s*\))`,
-  );
-
-  for (const root of sourceRoots) {
-    if (!fs.existsSync(root)) continue;
-    for (const file of walk(root)) {
-      if (!/\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(file)) continue;
-      if (importPattern.test(fs.readFileSync(file, 'utf8'))) return true;
-    }
-  }
-  return false;
-}
-
-function* walk(root) {
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const fullPath = path.join(root, entry.name);
-    if (entry.isDirectory()) yield* walk(fullPath);
-    else if (entry.isFile()) yield fullPath;
-  }
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
