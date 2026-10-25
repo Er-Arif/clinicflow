@@ -17,7 +17,7 @@ Current implementation and validation evidence: [V1 production readiness](../rel
 - The image starts with `python -m scripts.serve`. It binds `0.0.0.0:$PORT`, disables raw Uvicorn access logs, and forces exactly **one worker**. Keep one service instance while authentication budgets are process-local.
 - Use Render PostgreSQL **18** and the private/internal database connection string. Set `CLINICFLOW_ENVIRONMENT=staging` or `production` as appropriate, a random access secret of at least 32 characters, and a non-placeholder PostgreSQL URL. Never expose PostgreSQL merely to make the API reachable.
 - Set `CLINICFLOW_ALLOWED_HOSTS` to an exact JSON array containing the Render service hostname and any verified custom API hostname used by health checks. Keep `CLINICFLOW_CORS_ORIGINS=[]` for the native-only client; if a browser client is introduced, list only exact HTTPS origins.
-- Set `CLINICFLOW_CLIENT_IP_SOURCE=render` and keep `CLINICFLOW_TRUSTED_PROXY_IPS=[]`. Render public traffic arrives through its edge/load balancers, and ClinicFlow reads the edge-provided `X-Forwarded-For` value for authentication throttling. Missing or malformed forwarded addresses fail closed to the shared `unknown` bucket. Do not use the legacy `railway` mode on Render.
+- Set `CLINICFLOW_CLIENT_IP_SOURCE=render` and keep `CLINICFLOW_TRUSTED_PROXY_IPS=[]`. Render public traffic reaches the service through Cloudflare; ClinicFlow therefore uses Cloudflare-overwritten `CF-Connecting-IP` for authentication throttling rather than trusting a caller-influenced forwarding chain. Missing or malformed client-IP headers fail closed to the shared `unknown` bucket. Do not use the legacy `railway` mode on Render.
 - Configure `/health/ready` as the Render HTTP health-check path. `/health/live` checks the process; readiness executes `SELECT 1` and returns a safe 503 on database failure. Readiness does not certify schema compatibility or domain data, so migrations and smoke checks remain separate release gates.
 - Prefer auto-deploy **After CI Checks Pass** for the protected release branch. A deploy is not considered successful merely because it was triggered; verify that the new deploy becomes live and then inspect health/logs.
 - For a paid Render web service, run `alembic upgrade head` as the pre-deploy command so a failed migration prevents traffic from switching to the new build. If pre-deploy commands are unavailable for the selected plan, run migrations as an explicit serialized release step before application rollout. Never run migrations independently in every worker startup.
@@ -51,6 +51,15 @@ Application logs are JSON with request IDs, route templates, status, and duratio
 - Environment knobs are `CLINICFLOW_DB_POOL_SIZE`, `CLINICFLOW_DB_MAX_OVERFLOW`, `CLINICFLOW_DB_POOL_TIMEOUT`, `CLINICFLOW_DB_POOL_RECYCLE`, and `CLINICFLOW_DB_CONNECT_TIMEOUT`.
 - Budget connections for migrations and backups in addition to the application pool.
 - Do not impose an aggressive global statement timeout on financial or scheduling transactions without query-specific validation.
+
+## Backup and restore baseline
+
+- Run `scripts/backup_postgres.sh` on a schedule appropriate to the clinic's recovery-point objective. The script writes a PostgreSQL custom-format dump atomically with owner-only permissions, verifies its SHA-256 sidecar, and retains 7 daily, 4 weekly, and 6 monthly copies in the configured backup root.
+- A `.sha256` sidecar detects accidental corruption or an incomplete/corrupted copy. Because the checksum is stored beside the dump and is not cryptographically authenticated with a separate secret, it is **not** evidence against an attacker who can modify both files. Keep production backup copies on access-controlled storage separate from the live database host, with independent credentials or permissions where practical.
+- Copy backups off-host before treating them as disaster-recovery coverage. Render-managed production should use the provider's supported backup/recovery capabilities plus an independently controlled export/backup policy appropriate to the deployment; self-hosted production should keep at least one protected copy outside the application server.
+- Run `scripts/verify_restore.sh <dump>` periodically and after backup/recovery changes. It verifies the sidecar, restores into a disposable database with `pg_restore --exit-on-error`, checks key schema/data markers, and drops the test database afterward. A backup that has never been restored is not considered verified recovery evidence.
+- Record the timestamp, source release/commit, database migration revision, backup path/location, and restore-verification result for release-critical backups. Never overwrite an existing dump or checksum in place.
+- Do not place backups inside the web-service container or another ephemeral filesystem. Protect backup media as patient data and restrict access accordingly.
 
 ## Host baseline for self-hosted production
 
