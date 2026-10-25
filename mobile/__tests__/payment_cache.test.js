@@ -196,7 +196,7 @@ test('receipt Done returns to the originating appointment when context is presen
   const runtime = mobileRuntime({
     'expo-router': {
       useLocalSearchParams: () => ({ paymentId: 'pay1', appointmentId: 'a1', visitId: 'visit1' }),
-      useRouter: () => ({ replace: value => { destination = value; }, push() {}, back() {} }),
+      useRouter: () => ({ replace() {}, push: value => { destination = value; }, back() {} }),
     },
     '@/api/api': {
       useClinicTimeQuery: () => ready({ timezone: 'Asia/Kolkata' }),
@@ -209,7 +209,7 @@ test('receipt Done returns to the originating appointment when context is presen
 
   assert.deepEqual(destination, {
     pathname: '/assistant/appointments/[appointmentId]',
-    params: { appointmentId: 'a1' },
+    params: { appointmentId: 'a1', returnToAppointments: '1' },
   });
 });
 
