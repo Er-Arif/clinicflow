@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     PrimaryKeyConstraint,
     SmallInteger,
@@ -62,6 +63,12 @@ class Patient(Base):
             "whatsapp_same_as_mobile = FALSE OR "
             "(mobile_e164 IS NOT NULL AND whatsapp_e164 = mobile_e164)",
             name="whatsapp_contact_consistency",
+        ),
+        Index(
+            "ix_patients_full_name_trgm",
+            "full_name",
+            postgresql_using="gin",
+            postgresql_ops={"full_name": "gin_trgm_ops"},
         ),
     )
 
