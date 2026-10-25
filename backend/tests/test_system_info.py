@@ -21,3 +21,10 @@ def test_system_info_reports_typed_mobile_update_contract() -> None:
     assert info.minimum_mobile_version == settings.minimum_mobile_version
     assert info.minimum_mobile_version_code == settings.minimum_mobile_version_code
     assert info.mobile_update_mandatory == settings.mobile_update_mandatory
+
+
+def test_public_system_info_does_not_expose_deployment_fingerprints() -> None:
+    payload = system_info().model_dump()
+
+    assert "build_commit" not in payload
+    assert "environment" not in payload
