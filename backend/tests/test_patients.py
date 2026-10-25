@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.errors import AppError
+from app.modules.patients.models import Patient
 from app.modules.patients.phone import normalize_indian_mobile, try_normalize_indian_mobile
 from app.modules.patients.schemas import PatientCreateRequest
 from app.modules.patients.service import (
@@ -105,6 +106,15 @@ def test_patient_number_search_accepts_short_and_legacy_input() -> None:
     assert _patient_code_search_candidate("pt-000023") == "0023"
     assert _patient_code_search_candidate("0") is None
     assert _patient_code_search_candidate("Rahman") is None
+
+
+def test_patient_name_search_has_trigram_index() -> None:
+    indexes = {index.name: index for index in Patient.__table__.indexes}
+    index = indexes["ix_patients_full_name_trgm"]
+
+    assert [column.name for column in index.columns] == ["full_name"]
+    assert index.dialect_options["postgresql"]["using"] == "gin"
+    assert index.dialect_options["postgresql"]["ops"] == {"full_name": "gin_trgm_ops"}
 
 
 def test_age_math() -> None:
