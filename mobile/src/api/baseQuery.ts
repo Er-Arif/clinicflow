@@ -59,14 +59,28 @@ async function performRefresh(): Promise<TokenPair | null> {
   } finally {
     clearTimeout(timeoutId);
   }
+
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
+      // Ignore an obsolete refresh response if the user signed out or another
+      // session replaced this refresh token while the request was in flight.
+      if ((await getRefreshToken()) !== refreshToken) return null;
       await clearSessionTokens();
       notifySessionExpired();
     }
     return null;
   }
-  const tokens = (await response.json()) as TokenPair;
+
+  let tokens: TokenPair;
+  try {
+    tokens = (await response.json()) as TokenPair;
+  } catch {
+    return null;
+  }
+
+  // A successful response can still be stale. Never resurrect credentials
+  // after local sign-out or overwrite a newer sign-in session.
+  if ((await getRefreshToken()) !== refreshToken) return null;
   await setSessionTokens(tokens);
   return tokens;
 }
