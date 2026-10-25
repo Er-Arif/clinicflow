@@ -23,9 +23,12 @@ const allowedAdvisories = {
   },
   zod: {
     advisory: normalizeAdvisoryId('GHSA-mrhx-c7xc-m3w5'),
-    reason: 'Expo CLI includes an affected nested Zod release; ClinicFlow does not import Zod at runtime.',
-    validate() {
-      return !sourceImportsPackage('zod');
+    reason: 'Expo CLI carries a nested affected Zod 3.x used only by build tooling; ClinicFlow runtime Zod remains patched.',
+    validate(vulnerability) {
+      if (vulnerability.isDirect) return false;
+      const nodes = vulnerability.nodes ?? [];
+      return nodes.length > 0
+        && nodes.every((node) => node === 'node_modules/expo/node_modules/zod');
     },
   },
 };
